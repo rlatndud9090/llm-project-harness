@@ -30,6 +30,10 @@ npm run test:run
 http://127.0.0.1:5173/
 ```
 
+## Repository
+
+- [rlatndud9090/poke-battle-quiz](https://github.com/rlatndud9090/poke-battle-quiz)
+
 ## Documentation
 
 - [Agent guide](AGENTS.md): 프로젝트별 에이전트 운영 규칙과 LLM Wiki 진입점

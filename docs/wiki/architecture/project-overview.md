@@ -39,7 +39,8 @@ Out of scope for the first prototype:
 ## Current Technical State
 
 The app is a Vite React TypeScript project with Vitest and ESLint configured.
-There is no git repository initialized in this folder yet.
+The project is published as a public GitHub repository:
+`https://github.com/rlatndud9090/poke-battle-quiz`.
 
 Useful commands:
 

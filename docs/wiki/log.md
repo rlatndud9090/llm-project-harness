@@ -16,3 +16,5 @@
   from OMX runtime state.
 - Captured the public GitHub publication request and added
   `environment/github-publication`.
+- Captured completed publication facts for
+  `https://github.com/rlatndud9090/poke-battle-quiz`.

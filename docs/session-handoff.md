@@ -91,7 +91,18 @@ Verification already performed:
 - `npm run test:run` passed with no tests yet
 - `curl -I http://127.0.0.1:5173/` returned `200 OK`
 
-There is no Git repository initialized yet in this project.
+GitHub repository:
+
+```txt
+https://github.com/rlatndud9090/poke-battle-quiz
+```
+
+Current git state:
+
+- Local repo initialized on `main`.
+- `origin` points to `git@github.com:rlatndud9090/poke-battle-quiz.git`.
+- GitHub visibility is `PUBLIC`.
+- Local git author is configured as `rlatndud9090` with GitHub noreply email.
 
 ## Files Changed From Vite Template
 

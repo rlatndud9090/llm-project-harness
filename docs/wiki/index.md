@@ -18,6 +18,7 @@ remain under `docs/raw/`; this wiki compiles them into durable project context.
 
 - `docs/raw/2026-06-09-session-bootstrap.md` - initial setup handoff, battle hint engine discussion, and wiki adoption request
 - `docs/raw/2026-06-09-github-publication.md` - public GitHub repository publication request and environment facts
+- `docs/raw/2026-06-09-github-publication-complete.md` - completed public repository publication facts
 
 ## Existing Non-Wiki Docs
 
@@ -36,7 +37,7 @@ remain under `docs/raw/`; this wiki compiles them into durable project context.
 - Use PokeRogue only as architecture inspiration because its AGPL license makes
   direct code copying inappropriate unless that tradeoff is explicitly accepted.
 - Maintain project memory through this LLM Wiki, with `AGENTS.md` as the schema.
-- Publish the project as public `rlatndud9090/poke-battle-quiz`.
+- Published the project as public `rlatndud9090/poke-battle-quiz`.
 
 ## Page Categories
 
