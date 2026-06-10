@@ -19,11 +19,6 @@ Last updated: 2026-06-10 Asia/Seoul
 
 ## Raw Units
 
-### Product & Architecture
-
-- **Product foundation** — [PRD](../raw/feature/2026-06-09-product-foundation/prd.md) · [ADR](../raw/feature/2026-06-09-product-foundation/adr.md)
-- **Quiz hint engine foundation** — [PRD](../raw/feature/2026-06-09-quiz-hint-engine/prd.md) · [ADR](../raw/feature/2026-06-09-quiz-hint-engine/adr.md)
-
 ### Project Operations
 
 - **Repository bootstrap** — [Notes](../raw/chore/2026-06-09-repository-bootstrap/notes.md)
@@ -33,6 +28,7 @@ Last updated: 2026-06-10 Asia/Seoul
 - **Cross-Agent Harness** — [PRD](../raw/chore/cross-agent-harness/prd.md) · [ADR](../raw/chore/cross-agent-harness/adr.md)
 - **Intake helper harness** — [Notes](../raw/chore/intake-helper-harness/notes.md)
 - **하네스 강도와 한국어 원칙 보강** — [Notes](../raw/chore/harness-parity-language/notes.md)
+- **레거시 feature raw 제거** — [Notes](../raw/chore/remove-legacy-feature-raw/notes.md)
 
 ## Maintenance
 
