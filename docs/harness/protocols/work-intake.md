@@ -32,6 +32,7 @@
 | `non-scope` | 이 작업에서 제외할 것 |
 | `risk` | 가장 큰 불확실성 또는 결합 |
 | `verification` | 완료를 증명할 검증 |
+| `PRD/ADR` | PRD/ADR 필요 여부와 이유 |
 
 ## 우선순위 기준
 
@@ -45,9 +46,9 @@
 
 ## 실패 모드
 
-- **나쁨:** "플랫폼 만들기"처럼 너무 큰 후보를 하나만 제안한다.
-- **좋음:** `feature/quiz-platform-shell`, `feature/ability-trigger-system`,
-  `feature/curated-pokemon-dataset`처럼 독립 단위로 쪼갠다.
+- **나쁨:** "포켓몬 퀴즈 만들기"처럼 너무 큰 후보를 하나만 제안한다.
+- **좋음:** `feature/quiz-data-contract`, `feature/ability-trigger-system`,
+  `feature/daily-battle-loop`처럼 독립 단위로 쪼갠다.
 
 - **나쁨:** 구현 세부만 보고 제품 의도를 놓친다.
 - **좋음:** 사용자 경험, raw artifact, 검증 가능성을 함께 본다.
@@ -69,6 +70,7 @@
 - non-scope:
 - risk:
 - verification:
+- PRD/ADR:
 
 ## 1순위 추천
 <추천 이유>

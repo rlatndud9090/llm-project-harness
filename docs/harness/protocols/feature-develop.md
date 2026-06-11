@@ -2,7 +2,7 @@
 
 PRD/ADR 기반으로 기능을 설계, 구현, 검증, 커밋까지 진행하는 공용
 오케스트레이션 절차다. `html-editor-fe`의 강도는 유지하되, 이 프로젝트의
-도메인인 포켓몬 퀴즈 플랫폼과 deterministic hint engine에 맞춘다.
+도메인인 1일 1회 배틀형 포켓몬 추리 퀴즈와 deterministic hint engine에 맞춘다.
 
 ## 입력과 출력
 
@@ -21,7 +21,7 @@ proposed라면 구현 전에 결정 내용을 채우고 accepted로 바꾸거나
 | --- | --- |
 | `architect` | PRD 분석, ADR 작성, 구현 계획, 인터페이스 경계 정의 |
 | `domain-engineer` | `src/domain`의 순수 상태/명령/힌트/특성 트리거 구현 |
-| `ui-engineer` | React 화면, 모드 shell, 로그, 입력, 반응형 UI 구현 |
+| `ui-engineer` | React 화면, command panel, battle log, guess input, 결과 공유 UI 구현 |
 | `test-engineer` | 도메인/통합/UI 검증 전략과 테스트 구현 |
 | `integrator` | raw/wiki 검증, gate 실행, 커밋 프로토콜 |
 
@@ -75,7 +75,7 @@ domain 작업:
 UI 작업:
 
 - UI는 domain state를 렌더링한다.
-- shell, navigation, mode metadata는 quiz-specific domain logic과 분리한다.
+- command panel, battle log, guess input은 quiz-specific domain logic과 분리한다.
 - 모바일/데스크톱에서 텍스트와 컨트롤이 겹치지 않아야 한다.
 
 ## Phase 3: 테스트
@@ -101,10 +101,10 @@ npm run harness:gate
 ## 실패 모드
 
 - **나쁨:** ADR placeholder를 둔 채 구현한다.
-- **좋음:** route/state, mode registry, engine boundary 같은 결정을 ADR에 남긴 뒤 구현한다.
+- **좋음:** data contract, action/turn model, engine boundary 같은 결정을 ADR에 남긴 뒤 구현한다.
 
-- **나쁨:** UI가 battle mode 전용 구조를 전역 shell에 박아 넣는다.
-- **좋음:** mode registry와 mode entry surface를 분리한다.
+- **나쁨:** UI가 타입 상성이나 특성 판정을 컴포넌트 안에서 직접 계산한다.
+- **좋음:** UI는 domain result를 렌더링하고 판정은 domain에 둔다.
 
 - **나쁨:** 특성 트리거를 reducer 조건문으로 계속 추가한다.
 - **좋음:** AbilityDefinition과 trigger/effect로 확장한다.

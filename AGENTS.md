@@ -87,9 +87,12 @@ Use `harness:start` when beginning a new feature, bugfix, or chore. On a valid
 work branch it can infer the type and slug. On `main`, pass `--type` and
 `--slug` explicitly.
 
-Before commit, run `npm run harness:gate` unless the change is so small that a
-clearly justified subset is enough. The gate runs artifact checks, lint, build,
-and tests.
+Before commit, follow `docs/harness/protocols/commit-protocol.md`. Run
+`npm run harness:gate` unless the change is so small that a clearly justified
+subset is enough. The gate runs artifact checks, lint, build, and tests.
+Commit bodies must include a `관련 문서:` block with PRD/ADR links for product,
+architecture, implementation, data, or harness policy changes. Use notes-only
+links only for small maintenance work without a durable decision.
 
 When the user asks an open-ended next-work question such as "이제 뭐하지?", follow
 `docs/harness/protocols/work-intake.md` before creating a branch or raw unit.

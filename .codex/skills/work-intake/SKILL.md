@@ -13,4 +13,5 @@ description: "사용자가 다음 작업을 묻거나 넓은 아이디어를 bra
 4. 후보 선택 후 `docs/harness/protocols/prd-drafting.md`
 5. `docs/harness/roles/prd-writer.md`
 
-사용자 승인 전에는 raw unit을 생성하지 않는다.
+사용자 승인 전에는 raw unit을 생성하지 않는다. 후보는 branch name, raw path,
+scope, non-scope, 검증 방법, PRD/ADR 필요성을 포함해야 한다.

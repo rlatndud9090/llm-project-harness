@@ -20,6 +20,8 @@ npm run harness:check
 - feature raw unit에는 `prd.md`와 `adr.md`가 있다.
 - frontmatter 문서에는 `title`, `date`, `status`, `unit_type`이 있다.
 - public docs에는 금지된 출처/세션/로컬 설정 정보가 없다.
+- 공용 harness role은 Codex/ClaudeCode agent adapter를 가진다.
+- 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
 
 ## 수동 검토 항목
 
@@ -31,6 +33,9 @@ npm run harness:check
 - raw unit 이름이 브랜치 핵심 내용을 설명하는가?
 - wiki가 합성 문서처럼 길어지지 않았는가?
 - 새 의존성을 추가했다면 사용자가 동의했는가?
+- 제품/구조/하네스 정책 변경인데 notes-only 예외를 사용하지 않았는가?
+- 커밋할 작업에 PRD/ADR이 필요하다면 raw unit에 두 문서가 있는가?
+- 커밋 본문에 넣을 `관련 문서:` 블록 경로가 실제 파일을 가리키는가?
 
 ## ADR 불변성
 
@@ -52,3 +57,7 @@ accepted ADR은 과거 결정의 근거다. 내용을 고쳐 쓰지 않는다.
 
 검사가 실패하면 다음 단계로 진행하지 않는다. 실패 항목을 수정한 뒤
 `harness:check`를 다시 실행한다.
+
+자동 검사가 통과해도 수동 검토 항목이 실패하면 integration gate를 통과한 것으로
+보지 않는다. 특히 PRD/ADR이 필요한 변경을 notes-only로 처리한 경우에는 raw unit을
+보강한 뒤 wiki ingest를 다시 실행한다.

@@ -1,6 +1,6 @@
 ---
 name: artifact-validation
-description: "PRD/ADR/notes, raw/wiki 링크, branch/raw 매핑을 검증할 때 사용한다. '아티팩트 검증', 'PRD 검증', 'ADR 검증', 'frontmatter', 'wiki 링크 확인' 요청에 대응한다."
+description: "PRD/ADR/notes, raw/wiki 링크, branch/raw 매핑, 도구별 어댑터 정합성을 검증할 때 사용한다."
 ---
 
 # Artifact Validation 어댑터
@@ -15,5 +15,6 @@ description: "PRD/ADR/notes, raw/wiki 링크, branch/raw 매핑을 검증할 때
 4. 실패하면 출력의 파일/규칙을 기준으로 수정한다.
 5. PRD/ADR/notes가 한국어로 작성되었는지 수동 확인한다.
 
-자동 검증만으로 충분하다고 주장하지 않는다. placeholder ADR, 검증 불가능한
-수용 기준, 영어로 작성된 프로젝트 문서가 있으면 보정한다.
+자동 검증만으로 충분하다고 주장하지 않는다. placeholder ADR, 검증 불가능한 수용
+기준, 영어로 작성된 프로젝트 문서, PRD/ADR이 필요한 notes-only 작업이 있으면
+보정한다.
