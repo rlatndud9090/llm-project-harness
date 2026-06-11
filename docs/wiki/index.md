@@ -29,6 +29,7 @@ Last updated: 2026-06-10 Asia/Seoul
 - **Intake helper harness** — [Notes](../raw/chore/intake-helper-harness/notes.md)
 - **하네스 강도와 한국어 원칙 보강** — [Notes](../raw/chore/harness-parity-language/notes.md)
 - **레거시 feature raw 제거** — [Notes](../raw/chore/remove-legacy-feature-raw/notes.md)
+- **PRD ADR 템플릿 정합화** — [Notes](../raw/chore/align-prd-adr-templates/notes.md)
 
 ## Maintenance
 
