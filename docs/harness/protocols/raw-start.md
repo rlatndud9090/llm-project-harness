@@ -1,7 +1,8 @@
 # Raw 시작 프로토콜
 
 작업 단위가 확정된 뒤 raw source를 생성할 때 사용한다. 작업 단위가 아직
-정해지지 않았다면 먼저 `work-intake.md`와 `prd-drafting.md`를 사용한다.
+정해지지 않았다면 먼저 `$do-next`와 `do-next.md`를 사용한다. `work-intake.md`와
+`prd-drafting.md`는 `$do-next` 내부 호환 단계다.
 
 ## 목적
 

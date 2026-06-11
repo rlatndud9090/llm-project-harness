@@ -99,9 +99,15 @@ include `approval: "user:YYYY-MM-DD:<reason>"` frontmatter. Legacy approved or
 accepted raw artifacts may use `approval: "legacy-before-approval-gate"` only if
 the artifact-check allowlist permits it.
 
-When the user asks an open-ended next-work question such as "이제 뭐하지?", follow
-`docs/harness/protocols/work-intake.md` before creating a branch or raw unit.
-After a candidate is accepted, use `docs/harness/protocols/prd-drafting.md`.
+When the user asks an open-ended next-work question such as "이제 뭐하지?", use
+`$do-next` and follow `docs/harness/protocols/do-next.md`. `work-intake` and
+`prd-drafting` remain compatibility/internal steps, but new work should converge
+through `$do-next` before creating a branch or raw unit.
+
+After PRD/ADR approval, implementation is a separate request. Use `$ralplan`
+first for structural, data, engine, harness, dependency, or multi-module
+changes. Use `$ralph` as the default execution lane for approved branch-sized
+implementation, with solo execution reserved for small local edits.
 
 ## Raw Unit Templates
 

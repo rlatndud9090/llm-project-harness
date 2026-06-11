@@ -228,6 +228,11 @@ function assertHarnessAdapters() {
 
   const requiredSurfaces = [
     {
+      name: "do next",
+      codex: [repoPath(".codex", "skills", "do-next", "SKILL.md")],
+      claude: [repoPath(".claude", "skills", "do-next", "SKILL.md")],
+    },
+    {
       name: "artifact validation",
       codex: [repoPath(".codex", "skills", "artifact-check", "SKILL.md")],
       claude: [
@@ -275,6 +280,30 @@ function assertHarnessAdapters() {
   for (const surface of requiredSurfaces) {
     if (!surface.codex.some(pathExists)) addError(`missing Codex adapter for harness surface: ${surface.name}`);
     if (!surface.claude.some(pathExists)) addError(`missing ClaudeCode adapter for harness surface: ${surface.name}`);
+  }
+
+  assertDoNextCompatibilityAdapters();
+}
+
+function assertDoNextCompatibilityAdapters() {
+  const compatibilityAdapters = [
+    repoPath(".codex", "skills", "work-intake", "SKILL.md"),
+    repoPath(".claude", "skills", "work-intake", "SKILL.md"),
+    repoPath(".codex", "skills", "prd-drafting", "SKILL.md"),
+    repoPath(".claude", "skills", "prd-drafting", "SKILL.md"),
+  ];
+
+  for (const adapterPath of compatibilityAdapters) {
+    const relative = toPosix(path.relative(process.cwd(), adapterPath));
+    if (!pathExists(adapterPath)) {
+      addError(`missing do-next compatibility adapter: ${relative}`);
+      continue;
+    }
+
+    const content = readText(adapterPath);
+    if (!content.includes("$do-next")) {
+      addError(`compatibility adapter must route new work through $do-next: ${relative}`);
+    }
   }
 }
 

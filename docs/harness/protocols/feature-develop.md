@@ -1,6 +1,6 @@
 # 기능 개발 프로토콜
 
-PRD/ADR 기반으로 기능을 설계, 구현, 검증, 커밋까지 진행하는 공용
+승인된 PRD/ADR 기반으로 기능을 설계, 구현, 검증, 커밋까지 진행하는 공용
 오케스트레이션 절차다. `html-editor-fe`의 강도는 유지하되, 이 프로젝트의
 도메인인 1일 1회 배틀형 포켓몬 추리 퀴즈와 deterministic hint engine에 맞춘다.
 
@@ -13,7 +13,7 @@ PRD/ADR 기반으로 기능을 설계, 구현, 검증, 커밋까지 진행하는
 
 feature raw unit은 `prd.md`, `adr.md`, `notes.md`를 가진다. 에이전트는 PRD/ADR
 초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를 `approved`, ADR을 `accepted`로
-바꾸지 않는다.
+바꾸지 않는다. 구현은 승인된 PRD/ADR을 기준으로만 시작한다.
 
 ## 역할
 
@@ -29,8 +29,9 @@ feature raw unit은 `prd.md`, `adr.md`, `notes.md`를 가진다. 에이전트는
 
 1. 현재 branch와 raw path를 확인한다.
 2. `docs/raw/feature/<slug>/prd.md`와 `adr.md`를 읽는다.
-3. 사용자 요청이 신규 구현, 재작업, 부분 수정, PRD 보강 중 무엇인지 분류한다.
-4. 분류 결과를 한 줄로 보고한다.
+3. PRD `approved`, ADR `accepted`, `approval:` 근거를 확인한다.
+4. 사용자 요청이 신규 구현, 재작업, 부분 수정, PRD 보강 중 무엇인지 분류한다.
+5. `$ralplan` 필요 여부와 `$ralph` 실행 여부를 한 줄로 보고한다.
 
 | 조건 | 실행 모드 | 동작 |
 | --- | --- | --- |
@@ -38,6 +39,18 @@ feature raw unit은 `prd.md`, `adr.md`, `notes.md`를 가진다. 에이전트는
 | 구현이 일부 있음 + 같은 PRD | 개선 실행 | 변경 범위만 재계획 |
 | 특정 모듈만 수정 | 부분 실행 | 해당 role 중심으로 진행 |
 | ADR 결정이 바뀜 | 새 결정 | 기존 ADR superseded 또는 새 ADR 작성 |
+
+## Phase 0.5: 실행 레일 선택
+
+| 조건 | 레일 |
+| --- | --- |
+| 구조, 데이터, engine, harness, dependency, 다중 모듈 변경 | `$ralplan` 필수 |
+| 승인된 branch-sized 구현 | `$ralph` 기본 |
+| 오타, 링크, 한 파일의 작은 문서 수정 | solo execute 허용 |
+
+`$ralplan`은 계획/합의 게이트이므로 직접 구현하지 않는다. `$ralph`는 승인된
+PRD/ADR 또는 `$ralplan` 산출물을 기준으로 구현과 검증을 완료하는 기본 실행
+레일이다.
 
 ## Phase 1: 설계
 
@@ -63,6 +76,8 @@ feature raw unit은 `prd.md`, `adr.md`, `notes.md`를 가진다. 에이전트는
 - 사용자가 명시 승인하지 않은 ADR은 `proposed`로 유지한다.
 - PRD `approved` 또는 ADR `accepted`로 전환하려면 `approval: "user:YYYY-MM-DD:<근거>"`
   frontmatter가 필요하다.
+- 승인 상태가 아닌 PRD/ADR 기반으로 구현하지 않는다. 먼저 `$do-next` 또는
+  PRD/ADR 승인 라운드로 되돌린다.
 - 사용자의 제품 판단이 필요한 질문은 숨기지 않고 보고한다.
 
 ## Phase 2: 구현

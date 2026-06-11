@@ -29,6 +29,7 @@ Last updated: 2026-06-11 Asia/Seoul
 - **PRD ADR 템플릿 정합화** — [Notes](../raw/chore/align-prd-adr-templates/notes.md)
 - **하네스 스킬과 에이전트 정의 보강** — [PRD](../raw/chore/harness-agent-protocol-strengthening/prd.md) · [ADR](../raw/chore/harness-agent-protocol-strengthening/adr.md) · [Notes](../raw/chore/harness-agent-protocol-strengthening/notes.md)
 - **ADR 승인 게이트** — [PRD](../raw/chore/adr-acceptance-gate/prd.md) · [ADR](../raw/chore/adr-acceptance-gate/adr.md) · [Notes](../raw/chore/adr-acceptance-gate/notes.md)
+- **Do Next 하네스 강화** — [PRD](../raw/chore/do-next-harness/prd.md) · [ADR](../raw/chore/do-next-harness/adr.md) · [Notes](../raw/chore/do-next-harness/notes.md)
 
 ## Maintenance
 

@@ -1,8 +1,8 @@
 # PRD 작성 프로토콜
 
-작업 인테이크에서 후보가 선택된 뒤 사용한다. PRD는 구현 지시서가 아니라
-"왜 이 작업을 하는가, 무엇이 완료인가, 무엇은 하지 않는가"를 보존하는
-제품 아티팩트다.
+`$do-next`에서 후보가 선택된 뒤 사용하는 호환/내부 프로토콜이다. PRD는 구현
+지시서가 아니라 "왜 이 작업을 하는가, 무엇이 완료인가, 무엇은 하지 않는가"를
+보존하는 제품 아티팩트다.
 
 ## 언어
 
@@ -69,7 +69,8 @@ PRD 초안은 아래 질문에 답할 수 있어야 한다.
 
 ## Handoff
 
-사용자가 PRD 방향을 승인하면:
+새 작업에서는 `$do-next`가 아래 흐름을 오케스트레이션한다. 사용자가 PRD 방향과
+필요한 ADR을 명시 승인하면:
 
 ```sh
 npm run harness:start -- --type <type> --slug <slug> --title "<한국어 제목>"
@@ -81,3 +82,6 @@ npm run harness:start -- --type <type> --slug <slug> --title "<한국어 제목>
 npm run harness:ingest -- docs/raw/<type>/<slug>
 npm run harness:check
 ```
+
+이 단계가 끝나도 구현은 시작하지 않는다. 구현 요청은 승인된 PRD/ADR을 기준으로
+`feature-develop.md`로 넘어간다.

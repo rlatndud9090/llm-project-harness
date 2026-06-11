@@ -19,6 +19,9 @@ ClaudeCode는 독자 규칙을 만들지 않고 공용 하네스를 따른다.
 
 - ADR placeholder 상태에서 구현하지 않는다.
 - 사용자 승인 전 PRD를 `approved`, ADR을 `accepted`로 바꾸지 않는다.
+- 승인된 PRD/ADR 없이 구현하지 않는다. 먼저 `$do-next` 또는 승인 라운드로 되돌린다.
+- 구조, 데이터, engine, harness, dependency, 다중 모듈 변경은 `$ralplan`을 먼저 사용한다.
+- 승인된 branch-sized 구현은 `$ralph`를 기본 실행 레일로 사용한다.
 - domain/UI/test 경계를 분리한다.
 - 완료 전 `npm run harness:gate`를 실행한다.
 - 커밋이 필요하면 `commit-protocol`을 사용한다.
