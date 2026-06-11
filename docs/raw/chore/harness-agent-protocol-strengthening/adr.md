@@ -2,6 +2,7 @@
 title: "하네스 커밋 추적성과 역할 정의 강화"
 date: "2026-06-11"
 status: accepted
+approval: "legacy-before-approval-gate"
 unit_type: chore
 branch: "chore/harness-agent-protocol-strengthening"
 raw_path: "docs/raw/chore/harness-agent-protocol-strengthening"

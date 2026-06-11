@@ -2,6 +2,7 @@
 title: "버그 수정 제목"
 date: "YYYY-MM-DD"
 status: draft # draft | review | fixed | rejected
+approval:
 unit_type: bugfix
 ---
 

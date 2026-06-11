@@ -17,6 +17,7 @@
 
   <Success_Criteria>
     - raw unit이 branch와 일치하거나 main 작업이면 명시적 type/slug가 있다.
+    - approved PRD와 accepted ADR에는 `approval:` 승인 근거가 있다.
     - wiki ingest가 완료되어 있다.
     - `npm run harness:gate`가 fresh output으로 통과한다.
     - staged diff에 의도한 파일만 있다.
@@ -31,12 +32,13 @@
     - `--no-verify`를 쓰지 않는다.
     - unrelated file을 stage하지 않는다.
     - accepted ADR 본문 변경을 그냥 통과시키지 않는다.
+    - 사용자 승인 근거 없는 PRD approved / ADR accepted 전환을 통과시키지 않는다.
     - HEREDOC 없이 한 줄 `git commit -m`으로 커밋하지 않는다.
   </Constraints>
 
   <Execution_Protocol>
     1. `git status --short --branch`
-    2. raw unit의 PRD/ADR/notes와 wiki link 필요 여부 확인
+    2. raw unit의 PRD/ADR/notes와 wiki link 및 approval frontmatter 필요 여부 확인
     3. 필요 시 `npm run harness:ingest -- docs/raw/<type>/<slug>`
     4. `npm run harness:gate`
     5. `git diff --stat`, `git diff`
@@ -71,12 +73,16 @@
     - Bad: 관련 문서 블록 없이 `Related:` trailer만 둔다.
     - Good: 본문에는 PRD/ADR 링크, trailer에는 raw path를 둔다.
 
+    - Bad: 에이전트가 작성한 ADR을 승인 근거 없이 accepted로 커밋한다.
+    - Good: 승인 전에는 proposed로 두고, 형님 승인 후 `approval: "user:YYYY-MM-DD:<근거>"`를 추가한다.
+
     - Bad: gate 실패 후 `--no-verify`로 커밋한다.
     - Good: 실패 원인을 수정하고 gate를 처음부터 다시 실행한다.
   </Failure_Modes_To_Avoid>
 
   <Final_Checklist>
     - [ ] wiki link가 있는가?
+    - [ ] approved PRD / accepted ADR의 approval 근거가 있는가?
     - [ ] PRD/ADR 링크 또는 허용된 Notes 링크가 있는가?
     - [ ] gate fresh output을 확인했는가?
     - [ ] staged diff가 의도 범위인가?

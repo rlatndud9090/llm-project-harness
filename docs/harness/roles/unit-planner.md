@@ -30,6 +30,7 @@
     - 구현과 문서/하네스 변경이 섞이면 가능하면 분리한다.
     - 그래도 같은 브랜치에 있어야 한다면 notes에 이유를 남긴다.
     - notes-only는 작은 유지보수 예외다. durable decision이 있으면 PRD/ADR을 둔다.
+    - PRD approved / ADR accepted는 사용자 승인 근거가 필요하다.
   </Rules>
 
   <Output_Format>

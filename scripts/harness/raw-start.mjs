@@ -39,6 +39,11 @@ const branchName = `${type}/${slug}`;
 const rawPath = `docs/raw/${type}/${slug}`;
 
 const replacements = [
+  [/\{제목\}/g, title],
+  [/\{YYYY-MM-DD\}/g, date],
+  [/\{slug\}/g, slug],
+  [/\{branch\}/g, branchName],
+  [/\{raw_path\}/g, rawPath],
   [/Feature title/g, title],
   [/Decision title/g, title],
   [/Bugfix title/g, title],
@@ -50,11 +55,6 @@ const replacements = [
   [/정리 작업 제목/g, title],
   [/작업 단위 제목/g, title],
   [/YYYY-MM-DD/g, date],
-  [/\{제목\}/g, title],
-  [/\{YYYY-MM-DD\}/g, date],
-  [/\{slug\}/g, slug],
-  [/\{branch\}/g, branchName],
-  [/\{raw_path\}/g, rawPath],
   [/unit_type: feature/g, `unit_type: ${type}`],
   [/Unit type: feature \| bugfix \| chore/g, `Unit type: ${type}`],
 ];

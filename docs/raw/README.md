@@ -54,6 +54,23 @@ chore/cross-agent-harness    -> docs/raw/chore/cross-agent-harness/
 8. 커밋 본문에는 `관련 문서:` 블록으로 PRD/ADR 링크를 넣는다.
 9. 커밋 trailer에는 `Related: docs/raw/<type>/<slug>/`를 넣는다.
 
+## 승인 상태
+
+에이전트는 PRD/ADR 초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를
+`approved`, ADR을 `accepted`로 바꾸지 않는다.
+
+승인된 PRD/ADR에는 frontmatter 승인 근거가 필요하다.
+
+```yaml
+approval: "user:YYYY-MM-DD:<짧은 승인 근거>"
+```
+
+게이트 도입 전 legacy raw만 아래 marker를 사용할 수 있다.
+
+```yaml
+approval: "legacy-before-approval-gate"
+```
+
 ## Notes-Only 예외
 
 bugfix/chore는 작은 유지보수 작업이라면 notes-only raw unit을 사용할 수 있다.

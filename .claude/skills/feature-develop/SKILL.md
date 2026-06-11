@@ -18,6 +18,7 @@ ClaudeCode는 독자 규칙을 만들지 않고 공용 하네스를 따른다.
 ## 실행 원칙
 
 - ADR placeholder 상태에서 구현하지 않는다.
+- 사용자 승인 전 PRD를 `approved`, ADR을 `accepted`로 바꾸지 않는다.
 - domain/UI/test 경계를 분리한다.
 - 완료 전 `npm run harness:gate`를 실행한다.
 - 커밋이 필요하면 `commit-protocol`을 사용한다.

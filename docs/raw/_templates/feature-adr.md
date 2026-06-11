@@ -2,6 +2,7 @@
 title: "{제목}"
 date: "{YYYY-MM-DD}"
 status: proposed # proposed | accepted | deprecated | superseded
+approval:
 related_prd: "./prd.md"
 unit_type: feature
 branch: "feature/{slug}"

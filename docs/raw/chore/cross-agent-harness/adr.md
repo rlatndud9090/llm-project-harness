@@ -2,6 +2,7 @@
 title: "Use a shared harness core with tool adapters"
 date: "2026-06-10"
 status: accepted
+approval: "legacy-before-approval-gate"
 related_prd: "./prd.md"
 unit_type: chore
 supersedes:

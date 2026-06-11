@@ -19,6 +19,7 @@ npm run harness:check
 - work branch와 raw path가 일치한다.
 - feature raw unit에는 `prd.md`와 `adr.md`가 있다.
 - frontmatter 문서에는 `title`, `date`, `status`, `unit_type`이 있다.
+- `approved` PRD와 `accepted` ADR에는 `approval:` 승인 근거가 있다.
 - public docs에는 금지된 출처/세션/로컬 설정 정보가 없다.
 - 공용 harness role은 Codex/ClaudeCode agent adapter를 가진다.
 - 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
@@ -36,14 +37,24 @@ npm run harness:check
 - 제품/구조/하네스 정책 변경인데 notes-only 예외를 사용하지 않았는가?
 - 커밋할 작업에 PRD/ADR이 필요하다면 raw unit에 두 문서가 있는가?
 - 커밋 본문에 넣을 `관련 문서:` 블록 경로가 실제 파일을 가리키는가?
+- PRD `approved`나 ADR `accepted` 전환이 사용자 승인 없이 이루어지지 않았는가?
 
 ## ADR 불변성
 
 accepted ADR은 과거 결정의 근거다. 내용을 고쳐 쓰지 않는다.
 
+ADR은 에이전트가 단독으로 `accepted` 처리하지 않는다. 사용자의 명시 승인이 있을
+때만 아래 frontmatter를 추가하고 status를 전환한다.
+
+```yaml
+status: accepted
+approval: "user:YYYY-MM-DD:<짧은 승인 근거>"
+```
+
 허용:
 
 - `status` 변경
+- `approval` 근거 추가
 - superseding ADR 추가
 - notes에 후속 맥락 추가
 

@@ -2,6 +2,7 @@
 title: "하네스 스킬과 에이전트 정의 보강"
 date: "2026-06-11"
 status: approved
+approval: "legacy-before-approval-gate"
 unit_type: chore
 branch: "chore/harness-agent-protocol-strengthening"
 raw_path: "docs/raw/chore/harness-agent-protocol-strengthening"

@@ -2,6 +2,7 @@
 title: "LLM Wiki harness baseline"
 date: "2026-06-10"
 status: approved
+approval: "legacy-before-approval-gate"
 unit_type: chore
 ---
 

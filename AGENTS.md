@@ -93,6 +93,11 @@ subset is enough. The gate runs artifact checks, lint, build, and tests.
 Commit bodies must include a `관련 문서:` block with PRD/ADR links for product,
 architecture, implementation, data, or harness policy changes. Use notes-only
 links only for small maintenance work without a durable decision.
+Agents may draft PRDs and ADRs, but must not mark PRDs as `approved` or ADRs as
+`accepted` without explicit user approval. Approved PRDs and accepted ADRs must
+include `approval: "user:YYYY-MM-DD:<reason>"` frontmatter. Legacy approved or
+accepted raw artifacts may use `approval: "legacy-before-approval-gate"` only if
+the artifact-check allowlist permits it.
 
 When the user asks an open-ended next-work question such as "이제 뭐하지?", follow
 `docs/harness/protocols/work-intake.md` before creating a branch or raw unit.

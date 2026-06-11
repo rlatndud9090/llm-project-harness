@@ -14,6 +14,15 @@ import {
 } from "./lib.mjs";
 
 const errors = [];
+const LEGACY_APPROVAL = "legacy-before-approval-gate";
+const LEGACY_APPROVAL_PATHS = new Set([
+  "docs/raw/chore/2026-06-10-llm-wiki-harness-baseline/prd.md",
+  "docs/raw/chore/2026-06-10-llm-wiki-harness-baseline/adr.md",
+  "docs/raw/chore/cross-agent-harness/prd.md",
+  "docs/raw/chore/cross-agent-harness/adr.md",
+  "docs/raw/chore/harness-agent-protocol-strengthening/prd.md",
+  "docs/raw/chore/harness-agent-protocol-strengthening/adr.md",
+]);
 
 function addError(message) {
   errors.push(message);
@@ -112,6 +121,12 @@ function assertCurrentBranchRawUnit() {
 function assertFrontmatter() {
   const files = listMarkdownFiles(repoPath("docs", "raw")).filter((filePath) => !filePath.includes(`${path.sep}_templates${path.sep}`));
   const required = ["title", "date", "status", "unit_type"];
+  const allowedStatuses = {
+    "prd.md": new Set(["draft", "review", "approved", "rejected"]),
+    "adr.md": new Set(["proposed", "accepted", "deprecated", "superseded"]),
+    "bugfix.md": new Set(["draft", "review", "fixed", "rejected"]),
+    "chore.md": new Set(["draft", "done", "rejected"]),
+  };
 
   for (const filePath of files) {
     const baseName = path.basename(filePath);
@@ -132,10 +147,40 @@ function assertFrontmatter() {
       addError(`frontmatter date must be YYYY-MM-DD: ${relative}`);
     }
 
+    if (fields.status && !allowedStatuses[baseName].has(fields.status)) {
+      addError(`frontmatter status is invalid for ${baseName}: ${relative}`);
+    }
+
     const expectedType = relative.split("/")[2];
     if (fields.unit_type && fields.unit_type !== expectedType) {
       addError(`frontmatter unit_type must be ${expectedType}: ${relative}`);
     }
+
+    if (baseName === "prd.md" && fields.status === "approved") {
+      assertApprovalField(fields, relative, "approved PRD");
+    }
+
+    if (baseName === "adr.md" && fields.status === "accepted") {
+      assertApprovalField(fields, relative, "accepted ADR");
+    }
+  }
+}
+
+function assertApprovalField(fields, relative, label) {
+  if (!fields.approval) {
+    addError(`${label} must include approval frontmatter: ${relative}`);
+    return;
+  }
+
+  if (fields.approval === LEGACY_APPROVAL) {
+    if (!LEGACY_APPROVAL_PATHS.has(relative)) {
+      addError(`${label} uses legacy approval marker outside allowlist: ${relative}`);
+    }
+    return;
+  }
+
+  if (!/^user:\d{4}-\d{2}-\d{2}:.+/.test(fields.approval)) {
+    addError(`${label} approval must match user:YYYY-MM-DD:<reason>: ${relative}`);
   }
 }
 

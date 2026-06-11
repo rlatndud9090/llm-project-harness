@@ -2,6 +2,7 @@
 title: "정리 작업 제목"
 date: "YYYY-MM-DD"
 status: draft # draft | done | rejected
+approval:
 unit_type: chore
 ---
 

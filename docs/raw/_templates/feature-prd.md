@@ -2,6 +2,7 @@
 title: "{제목}"
 date: "{YYYY-MM-DD}"
 status: draft # draft | review | approved | rejected
+approval:
 unit_type: feature
 branch: "feature/{slug}"
 raw_path: "docs/raw/feature/{slug}"

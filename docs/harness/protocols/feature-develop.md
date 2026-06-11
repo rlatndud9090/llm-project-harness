@@ -11,9 +11,9 @@ PRD/ADR 기반으로 기능을 설계, 구현, 검증, 커밋까지 진행하는
 출력: 구현 완료 + wiki ingest + harness gate 통과 + Lore commit
 ```
 
-feature raw unit은 `prd.md`, `adr.md`, `notes.md`를 가진다. ADR이 아직
-proposed라면 구현 전에 결정 내용을 채우고 accepted로 바꾸거나, 사용자 리뷰가
-필요하면 구현을 멈춘다.
+feature raw unit은 `prd.md`, `adr.md`, `notes.md`를 가진다. 에이전트는 PRD/ADR
+초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를 `approved`, ADR을 `accepted`로
+바꾸지 않는다.
 
 ## 역할
 
@@ -45,7 +45,7 @@ proposed라면 구현 전에 결정 내용을 채우고 accepted로 바꾸거나
 
 1. `AGENTS.md`, `docs/wiki/index.md`, feature PRD/ADR을 읽는다.
 2. 관련 raw unit과 현재 코드 구조를 조사한다.
-3. ADR에 아래 결정을 기록한다.
+3. ADR에 아래 결정을 제안으로 기록한다.
    - 채택한 구조
    - 대안 최소 2개
    - 기각 이유
@@ -60,6 +60,9 @@ proposed라면 구현 전에 결정 내용을 채우고 accepted로 바꾸거나
 게이트:
 
 - ADR이 proposed placeholder 상태이면 구현으로 넘어가지 않는다.
+- 사용자가 명시 승인하지 않은 ADR은 `proposed`로 유지한다.
+- PRD `approved` 또는 ADR `accepted`로 전환하려면 `approval: "user:YYYY-MM-DD:<근거>"`
+  frontmatter가 필요하다.
 - 사용자의 제품 판단이 필요한 질문은 숨기지 않고 보고한다.
 
 ## Phase 2: 구현
@@ -102,6 +105,9 @@ npm run harness:gate
 
 - **나쁨:** ADR placeholder를 둔 채 구현한다.
 - **좋음:** data contract, action/turn model, engine boundary 같은 결정을 ADR에 남긴 뒤 구현한다.
+
+- **나쁨:** 에이전트가 ADR을 작성한 뒤 곧바로 `accepted`로 바꾼다.
+- **좋음:** ADR은 `proposed`로 남기고, 형님 승인 후 `approval:` 근거와 함께 `accepted`로 바꾼다.
 
 - **나쁨:** UI가 타입 상성이나 특성 판정을 컴포넌트 안에서 직접 계산한다.
 - **좋음:** UI는 domain result를 렌더링하고 판정은 domain에 둔다.

@@ -29,6 +29,7 @@
     - `feature/update`, `chore/misc`, `bugfix/fix` 같은 빈 slug를 제안하지 않는다.
     - 데이터 수집, 엔진 구현, UI 구현을 한 feature에 합치지 않는다.
     - 사용자의 방향 전환이 있으면 이전 platform 가정을 끌고 오지 않는다.
+    - 후보 제안 단계에서 PRD/ADR 승인을 가정하지 않는다.
   </Constraints>
 
   <Execution_Protocol>
