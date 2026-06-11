@@ -29,6 +29,10 @@ Last updated: 2026-06-11 Asia/Seoul
 - **PRD ADR 템플릿 정합화** — [Notes](../raw/chore/align-prd-adr-templates/notes.md)
 - **하네스 스킬과 에이전트 정의 보강** — [PRD](../raw/chore/harness-agent-protocol-strengthening/prd.md) · [ADR](../raw/chore/harness-agent-protocol-strengthening/adr.md) · [Notes](../raw/chore/harness-agent-protocol-strengthening/notes.md)
 
+### Product & Architecture
+
+- **퀴즈 데이터 계약** — [PRD](../raw/feature/quiz-data-contract/prd.md) · [ADR](../raw/feature/quiz-data-contract/adr.md) · [Notes](../raw/feature/quiz-data-contract/notes.md)
+
 ## Maintenance
 
 - 새 raw work unit은 `docs/raw/{feature,bugfix,chore}/branch-slug/` 아래에 둔다.
