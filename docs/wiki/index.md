@@ -9,7 +9,7 @@ Last updated: 2026-06-12 Asia/Seoul
 
 - **무엇:** 여러 제품 저장소에 장착 가능한 cross-agent LLM harness.
 - **대상:** 웹앱, 모바일앱, 게임, 도구, 실험 프로젝트.
-- **범위:** raw/wiki, PRD/ADR, Do Next, 역할 프롬프트, 도구별 어댑터, artifact check, gate, commit protocol.
+- **범위:** raw/wiki, PRD/ADR, Do Next, 역할 프롬프트, 도구별 어댑터, artifact check, gate, commit protocol, submodule attach.
 - **비범위:** 특정 제품 코드, 특정 도메인 데이터, 특정 UI 디자인 시스템.
 - **Knowledge boundary:** raw PRD/ADR/notes가 진실 원천이고, 이 index는 navigation만 맡는다.
 
@@ -31,6 +31,7 @@ Last updated: 2026-06-12 Asia/Seoul
 ### Project Operations
 
 - **하네스 레포지토리 테라포밍** — [Notes](../raw/chore/harness-repository-terraform/notes.md)
+- **서브모듈 장착 하네스** — [Notes](../raw/chore/submodule-attach-harness/notes.md)
 
 ## Maintenance
 

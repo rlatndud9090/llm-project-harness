@@ -37,6 +37,7 @@
 | PRD/ADR 확정까지 진행 | `do-next.md` |
 | PRD 초안 작성 호환 요청 | `do-next.md`, 필요 시 `prd-drafting.md` |
 | raw unit 생성 | `raw-start.md` |
+| 하네스 submodule 장착/업데이트 | `submodule-attach.md` |
 | 승인된 PRD/ADR 기반 기능 구현 | `feature-develop.md` |
 | 검증/커밋 | `integration-gate.md`, `commit-protocol.md` |
 

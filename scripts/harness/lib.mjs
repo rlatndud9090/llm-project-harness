@@ -33,10 +33,18 @@ export function toPosix(filePath) {
 }
 
 export function getCurrentBranch() {
-  return execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-  }).trim();
+  try {
+    return execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return execFileSync("git", ["symbolic-ref", "--short", "HEAD"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    }).trim();
+  }
 }
 
 export function parseArgs(argv) {

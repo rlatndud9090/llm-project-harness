@@ -5,8 +5,8 @@ Codex와 ClaudeCode가 같은 raw/wiki, PRD/ADR, 커밋, 검증 규칙을 읽도
 공용 제어면을 제공합니다.
 
 이 저장소는 제품 앱을 담지 않습니다. 소비 프로젝트는 자기 코드와 자기
-`docs/raw/`, `docs/wiki/`를 유지하고, 이 저장소의 하네스 레이어를 복사하거나
-서브모듈/서브트리/동기화 스크립트로 참조합니다.
+`docs/raw/`, `docs/wiki/`를 유지하고, 이 저장소의 하네스 레이어를 `.harness`
+git submodule로 참조합니다.
 
 ## 구성
 
@@ -45,15 +45,25 @@ npm run harness:gate
 
 ## 소비 프로젝트에 장착하기
 
-초기 방식은 의도적으로 단순하게 둡니다.
+소비 프로젝트 루트에서:
 
-1. `docs/harness/`, `scripts/harness/`, `.codex/`, `.claude/`를 소비 프로젝트에
-   복사하거나 참조합니다.
-2. 소비 프로젝트의 `AGENTS.md`에 이 하네스의 세션 시작, raw/wiki, 커밋 규칙을
-   색인합니다.
-3. 소비 프로젝트는 자기 `docs/raw/`, `docs/wiki/index.md`를 별도로 유지합니다.
-4. 프로젝트 도메인 특수성은 소비 프로젝트의 PRD/ADR/AGENTS에 둡니다.
-5. 장착 후 `npm run harness:check`와 `npm run harness:gate`로 정합성을 확인합니다.
+```sh
+git submodule add git@github.com:rlatndud9090/llm-project-harness.git .harness
+node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
+npm run harness:check
+```
 
-서브모듈, 서브트리, npm 패키지, 템플릿 CLI 중 어떤 배포 방식을 표준으로 삼을지는
-후속 하네스 작업에서 결정합니다.
+장착 스크립트는 `docs/harness`, `scripts/harness`, `.codex`, `.claude` adapter를
+`.harness` submodule로 연결하고, 프로젝트 소유 `AGENTS.md`, `docs/raw/`,
+`docs/wiki/index.md`, `package.json`이 없으면 기본 파일을 만듭니다.
+
+하네스 업데이트는 소비 프로젝트에서 submodule pointer를 올리는 커밋으로 남깁니다.
+
+```sh
+git submodule update --remote .harness
+node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
+npm run harness:gate
+```
+
+세부 절차는 [Submodule Attach 프로토콜](docs/harness/protocols/submodule-attach.md)을
+따릅니다.

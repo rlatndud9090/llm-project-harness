@@ -259,6 +259,11 @@ function assertHarnessAdapters() {
       claude: [repoPath(".claude", "skills", "raw-start", "SKILL.md"), repoPath(".claude", "commands", "raw-start.md")],
     },
     {
+      name: "submodule attach",
+      codex: [repoPath(".codex", "skills", "submodule-attach", "SKILL.md")],
+      claude: [repoPath(".claude", "skills", "submodule-attach", "SKILL.md")],
+    },
+    {
       name: "ui verification",
       codex: [repoPath(".codex", "skills", "ui-verification", "SKILL.md")],
       claude: [repoPath(".claude", "skills", "ui-verification", "SKILL.md")],

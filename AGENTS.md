@@ -42,6 +42,8 @@ history, and exports the same pattern for consumer projects.
   use and maintain the wiki.
 - Shared cross-agent process rules live under `docs/harness/`. Tool-specific
   files under `.claude/` and `.codex/` are adapters, not sources of truth.
+- Consumer projects should mount this repository as a `.harness` git submodule,
+  then link shared harness surfaces with `scripts/harness/attach-submodule.mjs`.
 
 On session start:
 
@@ -123,6 +125,10 @@ harness maintenance through `$do-next`, product PRD/ADR approval, or PRD/ADR
 based implementation automation unless the user explicitly asks to treat a
 harness change as a product-facing decision. Track ordinary harness changes with
 a chore raw Notes unit, wiki ingest, `harness:gate`, and the commit protocol.
+
+For consuming project setup, follow `docs/harness/protocols/submodule-attach.md`.
+The consuming project owns `AGENTS.md`, `docs/raw/`, and `docs/wiki/`; shared
+adapter and protocol files should remain linked to the `.harness` submodule.
 
 ## Raw Unit Templates
 

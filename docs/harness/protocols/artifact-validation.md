@@ -24,6 +24,7 @@ npm run harness:check
 - 공용 harness role은 Codex/ClaudeCode agent adapter를 가진다.
 - 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
 - Codex/ClaudeCode는 `$do-next` skill adapter를 가진다.
+- Codex/ClaudeCode는 `submodule-attach` skill adapter를 가진다.
 - 기존 `work-intake`와 `prd-drafting` adapter는 새 작업을 `$do-next`로 수렴시킨다.
 
 ## 수동 검토 항목

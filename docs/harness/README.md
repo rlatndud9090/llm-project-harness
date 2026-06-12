@@ -21,6 +21,7 @@
   ADR을 `accepted`로 바꾸지 않는다.
 - 하네스 변경은 제품 요구사항, 기획, 명세가 아니라 개발자 운영 구조다.
   `$do-next`/제품 PRD/ADR/PRD 기반 자동구현 레일에 넣지 않고 chore Notes로 추적한다.
+- 다른 프로젝트에는 복사본이 아니라 `.harness` git submodule로 장착한다.
 
 ```txt
 feature/main-layout          -> docs/raw/feature/main-layout/
@@ -89,6 +90,16 @@ approval: "user:YYYY-MM-DD:<짧은 승인 근거>"
 
 `integrator`가 이 순서를 책임진다.
 
+### 4. 소비 프로젝트 장착
+
+새 프로젝트에 이 하네스를 붙이거나 하네스 버전을 올릴 때:
+
+1. `protocols/submodule-attach.md`
+2. `scripts/harness/attach-submodule.mjs`
+
+소비 프로젝트는 `.harness` submodule pointer만 추적하고, 프로젝트별 raw/wiki와
+`AGENTS.md`는 로컬 소유로 유지한다.
+
 ## 프로토콜
 
 - [세션 시작](protocols/session-start.md)
@@ -96,6 +107,7 @@ approval: "user:YYYY-MM-DD:<짧은 승인 근거>"
 - [작업 인테이크](protocols/work-intake.md)
 - [PRD 작성](protocols/prd-drafting.md)
 - [Raw 시작](protocols/raw-start.md)
+- [Submodule attach](protocols/submodule-attach.md)
 - [기능 개발](protocols/feature-develop.md)
 - [Wiki ingest](protocols/wiki-ingest.md)
 - [아티팩트 검증](protocols/artifact-validation.md)
