@@ -15,21 +15,18 @@ if (sameRealPath(projectRoot, harnessRoot)) {
   fail("run this from a consuming project root, not from the harness repository root");
 }
 
-if (!exists(path.join(harnessRoot, "docs", "harness"))) {
+if (!exists(path.join(harnessRoot, "harness", "protocols"))) {
   fail(`harness root does not look valid: ${harnessRoot}`);
 }
 
 const operations = [];
-
-linkPath(path.join(harnessRoot, "docs", "harness"), path.join(projectRoot, "docs", "harness"), "dir");
-linkPath(path.join(harnessRoot, "scripts", "harness"), path.join(projectRoot, "scripts", "harness"), "dir");
-linkPath(path.join(harnessRoot, "docs", "raw", "_templates"), path.join(projectRoot, "docs", "raw", "_templates"), "dir");
 
 linkChildren(".codex", "agents");
 linkChildren(".codex", "skills");
 linkChildren(".claude", "agents");
 linkChildren(".claude", "commands");
 linkChildren(".claude", "skills");
+linkChildren(".agents", "skills");
 
 ensureProjectDocs();
 if (updatePackageScripts) ensurePackageScripts();
@@ -50,8 +47,17 @@ function linkChildren(toolDir, childDir) {
     if (entry.name.startsWith(".")) continue;
     const source = path.join(sourceDir, entry.name);
     const link = path.join(projectRoot, toolDir, childDir, entry.name);
-    linkPath(source, link, entry.isDirectory() ? "dir" : "file");
+    linkAdapterPath(source, link, entry.isDirectory() ? "dir" : "file");
   }
+}
+
+function linkAdapterPath(target, link, type) {
+  if (exists(link) && !isExpectedSymlink(link, target) && !force) {
+    operations.push(`kept local override ${relative(link)}`);
+    return;
+  }
+
+  linkPath(target, link, type);
 }
 
 function linkPath(target, link, type) {
@@ -114,7 +120,7 @@ Last updated: TODO Asia/Seoul
     `# Raw Sources
 
 이 디렉터리는 이 프로젝트의 raw PRD/ADR/notes를 저장한다.
-공용 템플릿은 \`docs/raw/_templates\` 링크를 통해 harness submodule에서 제공된다.
+공용 템플릿은 \`.harness/harness/templates/raw\`에서 제공된다.
 `,
   );
 
@@ -132,14 +138,15 @@ TODO: describe this product.
 ## Harness Entry Points
 
 1. Read \`docs/wiki/index.md\`.
-2. Read \`docs/harness/protocols/session-start.md\`.
+2. Read \`.harness/harness/protocols/session-start.md\`.
 3. Follow only raw links relevant to the task.
 4. Use \`$do-next\` for open-ended product work.
 5. Keep product-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
 
-Shared harness rules live in \`docs/harness/\`, which is linked from the
-\`.harness\` submodule. Do not edit linked harness files inside this product
-repository; update the harness repository and bump the submodule instead.
+Shared harness rules live in \`.harness/harness/\`. Root-level \`.codex/\`,
+\`.claude/\`, and \`.agents/\` may contain symlinks to shared harness adapters
+plus project-local skills or agents. Local project definitions are allowed and
+take precedence when they occupy the same path.
 `,
   );
 }
@@ -147,6 +154,12 @@ repository; update the harness repository and bump the submodule instead.
 function ensurePackageScripts() {
   const packagePath = path.join(projectRoot, "package.json");
   const desiredScripts = {
+    "harness:start": "node .harness/scripts/harness/raw-start.mjs",
+    "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
+    "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
+    "harness:gate": "node .harness/scripts/harness/gate.mjs",
+  };
+  const legacyScripts = {
     "harness:start": "node scripts/harness/raw-start.mjs",
     "harness:ingest": "node scripts/harness/wiki-ingest.mjs",
     "harness:check": "node scripts/harness/artifact-check.mjs",
@@ -169,7 +182,7 @@ function ensurePackageScripts() {
   let changed = false;
   for (const [name, command] of Object.entries(desiredScripts)) {
     if (packageJson.scripts[name] === command) continue;
-    if (packageJson.scripts[name] && !force) {
+    if (packageJson.scripts[name] && packageJson.scripts[name] !== legacyScripts[name] && !force) {
       operations.push(`kept package script ${name}: ${packageJson.scripts[name]}`);
       continue;
     }

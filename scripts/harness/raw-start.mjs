@@ -3,12 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   fail,
+  harnessPath,
   inferRawUnitFromBranch,
   parseArgs,
   pathExists,
   rawUnitPath,
   readText,
-  repoPath,
   titleFromSlug,
   todaySeoul,
   validateTypeAndSlug,
@@ -60,7 +60,7 @@ const replacements = [
 ];
 
 function materialize(templateName, outputName) {
-  const templatePath = repoPath("docs", "raw", "_templates", templateName);
+  const templatePath = harnessPath("harness", "templates", "raw", templateName);
   const outputPath = path.join(unitDir, outputName);
   if (pathExists(outputPath)) return false;
 

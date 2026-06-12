@@ -5,7 +5,7 @@ description: "raw work unit을 docs/wiki/index.md에 한 줄로 연결한다."
 
 # Wiki Ingest 어댑터
 
-공용 기준은 `docs/harness/protocols/wiki-ingest.md`다.
+공용 기준은 `.harness/harness/protocols/wiki-ingest.md`다.
 
 ## 실행
 

@@ -5,7 +5,7 @@ description: "공용 LLM Project Harness를 소비 프로젝트에 git submodule
 
 # Submodule Attach 어댑터
 
-공용 기준은 `docs/harness/protocols/submodule-attach.md`다.
+공용 기준은 `.harness/harness/protocols/submodule-attach.md`다.
 
 ## 신규 장착
 

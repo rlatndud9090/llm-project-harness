@@ -1,47 +1,25 @@
 # LLM Project Harness
 
-여러 웹앱, 모바일앱, 게임 프로젝트에 공통으로 장착할 수 있는 LLM 협업 하네스입니다.
-Codex와 ClaudeCode가 같은 raw/wiki, PRD/ADR, 커밋, 검증 규칙을 읽도록 만드는
-공용 제어면을 제공합니다.
+여러 웹앱, 모바일앱, 게임, 도구 프로젝트에 공통으로 장착할 수 있는 LLM 협업
+하네스입니다. Codex, ClaudeCode, 그리고 유사한 에이전트 런타임이 같은
+raw/wiki, PRD/ADR, 검증, 커밋 규칙을 따르도록 만드는 공용 제어면입니다.
 
-이 저장소는 제품 앱을 담지 않습니다. 소비 프로젝트는 자기 코드와 자기
-`docs/raw/`, `docs/wiki/`를 유지하고, 이 저장소의 하네스 레이어를 `.harness`
-git submodule로 참조합니다.
+이 저장소는 제품 앱이 아니며, 소비 프로젝트의 `docs/`를 소유하지 않습니다.
+소비 프로젝트가 자기 `docs/raw/`, `docs/wiki/`, `AGENTS.md`, 제품별 스킬과
+에이전트를 유지하고, 이 저장소는 `.harness` git submodule로 장착됩니다.
 
 ## 구성
 
 ```txt
-docs/harness/      공용 프로토콜과 역할 정의
-docs/raw/          이 하네스 저장소 자체의 변경 이력
-docs/wiki/         이 하네스 저장소의 얇은 wiki index
-.codex/            Codex용 skill/agent 어댑터
-.claude/           ClaudeCode용 command/skill/agent 어댑터
-scripts/harness/   raw 생성, wiki ingest, artifact check, gate 스크립트
+harness/            공용 프로토콜, 역할 정의, raw 템플릿
+scripts/harness/    장착, raw 생성, wiki ingest, artifact check, gate 스크립트
+.codex/             Codex용 shared skill/agent 어댑터
+.claude/            ClaudeCode용 shared command/skill/agent 어댑터
+.agents/            generic agent skill 어댑터
 ```
 
-## 핵심 원칙
-
-- 프로젝트 작성 문서는 한국어를 기본으로 한다.
-- 작업 단위는 `feature/<slug>`, `bugfix/<slug>`, `chore/<slug>` 브랜치와
-  `docs/raw/<type>/<slug>/` 경로를 1:1로 맞춘다.
-- 열린 제품 작업은 `$do-next`에서 후보 선정, PRD/ADR 작성, 명시 승인까지
-  진행하고 구현은 시작하지 않는다.
-- 승인된 PRD/ADR 기반 구현은 별도 요청에서 시작한다.
-- 하네스 자체 변경은 제품 PRD/ADR 자동구현 레일이 아니라 `chore` notes로
-  추적한다.
-- 모든 의미 있는 커밋은 Lore Commit Protocol과 `관련 문서:` 블록을 가진다.
-
-## 명령
-
-```sh
-npm run harness:start -- --type chore --slug harness-change --title "하네스 변경"
-npm run harness:ingest -- docs/raw/chore/harness-change
-npm run harness:check
-npm run harness:gate
-```
-
-`harness:gate`는 artifact check, lint, build, test를 순서대로 실행합니다.
-이 저장소의 build는 앱 번들이 아니라 하네스 스크립트 문법 검증입니다.
+`docs/` 네임스페이스는 소비 프로젝트 전용입니다. 이 하네스 저장소 안에는
+`docs/harness`, `docs/raw`, `docs/wiki`를 두지 않습니다.
 
 ## 소비 프로젝트에 장착하기
 
@@ -53,17 +31,62 @@ node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
 npm run harness:check
 ```
 
-장착 스크립트는 `docs/harness`, `scripts/harness`, `.codex`, `.claude` adapter를
-`.harness` submodule로 연결하고, 프로젝트 소유 `AGENTS.md`, `docs/raw/`,
-`docs/wiki/index.md`, `package.json`이 없으면 기본 파일을 만듭니다.
+장착 스크립트는 없을 때만 아래 프로젝트 소유 파일을 만듭니다.
 
-하네스 업데이트는 소비 프로젝트에서 submodule pointer를 올리는 커밋으로 남깁니다.
-
-```sh
-git submodule update --remote .harness
-node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
-npm run harness:gate
+```txt
+AGENTS.md
+docs/raw/README.md
+docs/wiki/index.md
+package.json
 ```
 
-세부 절차는 [Submodule Attach 프로토콜](docs/harness/protocols/submodule-attach.md)을
+그리고 런타임이 발견할 수 있도록 root adapter surface에 하네스 제공 항목을
+개별 symlink로 노출합니다.
+
+```txt
+.codex/agents/*
+.codex/skills/*
+.claude/agents/*
+.claude/commands/*
+.claude/skills/*
+.agents/skills/*
+```
+
+기존 로컬 스킬이나 에이전트는 기본적으로 덮어쓰지 않습니다. 같은 경로에 로컬
+파일이 있으면 그것을 프로젝트 override로 보고 보존합니다.
+
+## 생성되는 package scripts
+
+소비 프로젝트의 `package.json`에는 없을 때만 아래 script를 추가합니다.
+
+```json
+{
+  "scripts": {
+    "harness:start": "node .harness/scripts/harness/raw-start.mjs",
+    "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
+    "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
+    "harness:gate": "node .harness/scripts/harness/gate.mjs"
+  }
+}
+```
+
+소비 프로젝트는 자기 stack에 맞는 `lint`, `build`, `test:run`을 별도로 제공해야
+합니다. `harness:gate`는 harness check 뒤에 그 명령들을 순서대로 실행합니다.
+
+## 하네스 개발
+
+이 저장소 자체를 작업할 때는 소비 프로젝트용 branch/raw/wiki/PRD/ADR 정책을
+강제하지 않습니다. 공유 규칙을 바꿀 때는 먼저 `harness/`를 수정하고, 그 다음
+`.codex/`, `.claude/`, `.agents/` 어댑터를 맞춥니다.
+
+검증:
+
+```sh
+npm run harness:check
+npm run lint
+npm run build
+npm run test:run
+```
+
+세부 장착 절차는 [Submodule Attach 프로토콜](harness/protocols/submodule-attach.md)을
 따릅니다.

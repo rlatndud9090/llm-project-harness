@@ -5,8 +5,8 @@ description: "raw/wiki 정합성, harness gate, 명시적 스테이징, PRD/ADR 
 
 # Integrator 어댑터
 
-공용 기준은 `docs/harness/roles/integrator.md`와
-`docs/harness/protocols/commit-protocol.md`다.
+공용 기준은 `.harness/harness/roles/integrator.md`와
+`.harness/harness/protocols/commit-protocol.md`다.
 
 필수:
 

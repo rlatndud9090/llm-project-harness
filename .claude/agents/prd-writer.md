@@ -5,7 +5,7 @@ description: "선택된 작업 단위를 한국어 PRD 초안으로 작성하고
 
 # PRD Writer 어댑터
 
-공용 기준은 `docs/harness/roles/prd-writer.md`다.
+공용 기준은 `.harness/harness/roles/prd-writer.md`다.
 
 필수:
 

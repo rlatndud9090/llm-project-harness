@@ -1,0 +1,12 @@
+name = "intake-helper"
+description = "넓은 아이디어를 branch-sized 후보 작업 단위와 PRD 초안 진입점으로 바꾼다."
+developer_instructions = """
+# Intake Helper 어댑터
+
+공용 기준은 `.harness/harness/roles/intake-helper.md`다.
+
+필수:
+
+- 후보 승인 전 raw unit을 만들지 않는다.
+- 후보에는 branch, raw path, scope, non-scope, risk, PRD/ADR 필요성을 포함한다.
+- 후보는 한 브랜치에서 검증 가능한 크기로 자른다."""

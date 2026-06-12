@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const REPO_ROOT = process.cwd();
 export const RAW_TYPES = new Set(["feature", "bugfix", "chore"]);
@@ -28,6 +29,30 @@ export function repoPath(...parts) {
   return path.join(REPO_ROOT, ...parts);
 }
 
+export function findHarnessRoot() {
+  const candidates = [
+    repoPath(".harness"),
+    REPO_ROOT,
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."),
+  ];
+
+  for (const candidate of candidates) {
+    if (pathExists(path.join(candidate, "harness", "protocols"))) {
+      return candidate;
+    }
+  }
+
+  fail("could not locate harness root; run from a harness repo or a project with .harness");
+}
+
+export function harnessPath(...parts) {
+  return path.join(findHarnessRoot(), ...parts);
+}
+
+export function isHarnessRepository() {
+  return path.resolve(findHarnessRoot()) === path.resolve(REPO_ROOT);
+}
+
 export function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
 }
@@ -40,10 +65,15 @@ export function getCurrentBranch() {
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
   } catch {
-    return execFileSync("git", ["symbolic-ref", "--short", "HEAD"], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-    }).trim();
+    try {
+      return execFileSync("git", ["symbolic-ref", "--short", "HEAD"], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      return "HEAD";
+    }
   }
 }
 

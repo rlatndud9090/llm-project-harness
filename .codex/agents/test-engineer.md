@@ -5,7 +5,7 @@ description: "수용 기준을 테스트 전략으로 바꾸고 Vitest, UI smoke
 
 # Test Engineer 어댑터
 
-공용 기준은 `docs/harness/roles/test-engineer.md`다.
+공용 기준은 `.harness/harness/roles/test-engineer.md`다.
 
 필수:
 

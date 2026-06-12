@@ -15,4 +15,4 @@ npm run harness:ingest -- $ARGUMENTS
 - wiki에는 요약문을 쓰지 않고 raw link만 둔다.
 - PRD/ADR이 있는 raw unit은 둘 다 링크되었는지 확인한다.
 
-공용 기준은 `docs/harness/protocols/wiki-ingest.md`다.
+공용 기준은 `.harness/harness/protocols/wiki-ingest.md`다.

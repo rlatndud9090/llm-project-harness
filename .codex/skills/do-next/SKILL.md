@@ -11,9 +11,9 @@ Codex는 공용 하네스의 `$do-next` 흐름을 따른다.
 
 1. `AGENTS.md`
 2. `docs/wiki/index.md`
-3. `docs/harness/protocols/do-next.md`
-4. 필요한 경우 `docs/harness/protocols/work-intake.md`
-5. 필요한 경우 `docs/harness/protocols/prd-drafting.md`
+3. `.harness/harness/protocols/do-next.md`
+4. 필요한 경우 `.harness/harness/protocols/work-intake.md`
+5. 필요한 경우 `.harness/harness/protocols/prd-drafting.md`
 
 ## 실행 원칙
 
@@ -31,7 +31,7 @@ Codex는 공용 하네스의 `$do-next` 흐름을 따른다.
 
 - 구조, 데이터, engine, dependency, 다중 모듈 변경은 `$ralplan`을 먼저 사용한다.
 - 승인된 branch-sized 구현은 `$ralph`를 기본 실행 레일로 사용한다.
-- developer-only 하네스 변경은 `$do-next`/제품 PRD/ADR 레일이 아니라 chore Notes로 추적한다.
+- 하네스 submodule 업데이트나 adapter 정리는 제품 기능 변경과 분리한다.
 - 작은 문서/오타/국소 수정만 solo execute를 허용한다.
 
-규칙 변경은 `.codex`가 아니라 `docs/harness`를 먼저 수정한다.
+규칙 변경은 `.codex`가 아니라 `.harness/harness`를 먼저 수정한다.

@@ -5,7 +5,7 @@ description: "사용자-facing 화면, 상호작용, 반응형 UI, 접근성 표
 
 # UI Engineer 어댑터
 
-공용 기준은 `docs/harness/roles/ui-engineer.md`다.
+공용 기준은 `.harness/harness/roles/ui-engineer.md`다.
 
 필수:
 

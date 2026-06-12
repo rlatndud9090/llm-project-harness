@@ -3,7 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   fail,
+  findHarnessRoot,
   getCurrentBranch,
+  isHarnessRepository,
   listMarkdownFiles,
   parseFrontmatter,
   parseWorkBranch,
@@ -14,21 +16,65 @@ import {
 } from "./lib.mjs";
 
 const errors = [];
-const LEGACY_APPROVAL = "legacy-before-approval-gate";
-const LEGACY_APPROVAL_PATHS = new Set([
-  "docs/raw/chore/2026-06-10-llm-wiki-harness-baseline/prd.md",
-  "docs/raw/chore/2026-06-10-llm-wiki-harness-baseline/adr.md",
-  "docs/raw/chore/cross-agent-harness/prd.md",
-  "docs/raw/chore/cross-agent-harness/adr.md",
-  "docs/raw/chore/harness-agent-protocol-strengthening/prd.md",
-  "docs/raw/chore/harness-agent-protocol-strengthening/adr.md",
-]);
+const harnessRoot = findHarnessRoot();
+const harnessRepoMode = isHarnessRepository();
 
 function addError(message) {
   errors.push(message);
 }
 
+function harnessPath(...parts) {
+  return path.join(harnessRoot, ...parts);
+}
+
+function rootAdapterPath(...parts) {
+  return repoPath(...parts);
+}
+
+function assertHarnessShape() {
+  for (const requiredPath of [
+    harnessPath("harness", "README.md"),
+    harnessPath("harness", "protocols", "session-start.md"),
+    harnessPath("harness", "protocols", "submodule-attach.md"),
+    harnessPath("harness", "templates", "raw", "feature-prd.md"),
+    harnessPath("harness", "templates", "raw", "feature-adr.md"),
+    harnessPath("harness", "templates", "raw", "notes.md"),
+    harnessPath("scripts", "harness", "attach-submodule.mjs"),
+    harnessPath("scripts", "harness", "raw-start.mjs"),
+  ]) {
+    if (!pathExists(requiredPath)) {
+      addError(`missing harness file: ${toPosix(path.relative(harnessRoot, requiredPath))}`);
+    }
+  }
+}
+
+function assertNoHarnessDocsNamespace() {
+  if (!harnessRepoMode) return;
+
+  for (const removedPath of [repoPath("docs", "harness"), repoPath("docs", "raw"), repoPath("docs", "wiki")]) {
+    if (pathExists(removedPath)) {
+      addError(`harness repository must not own consumer docs namespace: ${toPosix(path.relative(process.cwd(), removedPath))}`);
+    }
+  }
+}
+
+function assertProjectDocsPresent() {
+  if (harnessRepoMode) return;
+
+  for (const requiredPath of [
+    repoPath("docs", "raw"),
+    repoPath("docs", "wiki", "index.md"),
+    repoPath("AGENTS.md"),
+  ]) {
+    if (!pathExists(requiredPath)) {
+      addError(`missing consuming project artifact: ${toPosix(path.relative(process.cwd(), requiredPath))}`);
+    }
+  }
+}
+
 function assertWikiShape() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki"))) return;
+
   const wikiDir = repoPath("docs", "wiki");
   const entries = fs.readdirSync(wikiDir).filter((entry) => !entry.startsWith("."));
   const unexpected = entries.filter((entry) => entry !== "index.md");
@@ -38,6 +84,8 @@ function assertWikiShape() {
 }
 
 function assertWikiLinks() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
+
   const wikiPath = repoPath("docs", "wiki", "index.md");
   const wiki = readText(wikiPath);
   const links = [...wiki.matchAll(/\]\((\.\.\/raw\/[^)]+)\)/g)].map((match) => match[1]);
@@ -59,6 +107,8 @@ function unitDirs(type) {
 }
 
 function assertRawUnits() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
   for (const unitDir of unitDirs("feature")) {
     for (const fileName of ["prd.md", "adr.md"]) {
       if (!pathExists(path.join(unitDir, fileName))) {
@@ -78,6 +128,8 @@ function assertRawUnits() {
 }
 
 function assertRawUnitsLinked() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
+
   const wiki = readText(repoPath("docs", "wiki", "index.md"));
   for (const type of ["feature", "bugfix", "chore"]) {
     for (const unitDir of unitDirs(type)) {
@@ -99,6 +151,8 @@ function assertRawUnitsLinked() {
 }
 
 function assertCurrentBranchRawUnit() {
+  if (harnessRepoMode) return;
+
   const branch = getCurrentBranch();
   if (branch === "main" || branch === "HEAD") return;
 
@@ -119,7 +173,9 @@ function assertCurrentBranchRawUnit() {
 }
 
 function assertFrontmatter() {
-  const files = listMarkdownFiles(repoPath("docs", "raw")).filter((filePath) => !filePath.includes(`${path.sep}_templates${path.sep}`));
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  const files = listMarkdownFiles(repoPath("docs", "raw"));
   const required = ["title", "date", "status", "unit_type"];
   const allowedStatuses = {
     "prd.md": new Set(["draft", "review", "approved", "rejected"]),
@@ -172,19 +228,14 @@ function assertApprovalField(fields, relative, label) {
     return;
   }
 
-  if (fields.approval === LEGACY_APPROVAL) {
-    if (!LEGACY_APPROVAL_PATHS.has(relative)) {
-      addError(`${label} uses legacy approval marker outside allowlist: ${relative}`);
-    }
-    return;
-  }
-
   if (!/^user:\d{4}-\d{2}-\d{2}:.+/.test(fields.approval)) {
     addError(`${label} approval must match user:YYYY-MM-DD:<reason>: ${relative}`);
   }
 }
 
 function assertPublicSafeDocs() {
+  if (harnessRepoMode) return;
+
   const forbiddenPatterns = [
     /\.omx-config\.json/i,
     /\.reference-repos/i,
@@ -209,80 +260,97 @@ function assertPublicSafeDocs() {
 }
 
 function assertHarnessAdapters() {
-  const roleDir = repoPath("docs", "harness", "roles");
+  const roleDir = harnessPath("harness", "roles");
   const roleFiles = fs
     .readdirSync(roleDir)
     .filter((entry) => entry.endsWith(".md"))
     .map((entry) => path.basename(entry, ".md"));
 
   for (const roleName of roleFiles) {
-    for (const toolDir of [".codex", ".claude"]) {
-      const adapterPath = repoPath(toolDir, "agents", `${roleName}.md`);
-      if (!pathExists(adapterPath)) {
-        addError(`missing ${toolDir} agent adapter for harness role: ${roleName}`);
-      }
+    const codexAdapters = [
+      rootAdapterPath(".codex", "agents", `${roleName}.md`),
+      rootAdapterPath(".codex", "agents", `${roleName}.toml`),
+    ];
+    if (!codexAdapters.some(pathExists)) {
+      addError(`missing Codex agent adapter for harness role: ${roleName}`);
+    }
+
+    const claudeAdapter = rootAdapterPath(".claude", "agents", `${roleName}.md`);
+    if (!pathExists(claudeAdapter)) {
+      addError(`missing ClaudeCode agent adapter for harness role: ${roleName}`);
     }
   }
 
   const requiredSurfaces = [
     {
       name: "do next",
-      codex: [repoPath(".codex", "skills", "do-next", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "do-next", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "do-next", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "do-next", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "do-next", "SKILL.md")],
     },
     {
       name: "artifact validation",
-      codex: [repoPath(".codex", "skills", "artifact-check", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "artifact-check", "SKILL.md")],
       claude: [
-        repoPath(".claude", "skills", "artifact-validation", "SKILL.md"),
-        repoPath(".claude", "commands", "artifact-check.md"),
+        rootAdapterPath(".claude", "skills", "artifact-validation", "SKILL.md"),
+        rootAdapterPath(".claude", "commands", "artifact-check.md"),
       ],
+      generic: [rootAdapterPath(".agents", "skills", "artifact-validation", "SKILL.md")],
     },
     {
       name: "commit protocol",
-      codex: [repoPath(".codex", "skills", "commit-protocol", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "commit-protocol", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "commit-protocol", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "commit-protocol", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "commit-protocol", "SKILL.md")],
     },
     {
       name: "feature develop",
-      codex: [repoPath(".codex", "skills", "feature-develop", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "feature-develop", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "feature-develop", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "feature-develop", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "feature-develop", "SKILL.md")],
     },
     {
       name: "prd drafting",
-      codex: [repoPath(".codex", "skills", "prd-drafting", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "prd-drafting", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "prd-drafting", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "prd-drafting", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "prd-drafting", "SKILL.md")],
     },
     {
       name: "raw start",
-      codex: [repoPath(".codex", "skills", "raw-start", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "raw-start", "SKILL.md"), repoPath(".claude", "commands", "raw-start.md")],
+      codex: [rootAdapterPath(".codex", "skills", "raw-start", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "raw-start", "SKILL.md"), rootAdapterPath(".claude", "commands", "raw-start.md")],
+      generic: [rootAdapterPath(".agents", "skills", "raw-start", "SKILL.md")],
     },
     {
       name: "submodule attach",
-      codex: [repoPath(".codex", "skills", "submodule-attach", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "submodule-attach", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "submodule-attach", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "submodule-attach", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "submodule-attach", "SKILL.md")],
     },
     {
       name: "ui verification",
-      codex: [repoPath(".codex", "skills", "ui-verification", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "ui-verification", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "ui-verification", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "ui-verification", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "ui-verification", "SKILL.md")],
     },
     {
       name: "wiki ingest",
-      codex: [repoPath(".codex", "skills", "wiki-ingest", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "wiki-ingest", "SKILL.md"), repoPath(".claude", "commands", "wiki-ingest.md")],
+      codex: [rootAdapterPath(".codex", "skills", "wiki-ingest", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "wiki-ingest", "SKILL.md"), rootAdapterPath(".claude", "commands", "wiki-ingest.md")],
+      generic: [rootAdapterPath(".agents", "skills", "wiki-ingest", "SKILL.md")],
     },
     {
       name: "work intake",
-      codex: [repoPath(".codex", "skills", "work-intake", "SKILL.md")],
-      claude: [repoPath(".claude", "skills", "work-intake", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "work-intake", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "work-intake", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "work-intake", "SKILL.md")],
     },
   ];
 
   for (const surface of requiredSurfaces) {
     if (!surface.codex.some(pathExists)) addError(`missing Codex adapter for harness surface: ${surface.name}`);
     if (!surface.claude.some(pathExists)) addError(`missing ClaudeCode adapter for harness surface: ${surface.name}`);
+    if (!surface.generic.some(pathExists)) addError(`missing generic agent adapter for harness surface: ${surface.name}`);
   }
 
   assertDoNextCompatibilityAdapters();
@@ -290,10 +358,12 @@ function assertHarnessAdapters() {
 
 function assertDoNextCompatibilityAdapters() {
   const compatibilityAdapters = [
-    repoPath(".codex", "skills", "work-intake", "SKILL.md"),
-    repoPath(".claude", "skills", "work-intake", "SKILL.md"),
-    repoPath(".codex", "skills", "prd-drafting", "SKILL.md"),
-    repoPath(".claude", "skills", "prd-drafting", "SKILL.md"),
+    rootAdapterPath(".codex", "skills", "work-intake", "SKILL.md"),
+    rootAdapterPath(".claude", "skills", "work-intake", "SKILL.md"),
+    rootAdapterPath(".agents", "skills", "work-intake", "SKILL.md"),
+    rootAdapterPath(".codex", "skills", "prd-drafting", "SKILL.md"),
+    rootAdapterPath(".claude", "skills", "prd-drafting", "SKILL.md"),
+    rootAdapterPath(".agents", "skills", "prd-drafting", "SKILL.md"),
   ];
 
   for (const adapterPath of compatibilityAdapters) {
@@ -310,6 +380,9 @@ function assertDoNextCompatibilityAdapters() {
   }
 }
 
+assertHarnessShape();
+assertNoHarnessDocsNamespace();
+assertProjectDocsPresent();
 assertWikiShape();
 assertWikiLinks();
 assertRawUnits();
@@ -326,4 +399,4 @@ if (errors.length > 0) {
   fail(`${errors.length} artifact issue(s) found`);
 }
 
-console.log("[harness:check] ok");
+console.log(`[harness:check] ok (${harnessRepoMode ? "harness" : "project"} mode)`);

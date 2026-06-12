@@ -11,9 +11,9 @@ ClaudeCode는 독자 규칙을 만들지 않고 공용 하네스를 따른다.
 
 1. `AGENTS.md`
 2. `docs/wiki/index.md`
-3. `docs/harness/protocols/feature-develop.md`
+3. `.harness/harness/protocols/feature-develop.md`
 4. 현재 raw unit의 PRD/ADR/notes
-5. 관련 role 문서: `docs/harness/roles/`
+5. 관련 role 문서: `.harness/harness/roles/`
 
 ## 실행 원칙
 
@@ -22,10 +22,10 @@ ClaudeCode는 독자 규칙을 만들지 않고 공용 하네스를 따른다.
 - 승인된 PRD/ADR 없이 구현하지 않는다. 먼저 `$do-next` 또는 승인 라운드로 되돌린다.
 - 구조, 데이터, engine, dependency, 다중 모듈 변경은 `$ralplan`을 먼저 사용한다.
 - 승인된 branch-sized 구현은 `$ralph`를 기본 실행 레일로 사용한다.
-- developer-only 하네스 변경은 이 기능 개발 레일로 처리하지 않는다.
+- 하네스 submodule 업데이트나 adapter 정리는 기능 개발 레일과 분리한다.
 - domain/UI/test 경계를 분리한다.
 - 완료 전 `npm run harness:gate`를 실행한다.
 - 커밋이 필요하면 `commit-protocol`을 사용한다.
 
-규칙 변경은 `.claude`가 아니라 `docs/harness`를 먼저 수정한다. 프로젝트 문서는
+규칙 변경은 `.claude`가 아니라 `.harness/harness`를 먼저 수정한다. 프로젝트 문서는
 한국어로 작성한다.
