@@ -72,6 +72,9 @@ The consumer project owns root `.codex/`, `.claude/`, and `.agents/`.
 - `attach-submodule.mjs` may add symlinks for shared harness adapters.
 - Existing local project adapters must not be overwritten by default.
 - A local project skill or agent at the same path is a project override.
+- Use `attach-submodule.mjs --retrofit` when adding the harness to an existing
+  project; it preserves local docs, adapters, and scripts while adding marker
+  blocks and fallback harness adapter names.
 - Use `--force` only when the user intentionally wants to replace a local
   adapter with the shared harness adapter.
 

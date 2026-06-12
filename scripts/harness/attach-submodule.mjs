@@ -9,6 +9,9 @@ const args = parseArgs(process.argv.slice(2));
 const harnessRoot = path.resolve(projectRoot, args["harness-dir"] ?? autoHarnessRoot(scriptPath));
 const dryRun = Boolean(args["dry-run"]);
 const force = Boolean(args.force);
+const retrofit = Boolean(args.retrofit);
+const jsonOutput = Boolean(args.json);
+const reportPath = typeof args.report === "string" ? path.resolve(projectRoot, args.report) : null;
 const updatePackageScripts = !args["no-package-scripts"];
 
 if (sameRealPath(projectRoot, harnessRoot)) {
@@ -20,6 +23,8 @@ if (!exists(path.join(harnessRoot, "harness", "protocols"))) {
 }
 
 const operations = [];
+const warnings = [];
+const conflicts = [];
 
 linkChildren(".codex", "agents");
 linkChildren(".codex", "skills");
@@ -30,13 +35,30 @@ linkChildren(".agents", "skills");
 
 ensureProjectDocs();
 if (updatePackageScripts) ensurePackageScripts();
+writeReport();
 
-if (dryRun) {
+if (jsonOutput) {
+  console.log(
+    JSON.stringify(
+      {
+        mode: retrofit ? "retrofit" : "attach",
+        dryRun,
+        operations,
+        warnings,
+        conflicts,
+      },
+      null,
+      2,
+    ),
+  );
+} else if (dryRun) {
   for (const operation of operations) console.log(`[dry-run] ${operation}`);
-  console.log("[attach-submodule] dry run complete");
+  printDiagnostics();
+  console.log(`[attach-submodule] ${retrofit ? "retrofit " : ""}dry run complete`);
 } else {
-  console.log("[attach-submodule] ok");
+  console.log(`[attach-submodule] ${retrofit ? "retrofit " : ""}ok`);
   for (const operation of operations) console.log(`- ${operation}`);
+  printDiagnostics();
 }
 
 function linkChildren(toolDir, childDir) {
@@ -54,10 +76,31 @@ function linkChildren(toolDir, childDir) {
 function linkAdapterPath(target, link, type) {
   if (exists(link) && !isExpectedSymlink(link, target) && !force) {
     operations.push(`kept local override ${relative(link)}`);
+    conflicts.push(`local adapter override: ${relative(link)}`);
+    if (retrofit) {
+      const fallback = fallbackAdapterPath(link);
+      if (exists(fallback) && !isExpectedSymlink(fallback, target) && !force) {
+        operations.push(`kept local fallback override ${relative(fallback)}`);
+        conflicts.push(`local fallback adapter override: ${relative(fallback)}`);
+        warnings.push(`manual adapter merge needed for ${relative(link)}; fallback ${relative(fallback)} already exists`);
+      } else {
+        operations.push(`add harness fallback ${relative(fallback)} for ${relative(link)}`);
+        linkPath(target, fallback, type);
+      }
+    }
     return;
   }
 
   linkPath(target, link, type);
+}
+
+function fallbackAdapterPath(link) {
+  const directory = path.dirname(link);
+  const baseName = path.basename(link);
+  const extension = path.extname(baseName);
+  const stem = extension ? baseName.slice(0, -extension.length) : baseName;
+  const fallbackName = `${stem.startsWith("harness-") ? stem : `harness-${stem}`}${extension}`;
+  return path.join(directory, fallbackName);
 }
 
 function linkPath(target, link, type) {
@@ -87,7 +130,7 @@ function ensureProjectDocs() {
   ensureDirectory(path.join(projectRoot, "docs", "raw"));
   ensureDirectory(path.join(projectRoot, "docs", "wiki"));
 
-  ensureFile(
+  ensureFileOrMarker(
     path.join(projectRoot, "docs", "wiki", "index.md"),
     `# Project Wiki Index
 
@@ -113,6 +156,13 @@ Last updated: TODO Asia/Seoul
 - 새 raw work unit은 \`docs/raw/{feature,bugfix,chore}/branch-slug/\` 아래에 둔다.
 - raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug>\`를 실행한다.
 `,
+    "LLM-HARNESS:WIKI",
+    `## Harness Maintenance
+
+- 새 raw work unit은 \`docs/raw/{feature,bugfix,chore}/branch-slug/\` 아래에 둔다.
+- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug>\`를 실행한다.
+- 기존 문서는 강제로 이동하지 않는다. 새 작업부터 raw/wiki 규칙을 적용한다.
+`,
   );
 
   ensureFile(
@@ -124,7 +174,7 @@ Last updated: TODO Asia/Seoul
 `,
   );
 
-  ensureFile(
+  ensureFileOrMarker(
     path.join(projectRoot, "AGENTS.md"),
     `# Project Agent Guide
 
@@ -148,6 +198,17 @@ Shared harness rules live in \`.harness/harness/\`. Root-level \`.codex/\`,
 plus project-local skills or agents. Local project definitions are allowed and
 take precedence when they occupy the same path.
 `,
+    "LLM-HARNESS",
+    `## LLM Project Harness
+
+This project uses the shared LLM Project Harness mounted at \`.harness\`.
+
+- Read \`docs/wiki/index.md\` first when starting project work.
+- Read \`.harness/harness/protocols/session-start.md\` for the shared workflow.
+- Keep project-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
+- Root-level \`.codex/\`, \`.claude/\`, and \`.agents/\` may contain shared harness links plus project-local skills or agents.
+- Local project definitions take precedence when they occupy the same path.
+`,
   );
 }
 
@@ -165,6 +226,9 @@ function ensurePackageScripts() {
     "harness:check": "node scripts/harness/artifact-check.mjs",
     "harness:gate": "node scripts/harness/gate.mjs",
   };
+  const fallbackScripts = Object.fromEntries(
+    Object.entries(desiredScripts).map(([name, command]) => [name.replace(/^harness:/, "llm-harness:"), command]),
+  );
 
   let packageJson;
   if (exists(packagePath)) {
@@ -184,6 +248,22 @@ function ensurePackageScripts() {
     if (packageJson.scripts[name] === command) continue;
     if (packageJson.scripts[name] && packageJson.scripts[name] !== legacyScripts[name] && !force) {
       operations.push(`kept package script ${name}: ${packageJson.scripts[name]}`);
+      conflicts.push(`package script override: ${name}`);
+      if (retrofit) {
+        const fallbackName = name.replace(/^harness:/, "llm-harness:");
+        if (!packageJson.scripts[fallbackName]) {
+          packageJson.scripts[fallbackName] = fallbackScripts[fallbackName];
+          changed = true;
+          operations.push(`set package script ${fallbackName}`);
+          warnings.push(`use npm run ${fallbackName} for shared harness because ${name} already exists`);
+        } else if (packageJson.scripts[fallbackName] !== fallbackScripts[fallbackName]) {
+          operations.push(`kept package script ${fallbackName}: ${packageJson.scripts[fallbackName]}`);
+          conflicts.push(`package fallback script override: ${fallbackName}`);
+          warnings.push(`manual package script merge needed for ${fallbackName}; ${name} already exists`);
+        } else {
+          operations.push(`kept package script ${fallbackName}: ${packageJson.scripts[fallbackName]}`);
+        }
+      }
       continue;
     }
     packageJson.scripts[name] = command;
@@ -216,6 +296,41 @@ function ensureFile(filePath, content) {
   fs.writeFileSync(filePath, content, "utf8");
 }
 
+function ensureFileOrMarker(filePath, content, markerName, markerContent) {
+  if (!exists(filePath)) {
+    ensureFile(filePath, content);
+    return;
+  }
+
+  if (!retrofit) {
+    operations.push(`kept ${relative(filePath)}`);
+    return;
+  }
+
+  const current = fs.readFileSync(filePath, "utf8");
+  const next = upsertMarkerBlock(current, markerName, markerContent);
+  if (next === current) {
+    operations.push(`kept ${relative(filePath)} marker ${markerName}`);
+    return;
+  }
+
+  operations.push(`update ${relative(filePath)} marker ${markerName}`);
+  if (!dryRun) fs.writeFileSync(filePath, next, "utf8");
+}
+
+function upsertMarkerBlock(content, markerName, markerContent) {
+  const start = `<!-- ${markerName}:START -->`;
+  const end = `<!-- ${markerName}:END -->`;
+  const block = `${start}\n${markerContent.trim()}\n${end}`;
+  const pattern = new RegExp(`${escapeRegExp(start)}[\\s\\S]*?${escapeRegExp(end)}`);
+
+  if (pattern.test(content)) {
+    return content.replace(pattern, block);
+  }
+
+  return `${content.trimEnd()}\n\n${block}\n`;
+}
+
 function isExpectedSymlink(link, target) {
   try {
     const stats = fs.lstatSync(link);
@@ -237,6 +352,41 @@ function readlink(link) {
 function removePath(filePath) {
   operations.push(`replace ${relative(filePath)}`);
   if (!dryRun) fs.rmSync(filePath, { recursive: true, force: true });
+}
+
+function writeReport() {
+  if (!reportPath) return;
+
+  operations.push(`${dryRun ? "would write" : "write"} ${retrofit ? "retrofit" : "attach"} report ${relative(reportPath)}`);
+  if (dryRun) return;
+
+  const content = [
+    "# Harness Attach Report",
+    "",
+    `- Mode: ${retrofit ? "retrofit" : "attach"}`,
+    `- Harness: ${relative(harnessRoot)}`,
+    "",
+    "## Operations",
+    "",
+    ...operations.map((operation) => `- ${operation}`),
+    "",
+    "## Conflicts",
+    "",
+    ...(conflicts.length ? conflicts.map((conflict) => `- ${conflict}`) : ["- None"]),
+    "",
+    "## Warnings",
+    "",
+    ...(warnings.length ? warnings.map((warning) => `- ${warning}`) : ["- None"]),
+    "",
+  ].join("\n");
+
+  fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+  fs.writeFileSync(reportPath, content, "utf8");
+}
+
+function printDiagnostics() {
+  for (const conflict of conflicts) console.log(`- conflict: ${conflict}`);
+  for (const warning of warnings) console.log(`- warning: ${warning}`);
 }
 
 function autoHarnessRoot(currentScriptPath) {
@@ -285,6 +435,10 @@ function parseArgs(argv) {
     index += 1;
   }
   return parsed;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function fail(message) {

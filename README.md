@@ -55,6 +55,25 @@ package.json
 기존 로컬 스킬이나 에이전트는 기본적으로 덮어쓰지 않습니다. 같은 경로에 로컬
 파일이 있으면 그것을 프로젝트 override로 보고 보존합니다.
 
+## 기존 프로젝트에 중도 장착하기
+
+이미 진행된 프로젝트에는 `--retrofit`을 사용합니다. 이 모드는 기존
+`AGENTS.md`, `docs/wiki/index.md`, 로컬 스킬/에이전트, package script를
+프로젝트 고유 자산으로 보존하고 하네스 안내만 marker block 또는 fallback 이름으로
+추가합니다.
+
+```sh
+git submodule add git@github.com:rlatndud9090/llm-project-harness.git .harness
+node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --retrofit --dry-run
+node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --retrofit --report harness-retrofit-report.md
+npm run harness:check
+```
+
+기존 `harness:check` 같은 script가 이미 있으면 하네스 명령은
+`llm-harness:check`처럼 `llm-harness:*` fallback으로 추가됩니다. 같은 이름의 로컬
+adapter가 있으면 로컬 adapter를 우선하고 하네스 adapter는 `harness-<name>` 링크로
+노출합니다.
+
 ## 생성되는 package scripts
 
 소비 프로젝트의 `package.json`에는 없을 때만 아래 script를 추가합니다.

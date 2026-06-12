@@ -373,10 +373,29 @@ function assertDoNextCompatibilityAdapters() {
       continue;
     }
 
+    if (isProjectLocalOverride(adapterPath)) {
+      continue;
+    }
+
     const content = readText(adapterPath);
     if (!content.includes("$do-next")) {
       addError(`compatibility adapter must route new work through $do-next: ${relative}`);
     }
+  }
+}
+
+function isProjectLocalOverride(adapterPath) {
+  if (harnessRepoMode) return false;
+
+  try {
+    const stats = fs.lstatSync(adapterPath);
+    if (!stats.isSymbolicLink()) return true;
+
+    const resolvedAdapter = fs.realpathSync(adapterPath);
+    const resolvedHarness = fs.realpathSync(harnessRoot);
+    return !resolvedAdapter.startsWith(`${resolvedHarness}${path.sep}`);
+  } catch {
+    return false;
   }
 }
 

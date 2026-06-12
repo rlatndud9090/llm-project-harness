@@ -17,6 +17,22 @@ node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
 npm run harness:check
 ```
 
+## 기존 프로젝트 retrofit
+
+이미 진행 중인 프로젝트에 중도 장착할 때는 기존 파일을 보존하는 `--retrofit`을
+사용한다.
+
+```sh
+git submodule add git@github.com:rlatndud9090/llm-project-harness.git .harness
+node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --retrofit --dry-run
+node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --retrofit --report harness-retrofit-report.md
+npm run harness:check
+```
+
+기존 `harness:*` script가 있으면 `llm-harness:*` fallback을 사용한다. 기존
+adapter는 프로젝트 override로 보존하고, 하네스 adapter는 `harness-<name>` fallback
+링크로 추가된다.
+
 ## 업데이트
 
 ```sh
