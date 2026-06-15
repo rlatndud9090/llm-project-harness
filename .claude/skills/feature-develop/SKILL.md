@@ -29,3 +29,9 @@ ClaudeCode는 독자 규칙을 만들지 않고 공용 하네스를 따른다.
 
 규칙 변경은 `.claude`가 아니라 `.harness/harness`를 먼저 수정한다. 프로젝트 문서는
 한국어로 작성한다.
+
+## Claude Code 가속 (선택)
+
+구조가 복잡하거나 domain/ui/test를 병렬로 진행하며 교차 조율이 필요하면 ClaudeCode
+`/team`으로 가속할 수 있다. teams는 ClaudeCode 전용 선택지이고, 기본 실행 레일은
+`$ralplan`/`$ralph` 서브에이전트 실행이다.
