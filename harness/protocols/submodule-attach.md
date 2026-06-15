@@ -9,8 +9,7 @@
 - 하네스 본체는 소비 프로젝트의 `.harness/` submodule에 둔다.
 - 소비 프로젝트의 `docs/raw/`, `docs/wiki/`, `AGENTS.md`는 프로젝트 소유다.
 - 하네스 공유 규칙은 `.harness/harness/`에서 읽는다.
-- 소비 프로젝트 루트의 `.codex/`, `.claude/`, `.agents/`는 프로젝트 소유 adapter
-  surface다.
+- 소비 프로젝트 루트의 `.codex/`, `.claude/`는 프로젝트 소유 adapter surface다.
 - 장착 스크립트는 하네스 제공 adapter만 개별 symlink로 추가한다.
 - 같은 경로에 로컬 adapter가 이미 있으면 프로젝트 override로 보고 덮어쓰지 않는다.
 - `docs/harness`, `docs/raw/_templates`, `scripts/harness` symlink를 만들지 않는다.
@@ -44,7 +43,6 @@ package.json
 .claude/agents/*      -> .harness/.claude/agents/*
 .claude/commands/*    -> .harness/.claude/commands/*
 .claude/skills/*      -> .harness/.claude/skills/*
-.agents/skills/*      -> .harness/.agents/skills/*
 ```
 
 생성되는 package scripts는 `.harness/scripts/harness/*.mjs`를 직접 호출한다.

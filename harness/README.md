@@ -10,8 +10,7 @@
 - 소비 프로젝트의 `docs/raw/`, `docs/wiki/`, `AGENTS.md`는 프로젝트 소유다.
 - 하네스는 소비 프로젝트의 `docs/` 아래에 공유 파일이나 symlink를 만들지 않는다.
 - 하네스는 raw/wiki/PRD/ADR/검증/커밋 절차와 템플릿을 제공한다.
-- 프로젝트 루트의 `.codex/`, `.claude/`, `.agents/`는 프로젝트 소유 adapter
-  surface다.
+- 프로젝트 루트의 `.codex/`, `.claude/`는 프로젝트 소유 adapter surface다.
 - 하네스 제공 adapter는 개별 symlink로 추가하고, 같은 경로의 로컬 adapter는
   프로젝트 override로 보존한다.
 - 작업 단위, 브랜치 정책, PRD/ADR 승인 정책은 소비 프로젝트가 하네스를 사용할 때

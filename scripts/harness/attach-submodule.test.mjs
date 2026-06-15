@@ -25,7 +25,7 @@ describe("attach-submodule", () => {
       expect(pathExists(path.join(projectRoot, "scripts", "harness"))).toBe(false);
       expect(isSymlink(path.join(projectRoot, ".codex", "skills", "next-feature"))).toBe(true);
       expect(isSymlink(path.join(projectRoot, ".claude", "skills", "next-feature"))).toBe(true);
-      expect(isSymlink(path.join(projectRoot, ".agents", "skills", "next-feature"))).toBe(true);
+      expect(pathExists(path.join(projectRoot, ".agents"))).toBe(false);
 
       runHarnessCheck(projectRoot);
     });
@@ -101,6 +101,9 @@ describe("attach-submodule", () => {
       // an adapter that existed in an older harness version but was renamed/removed
       const staleLink = path.join(projectRoot, ".codex", "skills", "artifact-check");
       fs.symlinkSync(path.join("..", "..", ".harness", ".codex", "skills", "artifact-check"), staleLink, "dir");
+      const staleGenericLink = path.join(projectRoot, ".agents", "skills", "next-feature");
+      fs.mkdirSync(path.dirname(staleGenericLink), { recursive: true });
+      fs.symlinkSync(path.join("..", "..", ".harness", ".agents", "skills", "next-feature"), staleGenericLink, "dir");
       // a project-owned local skill that must survive pruning
       writeFile(path.join(projectRoot, ".codex", "skills", "team-ritual", "SKILL.md"), "# Local skill\n");
 
@@ -108,6 +111,8 @@ describe("attach-submodule", () => {
       runAttach(projectRoot);
 
       expect(lexists(staleLink)).toBe(false);
+      expect(lexists(staleGenericLink)).toBe(false);
+      expect(pathExists(path.join(projectRoot, ".agents"))).toBe(false);
       expect(isSymlink(path.join(projectRoot, ".codex", "skills", "artifact-validation"))).toBe(true);
       expect(pathExists(path.join(projectRoot, ".codex", "skills", "team-ritual", "SKILL.md"))).toBe(true);
 

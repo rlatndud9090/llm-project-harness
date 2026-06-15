@@ -312,7 +312,6 @@ function assertHarnessAdapters() {
       name: "next feature",
       codex: [rootAdapterPath(".codex", "skills", "next-feature", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "next-feature", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "next-feature", "SKILL.md")],
     },
     {
       name: "artifact validation",
@@ -321,62 +320,52 @@ function assertHarnessAdapters() {
         rootAdapterPath(".claude", "skills", "artifact-validation", "SKILL.md"),
         rootAdapterPath(".claude", "commands", "artifact-check.md"),
       ],
-      generic: [rootAdapterPath(".agents", "skills", "artifact-validation", "SKILL.md")],
     },
     {
       name: "commit protocol",
       codex: [rootAdapterPath(".codex", "skills", "commit-protocol", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "commit-protocol", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "commit-protocol", "SKILL.md")],
     },
     {
       name: "feature develop",
       codex: [rootAdapterPath(".codex", "skills", "feature-develop", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "feature-develop", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "feature-develop", "SKILL.md")],
     },
     {
       name: "prd helper",
       codex: [rootAdapterPath(".codex", "skills", "prd-helper", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "prd-helper", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "prd-helper", "SKILL.md")],
     },
     {
       name: "adr helper",
       codex: [rootAdapterPath(".codex", "skills", "adr-helper", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "adr-helper", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "adr-helper", "SKILL.md")],
     },
     {
       name: "kickoff",
       codex: [rootAdapterPath(".codex", "skills", "kickoff", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "kickoff", "SKILL.md"), rootAdapterPath(".claude", "commands", "kickoff.md")],
-      generic: [rootAdapterPath(".agents", "skills", "kickoff", "SKILL.md")],
     },
     {
       name: "submodule attach",
       codex: [rootAdapterPath(".codex", "skills", "submodule-attach", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "submodule-attach", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "submodule-attach", "SKILL.md")],
     },
     {
       name: "ui verification",
       codex: [rootAdapterPath(".codex", "skills", "ui-verification", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "ui-verification", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "ui-verification", "SKILL.md")],
     },
     {
       name: "wiki ingest",
       codex: [rootAdapterPath(".codex", "skills", "wiki-ingest", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "wiki-ingest", "SKILL.md"), rootAdapterPath(".claude", "commands", "wiki-ingest.md")],
-      generic: [rootAdapterPath(".agents", "skills", "wiki-ingest", "SKILL.md")],
     },
   ];
 
   for (const surface of requiredSurfaces) {
     if (!surface.codex.some(pathExists)) addError(`missing Codex adapter for harness surface: ${surface.name}`);
     if (!surface.claude.some(pathExists)) addError(`missing ClaudeCode adapter for harness surface: ${surface.name}`);
-    if (!surface.generic.some(pathExists)) addError(`missing generic agent adapter for harness surface: ${surface.name}`);
   }
 }
 

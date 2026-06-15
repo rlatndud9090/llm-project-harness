@@ -33,11 +33,12 @@ const ADAPTER_DIRS = [
   [".claude", "agents"],
   [".claude", "commands"],
   [".claude", "skills"],
-  [".agents", "skills"],
 ];
+const PRUNE_ADAPTER_DIRS = [...ADAPTER_DIRS, [".agents", "skills"]];
 
 for (const [toolDir, childDir] of ADAPTER_DIRS) linkChildren(toolDir, childDir);
-for (const [toolDir, childDir] of ADAPTER_DIRS) pruneStaleLinks(toolDir, childDir);
+for (const [toolDir, childDir] of PRUNE_ADAPTER_DIRS) pruneStaleLinks(toolDir, childDir);
+if (prune) pruneEmptyLegacyAdapterDirs();
 
 ensureProjectDocs();
 if (updatePackageScripts) ensurePackageScripts();
@@ -96,6 +97,24 @@ function pruneStaleLinks(toolDir, childDir) {
       operations.push(`stale harness link ${relative(link)} (kept; --no-prune set)`);
       warnings.push(`stale harness link ${relative(link)}: target no longer exists in the harness; re-run without --no-prune to remove`);
     }
+  }
+}
+
+function pruneEmptyLegacyAdapterDirs() {
+  for (const directory of [path.join(projectRoot, ".agents", "skills"), path.join(projectRoot, ".agents")]) {
+    if (!isEmptyDirectory(directory)) continue;
+
+    operations.push(`remove empty legacy adapter dir ${relative(directory)}`);
+    if (!dryRun) fs.rmdirSync(directory);
+  }
+}
+
+function isEmptyDirectory(directory) {
+  try {
+    const stats = fs.lstatSync(directory);
+    return stats.isDirectory() && fs.readdirSync(directory).length === 0;
+  } catch {
+    return false;
   }
 }
 
@@ -248,10 +267,10 @@ TODO: describe this product.
 4. Use \`$next-feature\` for open-ended product work.
 5. Keep product-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
 
-Shared harness rules live in \`.harness/harness/\`. Root-level \`.codex/\`,
-\`.claude/\`, and \`.agents/\` may contain symlinks to shared harness adapters
-plus project-local skills or agents. Local project definitions are allowed and
-take precedence when they occupy the same path.
+Shared harness rules live in \`.harness/harness/\`. Root-level \`.codex/\`
+and \`.claude/\` may contain symlinks to shared harness adapters plus
+project-local skills or agents. Local project definitions are allowed and take
+precedence when they occupy the same path.
 `,
     "LLM-HARNESS",
     `## LLM Project Harness
@@ -261,7 +280,7 @@ This project uses the shared LLM Project Harness mounted at \`.harness\`.
 - Read \`docs/wiki/index.md\` first when starting project work.
 - Read \`.harness/harness/protocols/session-start.md\` for the shared workflow.
 - Keep project-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
-- Root-level \`.codex/\`, \`.claude/\`, and \`.agents/\` may contain shared harness links plus project-local skills or agents.
+- Root-level \`.codex/\` and \`.claude/\` may contain shared harness links plus project-local skills or agents.
 - Local project definitions take precedence when they occupy the same path.
 `,
   );

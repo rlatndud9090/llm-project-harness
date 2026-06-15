@@ -36,7 +36,6 @@ harness/
 scripts/harness/      Attach, kickoff, wiki-ingest, artifact-check, gate, install-hooks
 .codex/               Shared Codex adapter definitions
 .claude/              Shared ClaudeCode adapter definitions
-.agents/              Generic adapter definitions for runtimes that read it
 ```
 
 The `docs/` namespace is reserved for consuming projects. This harness
@@ -58,8 +57,7 @@ app-project/
 ```
 
 Shared rules are read from `.harness/harness/`. Runtime-visible adapters are
-exposed at the project root under `.codex/`, `.claude/`, and optionally
-`.agents/`.
+exposed at the project root under `.codex/` and `.claude/`.
 
 Do not symlink `docs/harness`, `docs/raw/_templates`, or `scripts/harness` into
 consumer projects. Package scripts should call `.harness/scripts/harness/*.mjs`
@@ -67,7 +65,7 @@ directly.
 
 ## Adapter Overlay Rules
 
-The consumer project owns root `.codex/`, `.claude/`, and `.agents/`.
+The consumer project owns root `.codex/` and `.claude/`.
 
 - `attach-submodule.mjs` may add symlinks for shared harness adapters.
 - Existing local project adapters must not be overwritten by default.
@@ -85,7 +83,7 @@ The consumer project owns root `.codex/`, `.claude/`, and `.agents/`.
   keywords in English when that is the natural machine-readable form.
 - Prefer small, reversible changes.
 - Update `harness/` first when changing shared workflow behavior, then update
-  `.codex/`, `.claude/`, and `.agents/` adapters to match.
+  `.codex/` and `.claude/` adapters to match.
 - Run the relevant verification before claiming completion:
 
 ```sh
