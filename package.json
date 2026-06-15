@@ -12,7 +12,8 @@
     "harness:start": "node scripts/harness/raw-start.mjs",
     "harness:ingest": "node scripts/harness/wiki-ingest.mjs",
     "harness:check": "node scripts/harness/artifact-check.mjs",
-    "harness:gate": "node scripts/harness/gate.mjs"
+    "harness:gate": "node scripts/harness/gate.mjs",
+    "harness:hooks": "node scripts/harness/install-hooks.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

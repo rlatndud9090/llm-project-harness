@@ -55,9 +55,28 @@ package.json
     "harness:start": "node .harness/scripts/harness/raw-start.mjs",
     "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
     "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
-    "harness:gate": "node .harness/scripts/harness/gate.mjs"
+    "harness:gate": "node .harness/scripts/harness/gate.mjs",
+    "harness:hooks": "node .harness/scripts/harness/install-hooks.mjs"
   }
 }
+```
+
+## pre-commit 훅 (선택)
+
+커밋 직전에 `harness:check`를 강제하려면 소비 프로젝트에서 한 번 설치한다. 하네스
+저장소가 자동으로 깔지 않으며 opt-in이다.
+
+```sh
+npm run harness:hooks
+```
+
+설치 스크립트는 현재 git 저장소의 `pre-commit` 훅에 `npm run harness:check`를
+건다. 기존 훅이 있으면 보존하고 안내하며, `--force`로만 교체한다(`.local.bak`
+백업을 남긴다). retrofit으로 `harness:*`가 `llm-harness:*`로 보존된 프로젝트는
+실행할 명령을 직접 지정한다.
+
+```sh
+npm run harness:hooks -- --command "npm run llm-harness:check"
 ```
 
 ## 기존 프로젝트에 붙이기
@@ -105,12 +124,23 @@ npm run llm-harness:check
 
 ```sh
 git submodule update --remote .harness
+node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --dry-run
 node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
 npm run harness:gate
 git status --short
 git add .harness
 git commit
 ```
+
+attach를 다시 실행하면 새 하네스 어댑터와 package script를 추가하고, 이름이
+바뀌거나 제거된 어댑터의 stale symlink를 기본으로 정리한다.
+
+- stale 정리는 기본 동작이라 별도 플래그가 필요 없다.
+- 정리 대상은 이전 attach가 만든 symlink 중 하네스에서 타겟이 사라진 것뿐이다.
+- 로컬 파일이나 하네스 밖을 가리키는 프로젝트 override는 절대 건드리지 않는다.
+- `--dry-run`으로 무엇이 추가/제거되는지 먼저 확인한다.
+- stale 링크를 일부러 남기려면 `--no-prune`을 쓴다(경고만 표시한다).
+- retrofit으로 장착한 프로젝트는 업데이트도 `--retrofit`을 함께 쓴다.
 
 하네스 submodule은 floating latest가 아니라 commit pin으로 관리한다. 어떤 프로젝트가
 어떤 하네스 버전을 쓰는지 git history에 남겨야 재현 가능하다.

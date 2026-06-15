@@ -10,7 +10,7 @@ import {
   rawUnitPath,
   readText,
   titleFromSlug,
-  todaySeoul,
+  today,
   validateTypeAndSlug,
   writeText,
 } from "./lib.mjs";
@@ -33,7 +33,7 @@ if (!type || !slug) {
 validateTypeAndSlug(type, slug);
 
 const title = args.title || titleFromSlug(slug);
-const date = args.date || todaySeoul();
+const date = args.date || today();
 const unitDir = rawUnitPath(type, slug);
 const branchName = `${type}/${slug}`;
 const rawPath = `docs/raw/${type}/${slug}`;

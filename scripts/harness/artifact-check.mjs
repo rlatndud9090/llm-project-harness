@@ -2,9 +2,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  REPO_ROOT,
   fail,
   findHarnessRoot,
   getCurrentBranch,
+  gitShow,
+  isForbiddenTransition,
   isHarnessRepository,
   listMarkdownFiles,
   parseFrontmatter,
@@ -259,6 +262,29 @@ function assertPublicSafeDocs() {
   }
 }
 
+function assertStatusTransitions() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  for (const filePath of listMarkdownFiles(repoPath("docs", "raw"))) {
+    const baseName = path.basename(filePath);
+    if (!["prd.md", "adr.md", "bugfix.md", "chore.md"].includes(baseName)) continue;
+
+    const relativePosix = toPosix(path.relative(REPO_ROOT, filePath));
+    const previousContent = gitShow(relativePosix);
+    if (!previousContent) continue; // new unit or no git history to compare
+
+    const previous = parseFrontmatter(previousContent);
+    const current = parseFrontmatter(readText(filePath));
+    if (!previous?.status || !current?.status || previous.status === current.status) continue;
+
+    if (isForbiddenTransition(baseName, previous.status, current.status)) {
+      addError(
+        `forbidden status transition ${previous.status} -> ${current.status}: ${toPosix(path.relative(process.cwd(), filePath))}`,
+      );
+    }
+  }
+}
+
 function assertHarnessAdapters() {
   const roleDir = harnessPath("harness", "roles");
   const roleFiles = fs
@@ -290,7 +316,7 @@ function assertHarnessAdapters() {
     },
     {
       name: "artifact validation",
-      codex: [rootAdapterPath(".codex", "skills", "artifact-check", "SKILL.md")],
+      codex: [rootAdapterPath(".codex", "skills", "artifact-validation", "SKILL.md")],
       claude: [
         rootAdapterPath(".claude", "skills", "artifact-validation", "SKILL.md"),
         rootAdapterPath(".claude", "commands", "artifact-check.md"),
@@ -408,6 +434,7 @@ assertRawUnits();
 assertRawUnitsLinked();
 assertCurrentBranchRawUnit();
 assertFrontmatter();
+assertStatusTransitions();
 assertPublicSafeDocs();
 assertHarnessAdapters();
 

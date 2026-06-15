@@ -12,6 +12,7 @@ npm run harness:ingest -- docs/raw/<type>/<slug>
 ## 규칙
 
 - 수정 가능한 파일은 `docs/wiki/index.md` 하나다.
+- wiki는 사람이 손으로 고치지 않고 `harness:ingest`로만 갱신하는 LLM Wiki다.
 - 같은 raw unit을 여러 번 ingest해도 중복 줄이 생기면 안 된다.
 - raw 본문 내용을 wiki에 요약하지 않는다.
 - 링크 한 줄만 추가한다.

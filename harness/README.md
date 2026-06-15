@@ -94,6 +94,7 @@ npm run harness:start -- --type feature --slug main-layout --title "메인 레�
 npm run harness:ingest -- docs/raw/feature/main-layout
 npm run harness:check
 npm run harness:gate
+npm run harness:hooks   # 선택: 현재 git 저장소에 pre-commit 훅 설치
 ```
 
 `harness:gate`는 `harness:check`, `lint`, `build`, `test:run`을 순서대로 실행한다.

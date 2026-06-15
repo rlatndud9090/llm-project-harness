@@ -10,6 +10,7 @@ const harnessRoot = path.resolve(projectRoot, args["harness-dir"] ?? autoHarness
 const dryRun = Boolean(args["dry-run"]);
 const force = Boolean(args.force);
 const retrofit = Boolean(args.retrofit);
+const prune = !args["no-prune"];
 const jsonOutput = Boolean(args.json);
 const reportPath = typeof args.report === "string" ? path.resolve(projectRoot, args.report) : null;
 const updatePackageScripts = !args["no-package-scripts"];
@@ -26,12 +27,17 @@ const operations = [];
 const warnings = [];
 const conflicts = [];
 
-linkChildren(".codex", "agents");
-linkChildren(".codex", "skills");
-linkChildren(".claude", "agents");
-linkChildren(".claude", "commands");
-linkChildren(".claude", "skills");
-linkChildren(".agents", "skills");
+const ADAPTER_DIRS = [
+  [".codex", "agents"],
+  [".codex", "skills"],
+  [".claude", "agents"],
+  [".claude", "commands"],
+  [".claude", "skills"],
+  [".agents", "skills"],
+];
+
+for (const [toolDir, childDir] of ADAPTER_DIRS) linkChildren(toolDir, childDir);
+for (const [toolDir, childDir] of ADAPTER_DIRS) pruneStaleLinks(toolDir, childDir);
 
 ensureProjectDocs();
 if (updatePackageScripts) ensurePackageScripts();
@@ -43,6 +49,7 @@ if (jsonOutput) {
       {
         mode: retrofit ? "retrofit" : "attach",
         dryRun,
+        prune,
         operations,
         warnings,
         conflicts,
@@ -71,6 +78,54 @@ function linkChildren(toolDir, childDir) {
     const link = path.join(projectRoot, toolDir, childDir, entry.name);
     linkAdapterPath(source, link, entry.isDirectory() ? "dir" : "file");
   }
+}
+
+function pruneStaleLinks(toolDir, childDir) {
+  const dir = path.join(projectRoot, toolDir, childDir);
+  if (!exists(dir)) return;
+
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith(".")) continue;
+    const link = path.join(dir, entry.name);
+    if (!isStaleHarnessLink(link)) continue;
+
+    if (prune) {
+      operations.push(`remove stale harness link ${relative(link)}`);
+      if (!dryRun) fs.rmSync(link, { recursive: true, force: true });
+    } else {
+      operations.push(`stale harness link ${relative(link)} (kept; --no-prune set)`);
+      warnings.push(`stale harness link ${relative(link)}: target no longer exists in the harness; re-run without --no-prune to remove`);
+    }
+  }
+}
+
+// A link is safe to prune only when it is a symlink that points inside the
+// harness (something a previous attach created) AND its target no longer
+// exists. Local files and overrides that point outside the harness are left
+// untouched so renamed/removed harness adapters can be cleaned up without
+// risking project-owned definitions.
+function isStaleHarnessLink(link) {
+  let stats;
+  try {
+    stats = fs.lstatSync(link);
+  } catch {
+    return false;
+  }
+  if (!stats.isSymbolicLink()) return false;
+
+  let rawTarget;
+  try {
+    rawTarget = fs.readlinkSync(link);
+  } catch {
+    return false;
+  }
+
+  const resolved = path.resolve(path.dirname(link), rawTarget);
+  const harnessAbs = path.resolve(harnessRoot);
+  const insideHarness = resolved === harnessAbs || resolved.startsWith(`${harnessAbs}${path.sep}`);
+  if (!insideHarness) return false;
+
+  return !fs.existsSync(link); // existsSync follows the link; a missing target means stale
 }
 
 function linkAdapterPath(target, link, type) {
@@ -219,12 +274,14 @@ function ensurePackageScripts() {
     "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
     "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
     "harness:gate": "node .harness/scripts/harness/gate.mjs",
+    "harness:hooks": "node .harness/scripts/harness/install-hooks.mjs",
   };
   const legacyScripts = {
     "harness:start": "node scripts/harness/raw-start.mjs",
     "harness:ingest": "node scripts/harness/wiki-ingest.mjs",
     "harness:check": "node scripts/harness/artifact-check.mjs",
     "harness:gate": "node scripts/harness/gate.mjs",
+    "harness:hooks": "node scripts/harness/install-hooks.mjs",
   };
   const fallbackScripts = Object.fromEntries(
     Object.entries(desiredScripts).map(([name, command]) => [name.replace(/^harness:/, "llm-harness:"), command]),
@@ -363,7 +420,7 @@ function writeReport() {
   const content = [
     "# Harness Attach Report",
     "",
-    `- Mode: ${retrofit ? "retrofit" : "attach"}`,
+    `- Mode: ${retrofit ? "retrofit" : "attach"}${prune ? "" : " (no-prune)"}`,
     `- Harness: ${relative(harnessRoot)}`,
     "",
     "## Operations",

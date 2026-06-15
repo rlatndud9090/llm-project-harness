@@ -136,15 +136,33 @@ export function inferRawUnitFromBranch() {
   return { branch, parsed };
 }
 
-export function todaySeoul() {
+export function resolveTimezone() {
+  const fromEnv = process.env.HARNESS_TZ?.trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (local) return local;
+  } catch {
+    // fall through to the default below
+  }
+  return "Asia/Seoul";
+}
+
+export function today(timeZone = resolveTimezone()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(new Date());
   const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+// Backwards-compatible alias; prefer today(), which honors HARNESS_TZ and the
+// host timezone before falling back to Asia/Seoul.
+export function todaySeoul() {
+  return today("Asia/Seoul");
 }
 
 export function titleFromSlug(slug) {
@@ -196,4 +214,47 @@ export function listMarkdownFiles(directory) {
     }
   }
   return files;
+}
+
+// Reads a tracked file's content at a git ref. Returns null when git is
+// unavailable, the path is untracked, or the ref does not exist (e.g. a brand
+// new raw unit). Callers treat null as "no previous state to compare".
+export function gitShow(relativePosixPath, ref = "HEAD") {
+  try {
+    return execFileSync("git", ["show", `${ref}:${relativePosixPath}`], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Only the unambiguous backward moves are forbidden. Reopening a rejected PRD
+// (rejected -> draft) or retiring an accepted ADR (accepted -> superseded) stay
+// allowed on purpose. Each entry is [fromStatus, toStatus].
+export const FORBIDDEN_STATUS_TRANSITIONS = {
+  "prd.md": [
+    ["approved", "draft"],
+    ["approved", "review"],
+  ],
+  "adr.md": [
+    ["accepted", "proposed"],
+    ["deprecated", "proposed"],
+    ["deprecated", "accepted"],
+    ["superseded", "proposed"],
+    ["superseded", "accepted"],
+  ],
+  "bugfix.md": [
+    ["fixed", "draft"],
+    ["fixed", "review"],
+  ],
+  "chore.md": [["done", "draft"]],
+};
+
+export function isForbiddenTransition(baseName, fromStatus, toStatus) {
+  const transitions = FORBIDDEN_STATUS_TRANSITIONS[baseName];
+  if (!transitions) return false;
+  return transitions.some(([from, to]) => from === fromStatus && to === toStatus);
 }

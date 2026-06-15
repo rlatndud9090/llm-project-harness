@@ -93,6 +93,41 @@ describe("attach-submodule", () => {
       expect(pathExists(path.join(projectRoot, ".codex"))).toBe(false);
     });
   });
+
+  it("prunes stale harness symlinks left by an older harness version by default", () => {
+    withProject((projectRoot) => {
+      runAttach(projectRoot);
+
+      // an adapter that existed in an older harness version but was renamed/removed
+      const staleLink = path.join(projectRoot, ".codex", "skills", "artifact-check");
+      fs.symlinkSync(path.join("..", "..", ".harness", ".codex", "skills", "artifact-check"), staleLink, "dir");
+      // a project-owned local skill that must survive pruning
+      writeFile(path.join(projectRoot, ".codex", "skills", "team-ritual", "SKILL.md"), "# Local skill\n");
+
+      // a plain re-attach (no flags) cleans up the stale link
+      runAttach(projectRoot);
+
+      expect(lexists(staleLink)).toBe(false);
+      expect(isSymlink(path.join(projectRoot, ".codex", "skills", "artifact-validation"))).toBe(true);
+      expect(pathExists(path.join(projectRoot, ".codex", "skills", "team-ritual", "SKILL.md"))).toBe(true);
+
+      runHarnessCheck(projectRoot);
+    });
+  });
+
+  it("keeps stale harness symlinks and warns when --no-prune is set", () => {
+    withProject((projectRoot) => {
+      runAttach(projectRoot);
+
+      const staleLink = path.join(projectRoot, ".codex", "skills", "artifact-check");
+      fs.symlinkSync(path.join("..", "..", ".harness", ".codex", "skills", "artifact-check"), staleLink, "dir");
+
+      const output = runAttach(projectRoot, ["--no-prune"]);
+
+      expect(output).toContain("stale harness link .codex/skills/artifact-check");
+      expect(lexists(staleLink)).toBe(true);
+    });
+  });
 });
 
 function withProject(callback) {
@@ -142,4 +177,13 @@ function pathExists(filePath) {
 
 function isSymlink(filePath) {
   return fs.lstatSync(filePath).isSymbolicLink();
+}
+
+function lexists(filePath) {
+  try {
+    fs.lstatSync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
