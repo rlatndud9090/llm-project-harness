@@ -52,7 +52,7 @@ package.json
 ```json
 {
   "scripts": {
-    "harness:start": "node .harness/scripts/harness/raw-start.mjs",
+    "harness:kickoff": "node .harness/scripts/harness/kickoff.mjs",
     "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
     "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
     "harness:gate": "node .harness/scripts/harness/gate.mjs",

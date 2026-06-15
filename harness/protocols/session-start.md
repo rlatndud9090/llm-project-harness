@@ -8,8 +8,8 @@
 - wiki index를 통해 현재 프로젝트 방향을 빠르게 파악한다.
 - 현재 브랜치가 가리키는 raw unit을 확인한다.
 - 필요한 PRD/ADR만 읽어 컨텍스트를 과하게 불리지 않는다.
-- 열린 요청이면 `$do-next`로, 승인된 PRD/ADR 기반 구현 요청이면
-  feature-develop로 진입한다.
+- 열린 요청이면 `$next-feature`로, 작업이 정해졌으면 `$kickoff`→`$prd-helper`로,
+  승인된 PRD/ADR 기반 구현 요청이면 feature-develop로 진입한다.
 
 ## 절차
 
@@ -32,11 +32,11 @@
 
 | 사용자 요청 | 진입 프로토콜 |
 | --- | --- |
-| "이제 뭐하지?", "다음 뭐 할까?" | `do-next.md` |
-| "이 아이디어를 작업 단위로 쪼개줘" | `do-next.md` |
-| PRD/ADR 확정까지 진행 | `do-next.md` |
-| PRD 초안 작성 호환 요청 | `do-next.md`, 필요 시 `prd-drafting.md` |
-| raw unit 생성 | `raw-start.md` |
+| "이제 뭐하지?", "다음 뭐 할까?" | `next-feature.md` |
+| "이 아이디어를 작업 단위로 쪼개줘" | `next-feature.md` |
+| 작업 단위 초기세팅(브랜치/raw 생성) | `kickoff.md` |
+| PRD 작성/보강 | `prd-helper.md` |
+| ADR 작성/보강 (필요 시) | `adr-helper.md` |
 | 하네스 submodule 장착/업데이트 | `submodule-attach.md` |
 | 승인된 PRD/ADR 기반 기능 구현 | `feature-develop.md` |
 | 검증/커밋 | `integration-gate.md`, `commit-protocol.md` |

@@ -245,7 +245,7 @@ TODO: describe this product.
 1. Read \`docs/wiki/index.md\`.
 2. Read \`.harness/harness/protocols/session-start.md\`.
 3. Follow only raw links relevant to the task.
-4. Use \`$do-next\` for open-ended product work.
+4. Use \`$next-feature\` for open-ended product work.
 5. Keep product-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
 
 Shared harness rules live in \`.harness/harness/\`. Root-level \`.codex/\`,
@@ -270,14 +270,14 @@ This project uses the shared LLM Project Harness mounted at \`.harness\`.
 function ensurePackageScripts() {
   const packagePath = path.join(projectRoot, "package.json");
   const desiredScripts = {
-    "harness:start": "node .harness/scripts/harness/raw-start.mjs",
+    "harness:kickoff": "node .harness/scripts/harness/kickoff.mjs",
     "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
     "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
     "harness:gate": "node .harness/scripts/harness/gate.mjs",
     "harness:hooks": "node .harness/scripts/harness/install-hooks.mjs",
   };
   const legacyScripts = {
-    "harness:start": "node scripts/harness/raw-start.mjs",
+    "harness:kickoff": "node scripts/harness/kickoff.mjs",
     "harness:ingest": "node scripts/harness/wiki-ingest.mjs",
     "harness:check": "node scripts/harness/artifact-check.mjs",
     "harness:gate": "node scripts/harness/gate.mjs",

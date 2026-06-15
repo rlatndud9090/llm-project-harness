@@ -33,7 +33,7 @@ harness/
   roles/              Shared role prompts
   templates/raw/      Starter templates for consumer docs/raw units
 
-scripts/harness/      Attach, raw-start, wiki-ingest, artifact-check, gate, install-hooks
+scripts/harness/      Attach, kickoff, wiki-ingest, artifact-check, gate, install-hooks
 .codex/               Shared Codex adapter definitions
 .claude/              Shared ClaudeCode adapter definitions
 .agents/              Generic adapter definitions for runtimes that read it

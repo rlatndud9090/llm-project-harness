@@ -43,7 +43,7 @@ function assertHarnessShape() {
     harnessPath("harness", "templates", "raw", "feature-adr.md"),
     harnessPath("harness", "templates", "raw", "notes.md"),
     harnessPath("scripts", "harness", "attach-submodule.mjs"),
-    harnessPath("scripts", "harness", "raw-start.mjs"),
+    harnessPath("scripts", "harness", "kickoff.mjs"),
   ]) {
     if (!pathExists(requiredPath)) {
       addError(`missing harness file: ${toPosix(path.relative(harnessRoot, requiredPath))}`);
@@ -309,10 +309,10 @@ function assertHarnessAdapters() {
 
   const requiredSurfaces = [
     {
-      name: "do next",
-      codex: [rootAdapterPath(".codex", "skills", "do-next", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "do-next", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "do-next", "SKILL.md")],
+      name: "next feature",
+      codex: [rootAdapterPath(".codex", "skills", "next-feature", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "next-feature", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "next-feature", "SKILL.md")],
     },
     {
       name: "artifact validation",
@@ -336,16 +336,22 @@ function assertHarnessAdapters() {
       generic: [rootAdapterPath(".agents", "skills", "feature-develop", "SKILL.md")],
     },
     {
-      name: "prd drafting",
-      codex: [rootAdapterPath(".codex", "skills", "prd-drafting", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "prd-drafting", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "prd-drafting", "SKILL.md")],
+      name: "prd helper",
+      codex: [rootAdapterPath(".codex", "skills", "prd-helper", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "prd-helper", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "prd-helper", "SKILL.md")],
     },
     {
-      name: "raw start",
-      codex: [rootAdapterPath(".codex", "skills", "raw-start", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "raw-start", "SKILL.md"), rootAdapterPath(".claude", "commands", "raw-start.md")],
-      generic: [rootAdapterPath(".agents", "skills", "raw-start", "SKILL.md")],
+      name: "adr helper",
+      codex: [rootAdapterPath(".codex", "skills", "adr-helper", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "adr-helper", "SKILL.md")],
+      generic: [rootAdapterPath(".agents", "skills", "adr-helper", "SKILL.md")],
+    },
+    {
+      name: "kickoff",
+      codex: [rootAdapterPath(".codex", "skills", "kickoff", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "kickoff", "SKILL.md"), rootAdapterPath(".claude", "commands", "kickoff.md")],
+      generic: [rootAdapterPath(".agents", "skills", "kickoff", "SKILL.md")],
     },
     {
       name: "submodule attach",
@@ -365,63 +371,12 @@ function assertHarnessAdapters() {
       claude: [rootAdapterPath(".claude", "skills", "wiki-ingest", "SKILL.md"), rootAdapterPath(".claude", "commands", "wiki-ingest.md")],
       generic: [rootAdapterPath(".agents", "skills", "wiki-ingest", "SKILL.md")],
     },
-    {
-      name: "work intake",
-      codex: [rootAdapterPath(".codex", "skills", "work-intake", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "work-intake", "SKILL.md")],
-      generic: [rootAdapterPath(".agents", "skills", "work-intake", "SKILL.md")],
-    },
   ];
 
   for (const surface of requiredSurfaces) {
     if (!surface.codex.some(pathExists)) addError(`missing Codex adapter for harness surface: ${surface.name}`);
     if (!surface.claude.some(pathExists)) addError(`missing ClaudeCode adapter for harness surface: ${surface.name}`);
     if (!surface.generic.some(pathExists)) addError(`missing generic agent adapter for harness surface: ${surface.name}`);
-  }
-
-  assertDoNextCompatibilityAdapters();
-}
-
-function assertDoNextCompatibilityAdapters() {
-  const compatibilityAdapters = [
-    rootAdapterPath(".codex", "skills", "work-intake", "SKILL.md"),
-    rootAdapterPath(".claude", "skills", "work-intake", "SKILL.md"),
-    rootAdapterPath(".agents", "skills", "work-intake", "SKILL.md"),
-    rootAdapterPath(".codex", "skills", "prd-drafting", "SKILL.md"),
-    rootAdapterPath(".claude", "skills", "prd-drafting", "SKILL.md"),
-    rootAdapterPath(".agents", "skills", "prd-drafting", "SKILL.md"),
-  ];
-
-  for (const adapterPath of compatibilityAdapters) {
-    const relative = toPosix(path.relative(process.cwd(), adapterPath));
-    if (!pathExists(adapterPath)) {
-      addError(`missing do-next compatibility adapter: ${relative}`);
-      continue;
-    }
-
-    if (isProjectLocalOverride(adapterPath)) {
-      continue;
-    }
-
-    const content = readText(adapterPath);
-    if (!content.includes("$do-next")) {
-      addError(`compatibility adapter must route new work through $do-next: ${relative}`);
-    }
-  }
-}
-
-function isProjectLocalOverride(adapterPath) {
-  if (harnessRepoMode) return false;
-
-  try {
-    const stats = fs.lstatSync(adapterPath);
-    if (!stats.isSymbolicLink()) return true;
-
-    const resolvedAdapter = fs.realpathSync(adapterPath);
-    const resolvedHarness = fs.realpathSync(harnessRoot);
-    return !resolvedAdapter.startsWith(`${resolvedHarness}${path.sep}`);
-  } catch {
-    return false;
   }
 }
 

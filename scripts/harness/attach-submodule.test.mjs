@@ -13,7 +13,7 @@ describe("attach-submodule", () => {
       runAttach(projectRoot);
 
       expect(readJson(path.join(projectRoot, "package.json")).scripts).toMatchObject({
-        "harness:start": "node .harness/scripts/harness/raw-start.mjs",
+        "harness:kickoff": "node .harness/scripts/harness/kickoff.mjs",
         "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
         "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
         "harness:gate": "node .harness/scripts/harness/gate.mjs",
@@ -23,9 +23,9 @@ describe("attach-submodule", () => {
       expect(pathExists(path.join(projectRoot, "docs", "wiki", "index.md"))).toBe(true);
       expect(pathExists(path.join(projectRoot, "docs", "harness"))).toBe(false);
       expect(pathExists(path.join(projectRoot, "scripts", "harness"))).toBe(false);
-      expect(isSymlink(path.join(projectRoot, ".codex", "skills", "do-next"))).toBe(true);
-      expect(isSymlink(path.join(projectRoot, ".claude", "skills", "do-next"))).toBe(true);
-      expect(isSymlink(path.join(projectRoot, ".agents", "skills", "do-next"))).toBe(true);
+      expect(isSymlink(path.join(projectRoot, ".codex", "skills", "next-feature"))).toBe(true);
+      expect(isSymlink(path.join(projectRoot, ".claude", "skills", "next-feature"))).toBe(true);
+      expect(isSymlink(path.join(projectRoot, ".agents", "skills", "next-feature"))).toBe(true);
 
       runHarnessCheck(projectRoot);
     });
@@ -35,8 +35,8 @@ describe("attach-submodule", () => {
     withProject((projectRoot) => {
       writeFile(path.join(projectRoot, "AGENTS.md"), "# Existing Guide\n\nKeep me.\n");
       writeFile(path.join(projectRoot, "docs", "wiki", "index.md"), "# Existing Wiki\n\nKeep me too.\n");
-      writeFile(path.join(projectRoot, ".codex", "skills", "do-next", "SKILL.md"), "# Local do-next\n");
-      writeFile(path.join(projectRoot, ".codex", "skills", "work-intake", "SKILL.md"), "# Local work-intake\n");
+      writeFile(path.join(projectRoot, ".codex", "skills", "next-feature", "SKILL.md"), "# Local next-feature\n");
+      writeFile(path.join(projectRoot, ".codex", "skills", "kickoff", "SKILL.md"), "# Local kickoff\n");
       writeJson(path.join(projectRoot, "package.json"), {
         private: true,
         scripts: {
@@ -55,16 +55,16 @@ describe("attach-submodule", () => {
       expect(agents).toContain("<!-- LLM-HARNESS:START -->");
       expect(wiki).toContain("Keep me too.");
       expect(wiki).toContain("<!-- LLM-HARNESS:WIKI:START -->");
-      expect(fs.readFileSync(path.join(projectRoot, ".codex", "skills", "work-intake", "SKILL.md"), "utf8")).toBe(
-        "# Local work-intake\n",
+      expect(fs.readFileSync(path.join(projectRoot, ".codex", "skills", "kickoff", "SKILL.md"), "utf8")).toBe(
+        "# Local kickoff\n",
       );
-      expect(isSymlink(path.join(projectRoot, ".codex", "skills", "harness-do-next"))).toBe(true);
-      expect(isSymlink(path.join(projectRoot, ".codex", "skills", "harness-work-intake"))).toBe(true);
+      expect(isSymlink(path.join(projectRoot, ".codex", "skills", "harness-next-feature"))).toBe(true);
+      expect(isSymlink(path.join(projectRoot, ".codex", "skills", "harness-kickoff"))).toBe(true);
       expect(packageScripts["harness:check"]).toBe("custom check");
       expect(packageScripts["llm-harness:check"]).toBe("node .harness/scripts/harness/artifact-check.mjs");
-      expect(packageScripts["harness:start"]).toBe("node .harness/scripts/harness/raw-start.mjs");
+      expect(packageScripts["harness:kickoff"]).toBe("node .harness/scripts/harness/kickoff.mjs");
       expect(report).toContain("- Mode: retrofit");
-      expect(report).toContain("- local adapter override: .codex/skills/do-next");
+      expect(report).toContain("- local adapter override: .codex/skills/next-feature");
       expect(report).toContain("- package script override: harness:check");
 
       runHarnessCheck(projectRoot);

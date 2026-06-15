@@ -24,9 +24,8 @@ npm run harness:check
 - public docs에는 금지된 출처/세션/로컬 설정 정보가 없다.
 - 공용 harness role은 Codex/ClaudeCode agent adapter를 가진다.
 - 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
-- Codex/ClaudeCode는 `$do-next` skill adapter를 가진다.
+- Codex/ClaudeCode는 `next-feature`, `kickoff`, `prd-helper`, `adr-helper` skill adapter를 가진다.
 - Codex/ClaudeCode는 `submodule-attach` skill adapter를 가진다.
-- 기존 `work-intake`와 `prd-drafting` adapter는 새 작업을 `$do-next`로 수렴시킨다.
 
 ## 수동 검토 항목
 

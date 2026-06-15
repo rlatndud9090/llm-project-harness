@@ -38,7 +38,7 @@
     3. 후보를 feature/bugfix/chore로 분류한다.
     4. branch/raw path와 PRD/ADR 필요성을 제안한다.
     5. 추천 1순위와 대안을 설명한다.
-    6. 사용자가 선택하면 `$do-next` 흐름으로 돌려 PRD/ADR 작성과 승인까지 진행한다.
+    6. 사용자가 선택하면 `$kickoff`로 raw를 만들고 `$prd-helper`로 PRD 작성을 잇는다.
   </Execution_Protocol>
 
   <Output_Format>

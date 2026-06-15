@@ -26,17 +26,18 @@
 3. `.harness/harness/protocols/session-start.md`
 4. 현재 요청과 관련된 raw unit
 
-### 2. 열린 요청
+### 2. 작업 정의 (단계별 진입)
 
-사용자가 "이제 뭐하지?", "이 아이디어를 작업 단위로 쪼개줘"처럼 넓게 시작하면:
+각 단계는 독립 진입점이다. 무엇을 할지 모르면 1부터, 작업이 이미 정해졌으면
+2부터, PRD만 쓰면 3부터 들어간다.
 
-1. `.harness/harness/protocols/do-next.md`
-2. 필요 시 `.harness/harness/protocols/work-intake.md`
-3. 필요 시 `.harness/harness/protocols/prd-drafting.md`
-4. 관련 role 문서
+1. `.harness/harness/protocols/next-feature.md` — 다음 작업 단위 추천/선택
+2. `.harness/harness/protocols/kickoff.md` — 브랜치 + raw 골격 생성
+3. `.harness/harness/protocols/prd-helper.md` — PRD 작성 보조(interview/research/review)
+4. `.harness/harness/protocols/adr-helper.md` — ADR 작성 보조(선택)
 
-`$do-next`는 작업 단위, branch, raw PRD/ADR, 명시 승인까지 담당하고 구현은
-시작하지 않는다.
+각 단계는 PRD/ADR을 `review`/`proposed`로만 만든다. 구현과 `approved`/`accepted`
+전환은 사용자 명시 승인 이후 별도로 진행한다.
 
 ### 3. 기능 개발
 
@@ -62,10 +63,10 @@ execute를 허용한다.
 ## 프로토콜
 
 - [세션 시작](protocols/session-start.md)
-- [Do Next](protocols/do-next.md)
-- [작업 인테이크](protocols/work-intake.md)
-- [PRD 작성](protocols/prd-drafting.md)
-- [Raw 시작](protocols/raw-start.md)
+- [Next Feature](protocols/next-feature.md)
+- [Kickoff](protocols/kickoff.md)
+- [PRD Helper](protocols/prd-helper.md)
+- [ADR Helper](protocols/adr-helper.md)
 - [Submodule attach](protocols/submodule-attach.md)
 - [기능 개발](protocols/feature-develop.md)
 - [Wiki ingest](protocols/wiki-ingest.md)
@@ -79,6 +80,8 @@ execute를 허용한다.
 - [Intake helper](roles/intake-helper.md)
 - [Unit planner](roles/unit-planner.md)
 - [PRD writer](roles/prd-writer.md)
+- [Researcher](roles/researcher.md)
+- [Reviewer](roles/reviewer.md)
 - [Architect](roles/architect.md)
 - [Domain engineer](roles/domain-engineer.md)
 - [UI engineer](roles/ui-engineer.md)
@@ -90,7 +93,7 @@ execute를 허용한다.
 소비 프로젝트의 package scripts는 `.harness/scripts/harness/*.mjs`를 직접 호출한다.
 
 ```sh
-npm run harness:start -- --type feature --slug main-layout --title "메인 레이아웃"
+npm run harness:kickoff -- --type feature --slug main-layout --title "메인 레이아웃"
 npm run harness:ingest -- docs/raw/feature/main-layout
 npm run harness:check
 npm run harness:gate
