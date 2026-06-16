@@ -77,7 +77,7 @@ describe("artifact-check placeholder detection", () => {
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "filled-unit");
       writeFile(
         path.join(unitDir, "prd.md"),
-        `${frontmatter({ title: "Filled", status: "review", unit_type: "feature" })}\n# PRD\n\n## 목표\n\n- [ ] 사용자가 결과를 공유할 수 있다\n`,
+        `${frontmatter({ title: "Filled", status: "review", unit_type: "feature" })}\n# PRD\n\n## 배경\n\nx\n\n## 목표\n\n- [ ] 사용자가 결과를 공유할 수 있다\n\n## 비목표\n\nx\n\n## 요구사항\n\nx\n\n## 수용 기준\n\n- [ ] 관찰 가능\n`,
       );
       writeFile(
         path.join(unitDir, "adr.md"),
@@ -237,6 +237,58 @@ describe("install-hooks", () => {
       const commitMsgHook = path.join(projectRoot, ".git", "hooks", "commit-msg");
       expect(fs.existsSync(commitMsgHook)).toBe(true);
       expect(read(commitMsgHook)).toContain("verify-commit-msg.mjs");
+    });
+  });
+});
+
+describe("artifact-check required sections", () => {
+  it("fails a review PRD missing required sections", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "sec-prd");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Sec", status: "review", unit_type: "feature" })}\n# PRD\n\n## 목표\n\n- [ ] 사용자가 결과를 본다\n`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "Sec", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      ingest(projectRoot, "docs/raw/feature/sec-prd");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("missing required section");
+    });
+  });
+
+  it("passes a review PRD with all required sections", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "full-prd");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Full", status: "review", unit_type: "feature" })}\n# PRD\n\n## 배경\n\nx\n\n## 목표\n\n- [ ] 사용자가 결과를 본다\n\n## 비목표\n\nx\n\n## 요구사항\n\nx\n\n## 수용 기준\n\n- [ ] 관찰 가능\n`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "Full", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      ingest(projectRoot, "docs/raw/feature/full-prd");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("fails an accepted ADR missing required sections", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "sec-adr");
+      writeFile(path.join(unitDir, "prd.md"), `${frontmatter({ title: "SecAdr", status: "draft", unit_type: "feature" })}\n# PRD\n`);
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "SecAdr", status: "accepted", unit_type: "feature", approval: "user:2026-01-01:ok" })}\n# ADR\n\n## 컨텍스트\n\nx\n`,
+      );
+      ingest(projectRoot, "docs/raw/feature/sec-adr");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("missing required section");
     });
   });
 });

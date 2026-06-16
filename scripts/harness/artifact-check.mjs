@@ -281,6 +281,42 @@ function assertNoPlaceholders() {
   }
 }
 
+// "content settled" 상태의 raw unit은 canonical 템플릿 섹션을 갖춰야 한다. 섹션을
+// 통째로 비운 빈 껍데기가 review/approved/accepted로 통과하는 구멍을 막는다.
+// 섹션명은 harness/templates/raw 의 feature-prd.md / feature-adr.md 기준이다.
+const REQUIRED_SECTIONS = {
+  "prd.md": {
+    statuses: new Set(["review", "approved"]),
+    sections: ["배경", "목표", "비목표", "요구사항", "수용 기준"],
+  },
+  "adr.md": {
+    statuses: new Set(["accepted"]),
+    sections: ["컨텍스트", "결정", "선택지", "선택 근거", "결과", "후속 작업", "검증"],
+  },
+};
+
+function assertRequiredSections() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  for (const filePath of listMarkdownFiles(repoPath("docs", "raw"))) {
+    const baseName = path.basename(filePath);
+    const rule = REQUIRED_SECTIONS[baseName];
+    if (!rule) continue;
+
+    const content = readText(filePath);
+    const fields = parseFrontmatter(content);
+    if (!fields?.status || !rule.statuses.has(fields.status)) continue;
+
+    const relative = toPosix(path.relative(process.cwd(), filePath));
+    const body = bodyAfterFrontmatter(content);
+    for (const section of rule.sections) {
+      if (!new RegExp(`^##\\s+${section}\\s*$`, "m").test(body)) {
+        addError(`${baseName} (status ${fields.status}) is missing required section "## ${section}": ${relative}`);
+      }
+    }
+  }
+}
+
 function assertPublicSafeDocs() {
   if (harnessRepoMode) return;
 
@@ -535,6 +571,7 @@ assertRawUnitsLinked();
 assertCurrentBranchRawUnit();
 assertFrontmatter();
 assertNoPlaceholders();
+assertRequiredSections();
 assertStatusTransitions();
 assertAdrReferences();
 assertImmutableAdrBody();
