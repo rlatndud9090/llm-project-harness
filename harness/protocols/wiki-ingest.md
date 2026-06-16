@@ -1,7 +1,8 @@
 # Wiki Ingest 프로토콜
 
 raw unit이 추가되거나 상태가 의미 있게 바뀌면 `docs/wiki/index.md`에 한 줄
-링크를 추가한다. wiki는 합성 문서가 아니라 navigation index다.
+링크를 추가한다. wiki는 합성 문서가 아니라, 프로젝트의 **분류 체계**를 따라 모든
+raw unit으로 가는 길을 제공하는 navigation index다.
 
 ## 명령
 
@@ -15,18 +16,32 @@ npm run harness:ingest -- docs/raw/<type>/<slug>
 - wiki는 사람이 손으로 고치지 않고 `harness:ingest`로만 갱신하는 LLM Wiki다.
 - 같은 raw unit을 여러 번 ingest해도 중복 줄이 생기면 안 된다.
 - raw 본문 내용을 wiki에 요약하지 않는다.
-- 링크 한 줄만 추가한다.
+- 적절한 카테고리 아래에 링크 한 줄만 추가한다.
 - 새 wiki page, log, frontmatter sync, rebuild metadata를 만들지 않는다.
 
-## 카테고리 기본값
+## 분류 체계 (카테고리)
 
-| raw type | 기본 카테고리 |
+wiki는 단순한 링크 더미가 아니라, 프로젝트가 정의한 분류 체계를 따르는 색인이다.
+ingest할 때 raw unit의 내용(PRD/ADR)을 근거로 index의 기존 카테고리 중 가장 적합한
+하나를 고른다. 맞는 카테고리가 없으면 새 카테고리를 만든다. **분류는 의미 판단이므로
+`--category`로 명시한다.**
+
+```sh
+npm run harness:ingest -- docs/raw/<type>/<slug> --category "<분류 이름>"
+```
+
+`--category`를 생략하면 아래 type 기반 fallback으로 떨어지고, ingest가 현재 index의
+기존 분류 목록을 함께 출력한다. fallback은 분류를 지정하지 않았을 때의 최소 기본값일
+뿐이며, 정확한 분류는 모델이 내용을 보고 고른다.
+
+| raw type | fallback 카테고리 |
 | --- | --- |
 | `feature` | `Product & Architecture` |
 | `bugfix` | `Project Operations` |
 | `chore` | `Project Operations` |
 
-필요하면 category를 명시할 수 있지만, 카테고리는 navigation label일 뿐이다.
+카테고리는 프로젝트가 자유롭게 정의·조정하는 분류축이다. 상세 내용은 링크된 raw에
+두고, 카테고리는 그 분류축만 제공한다.
 
 ## 검증
 

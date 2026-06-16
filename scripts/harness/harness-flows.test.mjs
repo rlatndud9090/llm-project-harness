@@ -130,6 +130,117 @@ describe("artifact-check placeholder detection", () => {
   });
 });
 
+describe("artifact-check adr references", () => {
+  it("fails when adr related_prd points to a missing file", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "ref-unit");
+      writeFile(path.join(unitDir, "prd.md"), `${frontmatter({ title: "Ref", status: "draft", unit_type: "feature" })}\n# PRD\n`);
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "Ref", status: "proposed", unit_type: "feature", related_prd: "./missing.md" })}\n# ADR\n`,
+      );
+      ingest(projectRoot, "docs/raw/feature/ref-unit");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("related_prd points to a missing file");
+    });
+  });
+
+  it("passes when adr related_prd resolves to an existing file", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "ok-ref");
+      writeFile(path.join(unitDir, "prd.md"), `${frontmatter({ title: "Ok", status: "draft", unit_type: "feature" })}\n# PRD\n`);
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "Ok", status: "proposed", unit_type: "feature", related_prd: "./prd.md" })}\n# ADR\n`,
+      );
+      ingest(projectRoot, "docs/raw/feature/ok-ref");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
+describe("artifact-check adr body immutability", () => {
+  it("blocks editing an accepted ADR body recorded in git history", () => {
+    withGitProject((projectRoot) => {
+      seedDecisionUnit(projectRoot, "accepted", "user:2026-01-01:approved");
+      const adrPath = path.join(projectRoot, "docs", "raw", "feature", "decision", "adr.md");
+      writeFile(
+        adrPath,
+        `${frontmatter({ title: "Decision", status: "accepted", unit_type: "feature", approval: "user:2026-01-01:approved" })}\n# Decision\n\n## 결정\n\n원래 결정을 다른 내용으로 재작성한다.\n`,
+      );
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("ADR body must not change");
+    });
+  });
+
+  it("allows changing only status on an accepted ADR (retire to superseded)", () => {
+    withGitProject((projectRoot) => {
+      seedDecisionUnit(projectRoot, "accepted", "user:2026-01-01:approved");
+      regressAdrStatus(projectRoot, "superseded");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
+describe("verify-commit-msg", () => {
+  it("rejects a commit message without a 관련 문서 block", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const msgPath = path.join(projectRoot, "COMMIT_MSG.txt");
+      writeFile(msgPath, "feat: do a thing\n\n맥락 설명.\n");
+      const result = runVerifyMsg(projectRoot, msgPath);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("관련 문서");
+    });
+  });
+
+  it("accepts a commit message with a 관련 문서 block and link", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const msgPath = path.join(projectRoot, "COMMIT_MSG.txt");
+      writeFile(msgPath, "feat: do a thing\n\n맥락.\n\n관련 문서:\n[PRD](docs/raw/feature/x/prd.md)\n");
+      const result = runVerifyMsg(projectRoot, msgPath);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("skips auto-generated merge commits", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const msgPath = path.join(projectRoot, "COMMIT_MSG.txt");
+      writeFile(msgPath, "Merge branch 'main' into feature/x\n");
+      const result = runVerifyMsg(projectRoot, msgPath);
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
+describe("install-hooks", () => {
+  it("installs pre-commit and commit-msg hooks", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      execFileSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "install-hooks.mjs")], {
+        cwd: projectRoot,
+        encoding: "utf8",
+      });
+      expect(fs.existsSync(path.join(projectRoot, ".git", "hooks", "pre-commit"))).toBe(true);
+      const commitMsgHook = path.join(projectRoot, ".git", "hooks", "commit-msg");
+      expect(fs.existsSync(commitMsgHook)).toBe(true);
+      expect(read(commitMsgHook)).toContain("verify-commit-msg.mjs");
+    });
+  });
+});
+
 function seedDecisionUnit(projectRoot, adrStatus, adrApproval) {
   attach(projectRoot);
   const unitDir = path.join(projectRoot, "docs", "raw", "feature", "decision");
@@ -183,6 +294,14 @@ function ingest(projectRoot, unitPath) {
   execFileSync(
     process.execPath,
     [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath],
+    { cwd: projectRoot, encoding: "utf8" },
+  );
+}
+
+function runVerifyMsg(projectRoot, msgPath) {
+  return spawnSync(
+    process.execPath,
+    [path.join(projectRoot, ".harness", "scripts", "harness", "verify-commit-msg.mjs"), msgPath],
     { cwd: projectRoot, encoding: "utf8" },
   );
 }

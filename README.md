@@ -92,8 +92,9 @@ adapter가 있으면 로컬 adapter를 우선하고 하네스 adapter는 `harnes
 합니다. `harness:gate`는 harness check 뒤에 그 명령들을 순서대로 실행합니다.
 
 `harness:hooks`는 선택 사항입니다. 실행하면 현재 git 저장소의 `pre-commit` 훅에
-`harness:check`를 걸어 정합성이 깨진 커밋을 막습니다. 하네스가 자동으로 설치하지
-않으며, 소비 프로젝트가 명시적으로 opt-in 합니다.
+`harness:check`를 걸어 정합성이 깨진 커밋을 막고, `commit-msg` 훅으로 커밋 메시지의
+`관련 문서:` 블록을 강제합니다. 하네스가 자동으로 설치하지 않으며, 소비 프로젝트가
+명시적으로 opt-in 합니다.
 
 ## 하네스 업데이트
 

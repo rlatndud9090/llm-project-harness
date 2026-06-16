@@ -32,6 +32,10 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 [ADR](docs/raw/<type>/<slug>/adr.md)
 ```
 
+소비 프로젝트에서 `npm run harness:hooks`로 훅을 설치하면 `commit-msg` 훅이 이
+`관련 문서:` 블록과 링크의 존재를 기계강제한다. 어떤 문서를 링크할지는 모델
+재량이고, 블록·링크의 존재만 강제한다. harness provider 저장소 자신은 제외한다.
+
 기본값은 PRD와 ADR 링크다. 특히 아래 변경은 PRD/ADR 링크가 필수다.
 
 - 사용자 경험, 제품 요구사항, 핵심 규칙 변경

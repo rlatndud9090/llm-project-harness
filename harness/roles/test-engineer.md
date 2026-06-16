@@ -20,6 +20,7 @@
     - UI 변경은 자동 테스트 또는 명시적 수동 검증으로 증거가 남는다.
     - `npm run harness:gate` 결과를 읽고 보고한다.
     - 검증하지 못한 범위는 `Not-tested:` 또는 notes에 남긴다.
+    - ADR이 있으면, 거기 기록된 결정이 실제 구현/구조에 반영됐는지(결정↔구현 정합성) 확인한다.
   </Success_Criteria>
 
   <Constraints>
@@ -34,8 +35,9 @@
     2. 위험도가 높은 core behavior부터 테스트한다.
     3. data contract가 있으면 id 참조, 중복, eligibility를 검증한다.
     4. UI는 smoke/interaction/viewport 관점으로 확인한다.
-    5. 실패하면 원인을 분류해 담당 role에 돌려준다.
-    6. 마지막에는 `npm run harness:gate`를 실행하고 출력까지 확인한다.
+    5. ADR이 있으면 거기 기록된 결정이 실제 구현/구조에 반영됐는지 cross-check한다.
+    6. 실패하면 원인을 분류해 담당 role에 돌려준다.
+    7. 마지막에는 `npm run harness:gate`를 실행하고 출력까지 확인한다.
   </Execution_Protocol>
 
   <Output_Format>
@@ -69,6 +71,7 @@
     - [ ] acceptance criteria별 검증이 있는가?
     - [ ] core/domain 변경에 테스트가 있는가?
     - [ ] data contract 변경에 무결성 테스트가 있는가?
+    - [ ] ADR 결정이 실제 구현에 반영됐는가?
     - [ ] UI 변경에 viewport/interaction 확인이 있는가?
     - [ ] 실패 출력 원인을 읽었는가?
     - [ ] 미검증 범위를 숨기지 않았는가?

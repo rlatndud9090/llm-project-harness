@@ -221,6 +221,9 @@ Last updated: TODO Asia/Seoul
 
 ## Raw Units
 
+아래 카테고리는 분류 체계의 출발점이다. 프로젝트에 맞게 자유롭게 추가·조정하고,
+ingest 시 \`--category\`로 raw unit에 맞는 분류를 지정한다.
+
 ### Product & Architecture
 
 ### Project Operations
@@ -228,13 +231,13 @@ Last updated: TODO Asia/Seoul
 ## Maintenance
 
 - 새 raw work unit은 \`docs/raw/{feature,bugfix,chore}/branch-slug/\` 아래에 둔다.
-- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug>\`를 실행한다.
+- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug> --category "<분류>"\`를 실행한다.
 `,
     "LLM-HARNESS:WIKI",
     `## Harness Maintenance
 
 - 새 raw work unit은 \`docs/raw/{feature,bugfix,chore}/branch-slug/\` 아래에 둔다.
-- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug>\`를 실행한다.
+- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug> --category "<분류>"\`를 실행한다.
 - 기존 문서는 강제로 이동하지 않는다. 새 작업부터 raw/wiki 규칙을 적용한다.
 `,
   );

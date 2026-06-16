@@ -66,18 +66,19 @@ package.json
 하네스-네이티브 기본 동작(명시 질문 인터뷰, `architect → domain/ui/test → integrator`
 role 체인)으로 동작한다. 가속기는 있으면 쓰고, 없으면 기본 동작으로 진행한다.
 
-## pre-commit 훅 (선택)
+## git 훅 (선택)
 
-커밋 직전에 `harness:check`를 강제하려면 소비 프로젝트에서 한 번 설치한다. 하네스
-저장소가 자동으로 깔지 않으며 opt-in이다.
+커밋 직전에 `harness:check`와 커밋 메시지의 `관련 문서:` 블록을 강제하려면 소비
+프로젝트에서 한 번 설치한다. 하네스 저장소가 자동으로 깔지 않으며 opt-in이다.
 
 ```sh
 npm run harness:hooks
 ```
 
-설치 스크립트는 현재 git 저장소의 `pre-commit` 훅에 `npm run harness:check`를
-건다. 기존 훅이 있으면 보존하고 안내하며, `--force`로만 교체한다(`.local.bak`
-백업을 남긴다). retrofit으로 `harness:*`가 `llm-harness:*`로 보존된 프로젝트는
+설치 스크립트는 현재 git 저장소의 `pre-commit` 훅에 `npm run harness:check`를,
+`commit-msg` 훅에 `관련 문서:` 블록 검증(verify-commit-msg)을 건다. 기존 훅이
+있으면 보존하고 안내하며, `--force`로만 교체한다(`.local.bak` 백업을 남긴다).
+retrofit으로 `harness:*`가 `llm-harness:*`로 보존된 프로젝트는 pre-commit이
 실행할 명령을 직접 지정한다.
 
 ```sh

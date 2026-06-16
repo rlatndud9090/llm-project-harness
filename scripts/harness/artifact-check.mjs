@@ -330,6 +330,55 @@ function assertStatusTransitions() {
   }
 }
 
+// ADR frontmatter의 related_prd/supersedes가 실제 파일을 가리키는지 검증한다.
+// assertWikiLinks와 같은 클래스의 link-resolution 게이트다. 값이 비어 있으면
+// 건너뛴다(supersedes는 비어 있는 게 정상이다). 경로는 ADR 디렉토리 기준이다.
+function assertAdrReferences() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  for (const filePath of listMarkdownFiles(repoPath("docs", "raw"))) {
+    if (path.basename(filePath) !== "adr.md") continue;
+
+    const fields = parseFrontmatter(readText(filePath));
+    if (!fields) continue;
+
+    const relative = toPosix(path.relative(process.cwd(), filePath));
+    const dir = path.dirname(filePath);
+    for (const key of ["related_prd", "supersedes"]) {
+      const value = fields[key];
+      if (!value) continue;
+      if (!pathExists(path.resolve(dir, value))) {
+        addError(`adr.md ${key} points to a missing file (${value}): ${relative}`);
+      }
+    }
+  }
+}
+
+// accepted/deprecated/superseded ADR은 과거 결정의 근거다. status/approval 같은
+// frontmatter는 바꿀 수 있어도 본문은 고쳐 쓰지 않는다. 이전 커밋이 이미 불변
+// 상태였는데 본문이 바뀌면 막는다(결정이 바뀌면 superseding ADR을 추가한다).
+function assertImmutableAdrBody() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  const immutableStatuses = new Set(["accepted", "deprecated", "superseded"]);
+  for (const filePath of listMarkdownFiles(repoPath("docs", "raw"))) {
+    if (path.basename(filePath) !== "adr.md") continue;
+
+    const relativePosix = toPosix(path.relative(REPO_ROOT, filePath));
+    const previousContent = gitShow(relativePosix);
+    if (!previousContent) continue; // new ADR or no git history to compare
+
+    const previous = parseFrontmatter(previousContent);
+    if (!previous?.status || !immutableStatuses.has(previous.status)) continue;
+
+    if (bodyAfterFrontmatter(previousContent).trim() !== bodyAfterFrontmatter(readText(filePath)).trim()) {
+      addError(
+        `accepted/deprecated/superseded ADR body must not change; record a superseding ADR instead: ${toPosix(path.relative(process.cwd(), filePath))}`,
+      );
+    }
+  }
+}
+
 function assertHarnessAdapters() {
   const roleDir = harnessPath("harness", "roles");
   const roleFiles = fs
@@ -487,6 +536,8 @@ assertCurrentBranchRawUnit();
 assertFrontmatter();
 assertNoPlaceholders();
 assertStatusTransitions();
+assertAdrReferences();
+assertImmutableAdrBody();
 assertPublicSafeDocs();
 assertHarnessAdapters();
 assertAdapterParity();

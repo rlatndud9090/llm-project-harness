@@ -23,6 +23,8 @@ npm run harness:check
   근거가 기록돼 있다. 자동 검사는 근거의 형식과 존재를 강제한다. 근거가 형님의 실제
   동의를 반영하는지는 아래 수동 검토 항목에서 확인한다.
 - raw unit의 status는 git 기록 대비 명백한 후퇴로 바뀌지 않는다(예: PRD `approved`→`draft`, ADR `accepted`→`proposed`). reopen(`rejected`→`draft`)이나 retire(`accepted`→`superseded`)는 허용한다.
+- ADR의 `related_prd`와 `supersedes` 링크는 실제 파일을 가리킨다(값이 비어 있으면 검사하지 않는다).
+- `accepted`/`deprecated`/`superseded` ADR의 본문은 git 기록 대비 바뀌지 않는다. status/approval 같은 frontmatter 변경은 허용한다.
 - public docs에는 금지된 출처/세션/로컬 설정 정보가 없다.
 - 공용 harness role은 Codex/ClaudeCode agent adapter를 가진다.
 - 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
@@ -47,7 +49,10 @@ npm run harness:check
 
 ## ADR 불변성
 
-accepted ADR은 과거 결정의 근거다. 내용을 고쳐 쓰지 않는다.
+accepted ADR은 과거 결정의 근거다. 내용을 고쳐 쓰지 않는다. 이 규칙은
+`harness:check`가 git 기록 대비 본문 변경을 차단해 기계강제한다. 오타 수정조차
+본문을 바꾸므로, 결정 내용을 바꾸려면 본문을 고치지 말고 superseding ADR을 새로
+추가한다(status/approval frontmatter 변경과 superseding ADR 추가는 허용한다).
 
 ADR은 에이전트가 단독으로 `accepted` 처리하지 않는다. 사용자의 명시 승인이 있을
 때만 아래 frontmatter를 추가하고 status를 전환한다.
@@ -67,7 +72,7 @@ approval: "user:YYYY-MM-DD:<짧은 승인 근거>"
 금지:
 
 - accepted ADR 본문을 현재 생각에 맞게 재작성
-- 과거 대안/기각 이유를 삭제
+- 과거 선택지/선택 근거를 삭제
 - 결정 근거를 wiki에만 남기고 raw에 남기지 않기
 
 ## 실패 처리
