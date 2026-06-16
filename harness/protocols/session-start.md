@@ -41,6 +41,13 @@
 | 승인된 PRD/ADR 기반 기능 구현 | `feature-develop.md` |
 | 검증/커밋 | `integration-gate.md`, `commit-protocol.md` |
 
+## 스킬과 명령
+
+ClaudeCode에서 같은 단계가 `/command`와 skill 두 표면으로 노출되면(`kickoff`,
+`wiki-ingest`, `artifact-check`), `/command`는 사람이 직접 부르는 진입점이고 같은
+이름의 skill은 모델이 자동 트리거하는 진입점이다. 둘 다 같은 protocol 문서를 기준으로
+동작한다. Codex는 skill 표면 하나만 쓴다.
+
 ## 금지
 
 - wiki index를 읽지 않고 바로 구현하지 않는다.

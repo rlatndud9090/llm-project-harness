@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   REPO_ROOT,
+  bodyAfterFrontmatter,
   fail,
   findHarnessRoot,
   getCurrentBranch,
@@ -236,6 +237,50 @@ function assertApprovalField(fields, relative, label) {
   }
 }
 
+// A raw unit that has reached a "content settled" status must not still carry
+// kickoff template scaffolding. The most reliable signal is an unsubstituted
+// `{...}` token (kickoff never fills `{이름}`, and `{제목}`/`{slug}` only survive
+// when kickoff was bypassed); a few template-only phrases back it up. This turns
+// the narrative "no placeholder PRD/ADR" rule into a machine gate.
+const PLACEHOLDER_SENTINELS = {
+  "prd.md": {
+    statuses: new Set(["review", "approved"]),
+    markers: ["목표 1", "요구사항 1", "완료 기준 1", "제외 항목 1"],
+  },
+  "adr.md": {
+    statuses: new Set(["accepted"]),
+    markers: ["후속 작업 1"],
+  },
+};
+
+function assertNoPlaceholders() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  for (const filePath of listMarkdownFiles(repoPath("docs", "raw"))) {
+    const baseName = path.basename(filePath);
+    const rule = PLACEHOLDER_SENTINELS[baseName];
+    if (!rule) continue;
+
+    const content = readText(filePath);
+    const fields = parseFrontmatter(content);
+    if (!fields?.status || !rule.statuses.has(fields.status)) continue;
+
+    const relative = toPosix(path.relative(process.cwd(), filePath));
+    const body = bodyAfterFrontmatter(content);
+
+    const tokenMatch = body.match(/\{[^}\n]{1,40}\}/);
+    if (tokenMatch) {
+      addError(`${baseName} (status ${fields.status}) still has an unsubstituted template token ${tokenMatch[0]}: ${relative}`);
+    }
+
+    for (const marker of rule.markers) {
+      if (body.includes(marker)) {
+        addError(`${baseName} (status ${fields.status}) still contains template placeholder "${marker}": ${relative}`);
+      }
+    }
+  }
+}
+
 function assertPublicSafeDocs() {
   if (harnessRepoMode) return;
 
@@ -293,12 +338,15 @@ function assertHarnessAdapters() {
     .map((entry) => path.basename(entry, ".md"));
 
   for (const roleName of roleFiles) {
-    const codexAdapters = [
+    // Codex loads the .toml at runtime and the .md is the readable mirror; both
+    // are required so a half-deleted or stale pair cannot pass silently.
+    for (const codexAdapter of [
       rootAdapterPath(".codex", "agents", `${roleName}.md`),
       rootAdapterPath(".codex", "agents", `${roleName}.toml`),
-    ];
-    if (!codexAdapters.some(pathExists)) {
-      addError(`missing Codex agent adapter for harness role: ${roleName}`);
+    ]) {
+      if (!pathExists(codexAdapter)) {
+        addError(`missing Codex agent adapter: ${toPosix(path.relative(process.cwd(), codexAdapter))}`);
+      }
     }
 
     const claudeAdapter = rootAdapterPath(".claude", "agents", `${roleName}.md`);
@@ -363,9 +411,68 @@ function assertHarnessAdapters() {
     },
   ];
 
+  // Each listed entry is a distinct runtime entrypoint (e.g. a skill and a
+  // command are not interchangeable), so require every one rather than any.
   for (const surface of requiredSurfaces) {
-    if (!surface.codex.some(pathExists)) addError(`missing Codex adapter for harness surface: ${surface.name}`);
-    if (!surface.claude.some(pathExists)) addError(`missing ClaudeCode adapter for harness surface: ${surface.name}`);
+    for (const codexPath of surface.codex) {
+      if (!pathExists(codexPath)) addError(`missing Codex adapter for ${surface.name}: ${toPosix(path.relative(process.cwd(), codexPath))}`);
+    }
+    for (const claudePath of surface.claude) {
+      if (!pathExists(claudePath)) addError(`missing ClaudeCode adapter for ${surface.name}: ${toPosix(path.relative(process.cwd(), claudePath))}`);
+    }
+  }
+}
+
+function tomlDeveloperInstructions(content) {
+  const match = /developer_instructions\s*=\s*"""\r?\n?([\s\S]*?)"""/.exec(content);
+  return match ? match[1] : null;
+}
+
+// Adapters are hand-maintained mirrors; verify the Codex and ClaudeCode copies
+// have not drifted apart (and that a Codex .toml still matches its .md). Runs in
+// harness-provider mode only, so a consumer project's local override adapters
+// are never compared.
+function assertAdapterParity() {
+  if (!harnessRepoMode) return;
+
+  const roleNames = fs
+    .readdirSync(harnessPath("harness", "roles"))
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => path.basename(entry, ".md"));
+
+  for (const roleName of roleNames) {
+    const codexMd = rootAdapterPath(".codex", "agents", `${roleName}.md`);
+    const claudeMd = rootAdapterPath(".claude", "agents", `${roleName}.md`);
+    if (pathExists(codexMd) && pathExists(claudeMd) && readText(codexMd).trim() !== readText(claudeMd).trim()) {
+      addError(`Codex and ClaudeCode agent adapters diverged: ${roleName}`);
+    }
+
+    const tomlPath = rootAdapterPath(".codex", "agents", `${roleName}.toml`);
+    if (pathExists(tomlPath) && pathExists(codexMd)) {
+      const tomlBody = tomlDeveloperInstructions(readText(tomlPath));
+      if (tomlBody !== null && tomlBody.trim() !== bodyAfterFrontmatter(readText(codexMd)).trim()) {
+        addError(`Codex .toml developer_instructions diverged from the .md adapter: ${roleName}`);
+      }
+    }
+  }
+
+  const codexSkillsDir = rootAdapterPath(".codex", "skills");
+  if (!pathExists(codexSkillsDir)) return;
+
+  for (const skillName of fs.readdirSync(codexSkillsDir)) {
+    const codexSkill = path.join(codexSkillsDir, skillName, "SKILL.md");
+    const claudeSkill = rootAdapterPath(".claude", "skills", skillName, "SKILL.md");
+    if (!pathExists(codexSkill) || !pathExists(claudeSkill)) continue;
+
+    // The ClaudeCode skill may append an optional "## Claude Code ..." section
+    // (Claude-native execution notes); the rest must match the Codex skill
+    // (modulo trailing whitespace).
+    const claudeContent = readText(claudeSkill);
+    const accelIndex = claudeContent.indexOf("## Claude Code");
+    const claudeBase = accelIndex === -1 ? claudeContent : claudeContent.slice(0, accelIndex);
+    if (claudeBase.trim() !== readText(codexSkill).trim()) {
+      addError(`Codex and ClaudeCode skill adapters diverged: ${skillName}`);
+    }
   }
 }
 
@@ -378,9 +485,11 @@ assertRawUnits();
 assertRawUnitsLinked();
 assertCurrentBranchRawUnit();
 assertFrontmatter();
+assertNoPlaceholders();
 assertStatusTransitions();
 assertPublicSafeDocs();
 assertHarnessAdapters();
+assertAdapterParity();
 
 if (errors.length > 0) {
   for (const error of errors) {

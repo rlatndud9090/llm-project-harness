@@ -76,6 +76,21 @@ The consumer project owns root `.codex/` and `.claude/`.
 - Use `--force` only when the user intentionally wants to replace a local
   adapter with the shared harness adapter.
 
+## Skill Invocation Markers
+
+Protocol and adapter prose points at harness skills with a `$` marker, e.g.
+`$next-feature`, `$kickoff`, `$prd-helper`. `$<name>` means "invoke the harness
+skill `<name>`" — ClaudeCode uses the Skill tool or `/<name>`; Codex uses the
+skill prompt. The marker is a documentation pointer, not a shell variable, and
+the name always matches a shipped skill adapter. Load-bearing handoffs name the
+skill in plain language too, so the marker is never the only signal.
+
+`$deep-interview`, `$ralph`, `$ralplan`, and `/team` are OPTIONAL external
+accelerators (oh-my-claudecode / OMX); this harness does not ship them. When they
+are absent, use the harness-native default each protocol defines (a one-question
+interview, and the `architect → domain/ui/test → integrator` role chain) and do
+not block on them.
+
 ## Development Rules
 
 - Keep project-authored documentation in Korean by default.

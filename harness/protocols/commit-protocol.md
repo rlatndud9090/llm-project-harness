@@ -126,7 +126,7 @@ Directive: <미래 수정자를 위한 지시>
 Tested: <실제로 실행한 검증>
 Not-tested: <알려진 검증 공백>
 Related: docs/raw/<type>/<slug>/
-Co-authored-by: OmX <omx@oh-my-codex.dev>
+Co-authored-by: <커밋을 만든 에이전트 정체성>
 EOF
 )"
 ```
@@ -137,7 +137,9 @@ EOF
 - `Not-tested:`는 알려진 공백을 적는다. 공백이 없으면 `None` 대신 구체적 맥락을
   짧게 쓴다.
 - `Related:`에는 raw unit 경로를 적는다.
-- `Co-authored-by: OmX <omx@oh-my-codex.dev>`는 hook 요구사항이다.
+- `Co-authored-by:`는 커밋을 만든 에이전트의 정체성으로 채운다(Codex는
+  `OmX <omx@oh-my-codex.dev>`, ClaudeCode는 해당 도구의 co-author identity). 이는 커밋
+  규약이며, 하네스가 hook으로 강제하지 않는다. 각 도구는 자신의 정체성으로 서명한다.
 
 권장 trailer:
 
@@ -177,7 +179,7 @@ EOF
 - [ ] `git diff --cached --check`가 통과했는가?
 - [ ] 민감 정보와 local-only 파일이 없는가?
 - [ ] `Related:` raw path가 있는가?
-- [ ] `Co-authored-by: OmX <omx@oh-my-codex.dev>`가 있는가?
+- [ ] `Co-authored-by:`에 커밋 에이전트 정체성이 있는가?
 
 ## 실패 모드
 

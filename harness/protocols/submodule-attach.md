@@ -59,6 +59,13 @@ package.json
 }
 ```
 
+## 선택적 외부 가속기
+
+하네스는 `$deep-interview`, `$ralph`, `$ralplan`, `/team` 같은 oh-my-claudecode/OMX
+스킬을 배포하지 않는다. 이들이 설치돼 있지 않아도 하네스는 protocol에 정의된
+하네스-네이티브 기본 동작(명시 질문 인터뷰, `architect → domain/ui/test → integrator`
+role 체인)으로 동작한다. 가속기는 있으면 쓰고, 없으면 기본 동작으로 진행한다.
+
 ## pre-commit 훅 (선택)
 
 커밋 직전에 `harness:check`를 강제하려면 소비 프로젝트에서 한 번 설치한다. 하네스

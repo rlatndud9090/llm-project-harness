@@ -15,6 +15,10 @@
   프로젝트 override로 보존한다.
 - 작업 단위, 브랜치 정책, PRD/ADR 승인 정책은 소비 프로젝트가 하네스를 사용할 때
   적용한다. 하네스 저장소 자체에 같은 정책을 강제하지 않는다.
+- 프로토콜 본문의 `$skill-name`은 "그 하네스 skill을 호출하라"는 표시다(ClaudeCode는
+  Skill 도구나 `/skill-name`, Codex는 skill 프롬프트). `$deep-interview`, `$ralph`,
+  `$ralplan`, `/team`은 하네스가 배포하지 않는 선택적 외부 가속기이고, 없으면
+  protocol의 하네스-네이티브 기본 동작으로 진행한다.
 
 ## 소비 프로젝트 실행 흐름
 
@@ -46,9 +50,11 @@
 2. 관련 raw PRD/ADR/notes
 3. 필요한 role 문서
 
-구조, 데이터, engine, dependency, 다중 모듈 변경은 `$ralplan`을 먼저 검토한다.
-승인된 branch-sized 구현은 `$ralph`가 기본 실행 레일이고, 작은 국소 수정만 solo
-execute를 허용한다.
+구조, 데이터, engine, dependency, 다중 모듈 변경은 설계를 먼저 확정한 뒤 구현한다
+(`architect` role로 계획을 수립하고, `$ralplan`이 설치돼 있으면 계획 게이트로 쓴다).
+승인된 branch-sized 구현의 기본 실행 레일은 `architect → domain/ui/test →
+integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 수 있다. 작은 국소
+수정만 solo execute를 허용한다.
 
 ### 4. 통합
 

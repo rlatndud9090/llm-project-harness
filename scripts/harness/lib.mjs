@@ -187,6 +187,16 @@ export function parseFrontmatter(content) {
   return fields;
 }
 
+// Returns the markdown body after the frontmatter block (or the whole content
+// when there is no frontmatter). Content/placeholder checks use this so they
+// never match frontmatter keys.
+export function bodyAfterFrontmatter(content) {
+  if (!content.startsWith("---\n")) return content;
+  const end = content.indexOf("\n---", 4);
+  if (end === -1) return content;
+  return content.slice(end + 4);
+}
+
 export function extractH1(content) {
   const match = /^#\s+(.+)$/m.exec(content);
   return match?.[1]?.trim() ?? null;

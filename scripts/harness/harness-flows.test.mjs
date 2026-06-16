@@ -50,6 +50,86 @@ describe("artifact-check status transitions", () => {
   });
 });
 
+describe("artifact-check placeholder detection", () => {
+  it("fails a review PRD that still contains template placeholders", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "ph-unit");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Ph", status: "review", unit_type: "feature" })}\n# PRD\n\n## 목표\n\n- [ ] 목표 1\n`,
+      );
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "Ph", status: "proposed", unit_type: "feature" })}\n# ADR\n`,
+      );
+      ingest(projectRoot, "docs/raw/feature/ph-unit");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("template placeholder");
+    });
+  });
+
+  it("passes a review PRD whose template placeholders are filled in", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "filled-unit");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Filled", status: "review", unit_type: "feature" })}\n# PRD\n\n## 목표\n\n- [ ] 사용자가 결과를 공유할 수 있다\n`,
+      );
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "Filled", status: "proposed", unit_type: "feature" })}\n# ADR\n`,
+      );
+      ingest(projectRoot, "docs/raw/feature/filled-unit");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("fails an accepted ADR that still has an unsubstituted {이름} token", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "adr-ph");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "AdrPh", status: "draft", unit_type: "feature" })}\n# PRD\n`,
+      );
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "AdrPh", status: "accepted", unit_type: "feature", approval: "user:2026-01-01:ok" })}\n# ADR\n\n### 선택지 A: {이름}\n`,
+      );
+      ingest(projectRoot, "docs/raw/feature/adr-ph");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("{이름}");
+    });
+  });
+
+  it("ignores placeholders while the unit is still a draft", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "draft-unit");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Draft", status: "draft", unit_type: "feature" })}\n# PRD\n\n- [ ] 목표 1\n`,
+      );
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "Draft", status: "proposed", unit_type: "feature" })}\n# ADR\n`,
+      );
+      ingest(projectRoot, "docs/raw/feature/draft-unit");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
 function seedDecisionUnit(projectRoot, adrStatus, adrApproval) {
   attach(projectRoot);
   const unitDir = path.join(projectRoot, "docs", "raw", "feature", "decision");

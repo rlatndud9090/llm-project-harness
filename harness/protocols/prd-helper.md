@@ -18,9 +18,10 @@ PRD는 한국어로 작성한다. branch name, file path, command, TypeScript id
 
 ## 진행 루프
 
-### Phase 1: 의견 수집 (`$deep-interview`)
+### Phase 1: 의견 수집
 
-1. `$deep-interview`로 목표, 성공 기준, 비목표, 결정 경계를 끌어낸다.
+1. 목표, 성공 기준, 비목표, 결정 경계를 끌어낸다. `$deep-interview`가 설치돼 있으면
+   그걸로 구조화하고, 없으면 한 번에 하나씩 명시 질문하고 답을 기다린다.
 2. 사용자가 직접 판단해야 하는 항목은 숨은 가정으로 처리하지 않고 명시 질문한다.
 
 ### Phase 2: 레퍼런스 수집 (`researcher`)
@@ -76,6 +77,11 @@ PRD는 한국어로 작성한다. branch name, file path, command, TypeScript id
 - 필요하면 `$adr-helper`로 넘어가 ADR을 작성한다(ADR은 `proposed` 상태 초안).
 - 필요 없으면 그 이유를 한 줄로 남긴다. ADR 작성은 선택이다.
 
+ADR "작성"이 선택이라는 뜻이지 `adr.md` 파일은 선택이 아니다. feature 단위는 항상
+`adr.md`를 유지한다(`$kickoff`가 생성하고 `harness:check`가 존재를 요구한다). ADR이
+불필요하면 본문에 "불필요: <이유>" 한 줄만 남기고 status는 `proposed`로 둔다. 파일을
+지우지 않는다.
+
 ## 정리
 
 PRD 초안이 자리를 잡으면:
@@ -85,8 +91,10 @@ npm run harness:ingest -- docs/raw/<type>/<slug>
 npm run harness:check
 ```
 
-이 단계는 PRD를 `review` 상태로 마무리한다. `approved` 전환과 구현은 사용자
-명시 승인 이후 별도 단계에서 진행한다.
+이 단계는 PRD를 `review` 상태로 마무리한다. `approved` 전환은 형님이 명시 승인하는
+시점에 이뤄진다: 형님이 승인하면 에이전트가 직접 status를 `approved`로 바꾸고
+`approval: "user:YYYY-MM-DD:<근거>"`를 함께 기록한다(별도 사람 커밋은 필요 없다).
+구현은 그 이후 `feature-develop`에서 진행한다.
 
 ## 품질 게이트
 

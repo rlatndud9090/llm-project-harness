@@ -43,4 +43,4 @@ trailer를 유지한다.
 - HEREDOC 없이 한 줄 `git commit -m`
 
 커밋에는 `Related: docs/raw/<type>/<slug>/`와
-`Co-authored-by: OmX <omx@oh-my-codex.dev>`를 포함한다.
+커밋 에이전트의 co-author 정체성(Codex는 `OmX <omx@oh-my-codex.dev>`, ClaudeCode는 해당 도구의 co-author)을 포함한다.

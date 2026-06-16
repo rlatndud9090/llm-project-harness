@@ -9,6 +9,7 @@ import {
   pathExists,
   rawUnitPath,
   readText,
+  repoPath,
   titleFromSlug,
   today,
   validateTypeAndSlug,
@@ -87,7 +88,20 @@ if (type === "feature") {
   if (materialize("chore.md", "notes.md")) created.push("notes.md");
 }
 
+// Reconcile against the unit next-feature recorded, then consume the anchor.
+// A mismatch means the chosen unit drifted between recommendation and kickoff.
+const anchorPath = repoPath("docs", "raw", ".next-unit");
+if (pathExists(anchorPath)) {
+  const anchorUnit = (readText(anchorPath).trim().split("\n")[0] ?? "").split("|")[0].trim();
+  const resolvedUnit = `${type}/${slug}`;
+  if (anchorUnit && anchorUnit !== resolvedUnit) {
+    console.warn(`[kickoff] WARNING: next-feature anchor (${anchorUnit}) != resolved unit (${resolvedUnit}); confirm this is intended`);
+  }
+  fs.rmSync(anchorPath, { force: true });
+}
+
 console.log(`[kickoff] ${path.relative(process.cwd(), unitDir)}`);
 console.log(`- branch: ${branchInfo.branch}`);
 console.log(`- title: ${title}`);
+console.log(`- unit: ${type}/${slug}`);
 console.log(`- created: ${created.length ? created.join(", ") : "none (already existed)"}`);

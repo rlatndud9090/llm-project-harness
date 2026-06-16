@@ -19,7 +19,9 @@ npm run harness:check
 - work branch와 raw path가 일치한다.
 - feature raw unit에는 `prd.md`와 `adr.md`가 있다.
 - frontmatter 문서에는 `title`, `date`, `status`, `unit_type`이 있다.
-- `approved` PRD와 `accepted` ADR에는 `approval:` 승인 근거가 있다.
+- `approved` PRD와 `accepted` ADR에는 `approval: "user:YYYY-MM-DD:<근거>"` 형식의 승인
+  근거가 기록돼 있다. 자동 검사는 근거의 형식과 존재를 강제한다. 근거가 형님의 실제
+  동의를 반영하는지는 아래 수동 검토 항목에서 확인한다.
 - raw unit의 status는 git 기록 대비 명백한 후퇴로 바뀌지 않는다(예: PRD `approved`→`draft`, ADR `accepted`→`proposed`). reopen(`rejected`→`draft`)이나 retire(`accepted`→`superseded`)는 허용한다.
 - public docs에는 금지된 출처/세션/로컬 설정 정보가 없다.
 - 공용 harness role은 Codex/ClaudeCode agent adapter를 가진다.

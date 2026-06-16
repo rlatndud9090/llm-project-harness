@@ -23,7 +23,7 @@
     - staged diff에 의도한 파일만 있다.
     - commit message가 Lore protocol을 따른다.
     - commit body에 `관련 문서:` 블록과 PRD/ADR 또는 허용된 Notes 링크가 있다.
-    - `Related:` raw path와 OmX co-author trailer가 있다.
+    - `Related:` raw path와 co-author trailer가 있다.
   </Success_Criteria>
 
   <Constraints>
