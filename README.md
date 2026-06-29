@@ -11,7 +11,7 @@ raw/wiki, PRD/ADR, 검증, 커밋 규칙을 따르도록 만드는 공용 제어
 ## 구성
 
 ```txt
-harness/            공용 프로토콜, 역할 정의, raw 템플릿
+harness/            공용 프로토콜, 역할 정의, raw/wiki 템플릿
 scripts/harness/    장착, raw 생성, wiki ingest, artifact check, gate 스크립트
 .codex/             Codex용 shared skill/agent 어댑터
 .claude/            ClaudeCode용 shared command/skill/agent 어댑터
@@ -19,6 +19,9 @@ scripts/harness/    장착, raw 생성, wiki ingest, artifact check, gate 스크
 
 `docs/` 네임스페이스는 소비 프로젝트 전용입니다. 이 하네스 저장소 안에는
 `docs/harness`, `docs/raw`, `docs/wiki`를 두지 않습니다.
+
+소비 프로젝트에 처음 생성하는 `docs/wiki/index.md` 골격은
+`harness/templates/wiki/index.md`를 source of truth로 사용합니다.
 
 ## 소비 프로젝트에 장착하기
 

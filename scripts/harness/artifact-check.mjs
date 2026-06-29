@@ -43,6 +43,7 @@ function assertHarnessShape() {
     harnessPath("harness", "templates", "raw", "feature-prd.md"),
     harnessPath("harness", "templates", "raw", "feature-adr.md"),
     harnessPath("harness", "templates", "raw", "notes.md"),
+    harnessPath("harness", "templates", "wiki", "index.md"),
     harnessPath("scripts", "harness", "attach-submodule.mjs"),
     harnessPath("scripts", "harness", "kickoff.mjs"),
   ]) {

@@ -206,33 +206,7 @@ function ensureProjectDocs() {
 
   ensureFileOrMarker(
     path.join(projectRoot, "docs", "wiki", "index.md"),
-    `# Project Wiki Index
-
-> 이 문서는 항상 로딩되는 유일한 LLM Wiki 페이지다. 프로젝트 방향과 raw work
-> unit 링크만 제공한다. 종합 요약 문서로 키우지 않는다.
-
-Last updated: TODO Asia/Seoul
-
-## Direction
-
-- **무엇:** TODO
-- **대상:** TODO
-- **Knowledge boundary:** raw PRD/ADR/notes가 진실 원천이고, 이 index는 navigation만 맡는다.
-
-## Raw Units
-
-아래 카테고리는 분류 체계의 출발점이다. 프로젝트에 맞게 자유롭게 추가·조정하고,
-ingest 시 \`--category\`로 raw unit에 맞는 분류를 지정한다.
-
-### Product & Architecture
-
-### Project Operations
-
-## Maintenance
-
-- 새 raw work unit은 \`docs/raw/{feature,bugfix,chore}/branch-slug/\` 아래에 둔다.
-- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug> --category "<분류>"\`를 실행한다.
-`,
+    readHarnessTemplate("wiki", "index.md"),
     "LLM-HARNESS:WIKI",
     `## Harness Maintenance
 
@@ -373,6 +347,10 @@ function ensureFile(filePath, content) {
 
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, "utf8");
+}
+
+function readHarnessTemplate(...parts) {
+  return fs.readFileSync(path.join(harnessRoot, "harness", "templates", ...parts), "utf8");
 }
 
 function ensureFileOrMarker(filePath, content, markerName, markerContent) {

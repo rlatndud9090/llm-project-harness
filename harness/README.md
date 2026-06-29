@@ -20,6 +20,11 @@
   `$ralplan`, `/team`은 하네스가 배포하지 않는 선택적 외부 가속기이고, 없으면
   protocol의 하네스-네이티브 기본 동작으로 진행한다.
 
+## 템플릿
+
+- `templates/raw/` — raw PRD/ADR/bugfix/notes starter templates
+- `templates/wiki/index.md` — 소비 프로젝트 `docs/wiki/index.md` starter template
+
 ## 소비 프로젝트 실행 흐름
 
 ### 1. 세션 시작

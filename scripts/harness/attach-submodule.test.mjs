@@ -11,6 +11,7 @@ describe("attach-submodule", () => {
   it("attaches harness surfaces to a new consuming project", () => {
     withProject((projectRoot) => {
       runAttach(projectRoot);
+      const wikiTemplate = fs.readFileSync(path.join(repoRoot, "harness", "templates", "wiki", "index.md"), "utf8");
 
       expect(readJson(path.join(projectRoot, "package.json")).scripts).toMatchObject({
         "harness:kickoff": "node .harness/scripts/harness/kickoff.mjs",
@@ -21,6 +22,7 @@ describe("attach-submodule", () => {
       expect(pathExists(path.join(projectRoot, "AGENTS.md"))).toBe(true);
       expect(pathExists(path.join(projectRoot, "docs", "raw", "README.md"))).toBe(true);
       expect(pathExists(path.join(projectRoot, "docs", "wiki", "index.md"))).toBe(true);
+      expect(fs.readFileSync(path.join(projectRoot, "docs", "wiki", "index.md"), "utf8")).toBe(wikiTemplate);
       expect(pathExists(path.join(projectRoot, "docs", "harness"))).toBe(false);
       expect(pathExists(path.join(projectRoot, "scripts", "harness"))).toBe(false);
       expect(isSymlink(path.join(projectRoot, ".codex", "skills", "next-feature"))).toBe(true);
