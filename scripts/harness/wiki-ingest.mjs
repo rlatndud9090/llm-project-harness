@@ -16,6 +16,25 @@ import {
   writeText,
 } from "./lib.mjs";
 
+const BROAD_FEATURE_CATEGORIES = new Set([
+  "Product & Architecture",
+  "Architecture",
+  "Product",
+  "Products",
+  "Feature",
+  "Features",
+  "General",
+  "Misc",
+  "Miscellaneous",
+  "Other",
+  "기능",
+  "전체 기능",
+  "아키텍처",
+  "공통",
+  "기타",
+]);
+const OPERATIONS_CATEGORIES = ["프로젝트 운영", "Project Operations"];
+
 const args = parseArgs(process.argv.slice(2));
 const positionalPath = args._[0];
 let unitDir;
@@ -61,18 +80,8 @@ if (wiki.includes(`](${primaryLink})`)) {
   process.exit(0);
 }
 
-// 분류는 의미 판단이므로 --category로 받는다. 생략하면 type 기반 fallback으로
-// 떨어지되, 기존 분류 목록을 노출해 더 적합한 분류로 다시 지정하도록 유도한다.
-const fallbackCategory = type === "feature" ? "Product & Architecture" : "Project Operations";
-const category = args.category || fallbackCategory;
-if (!args.category) {
-  console.warn(`[wiki-ingest] 분류(--category) 미지정 → fallback "${fallbackCategory}" 사용`);
-  const existing = listCategories(wiki);
-  if (existing.length) {
-    console.warn(`  기존 분류: ${existing.join(", ")}`);
-    console.warn(`  더 적합한 분류가 있으면 --category "<이름>"으로 다시 실행하세요.`);
-  }
-}
+const categories = listCategories(wiki);
+const category = resolveCategory({ type, requested: args.category, categories });
 
 const linkParts = files.map(([label, fileName]) => `[${label}](${relativeFromWiki(path.join(unitDir, fileName))})`);
 const line = `- **${title}** — ${linkParts.join(" · ")}`;
@@ -109,4 +118,47 @@ function listCategories(wiki) {
     categories.push(match[1].trim());
   }
   return categories;
+}
+
+function resolveCategory({ type, requested, categories }) {
+  if (type === "feature") {
+    return resolveFeatureCategory(requested, categories);
+  }
+
+  if (requested) return requested.trim();
+
+  const fallbackCategory = categories.find((category) => OPERATIONS_CATEGORIES.includes(category)) ?? OPERATIONS_CATEGORIES[0];
+  console.warn(`[wiki-ingest] 분류(--category) 미지정 → fallback "${fallbackCategory}" 사용`);
+  if (categories.length) {
+    console.warn(`  기존 분류: ${categories.join(", ")}`);
+    console.warn(`  더 적합한 분류가 있으면 --category "<이름>"으로 다시 실행하세요.`);
+  }
+  return fallbackCategory;
+}
+
+function resolveFeatureCategory(requested, categories) {
+  const featureCategories = categories.filter((category) => !OPERATIONS_CATEGORIES.includes(category));
+  if (!requested) {
+    const hint = featureCategories.length
+      ? ` 현재 세부 카테고리: ${featureCategories.join(", ")}`
+      : " docs/wiki/index.md에 세부 카테고리(최소 4개)를 먼저 정의하세요.";
+    fail(
+      `feature raw unit은 --category가 필수입니다. html-editor-fe처럼 세부 카테고리(예: 텍스트 서식, 블록 구조, 리치 콘텐츠) 중 하나를 명시하세요.${hint}`,
+    );
+  }
+
+  const category = requested.trim();
+  if (BROAD_FEATURE_CATEGORIES.has(category) || OPERATIONS_CATEGORIES.includes(category)) {
+    fail(
+      `feature category "${category}"는 너무 넓습니다. html-editor-fe 수준의 세부 카테고리로 나누고 --category에 그중 하나를 지정하세요.`,
+    );
+  }
+
+  if (!categories.includes(category)) {
+    fail(
+      `feature category "${category}"가 docs/wiki/index.md에 없습니다. 새 세부 카테고리가 필요하면 index.md에 ### ${category} 헤딩을 먼저 추가한 뒤 다시 실행하세요.`,
+    );
+  }
+
+  return category;
 }

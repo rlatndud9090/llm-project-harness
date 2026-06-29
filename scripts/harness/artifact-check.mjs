@@ -22,6 +22,26 @@ import {
 const errors = [];
 const harnessRoot = findHarnessRoot();
 const harnessRepoMode = isHarnessRepository();
+const DISALLOWED_FEATURE_WIKI_CATEGORIES = new Set([
+  "Product & Architecture",
+  "Architecture",
+  "Product",
+  "Products",
+  "Feature",
+  "Features",
+  "General",
+  "Misc",
+  "Miscellaneous",
+  "Other",
+  "기능",
+  "전체 기능",
+  "아키텍처",
+  "공통",
+  "기타",
+  "Project Operations",
+  "프로젝트 운영",
+]);
+const OPERATIONS_WIKI_CATEGORIES = new Set(["Project Operations", "프로젝트 운영"]);
 
 function addError(message) {
   errors.push(message);
@@ -102,6 +122,44 @@ function assertWikiLinks() {
   }
 }
 
+function assertWikiFeatureTaxonomy() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
+
+  const featureDirs = unitDirs("feature");
+  if (featureDirs.length === 0) return;
+
+  const wikiPath = repoPath("docs", "wiki", "index.md");
+  const wiki = readText(wikiPath);
+  const categories = parseWikiCategories(wiki);
+  const featureTaxonomy = categories.filter((category) => !OPERATIONS_WIKI_CATEGORIES.has(category.name));
+
+  if (featureTaxonomy.length < 4) {
+    addError(
+      "docs/wiki/index.md must define at least 4 fine-grained feature categories (html-editor-fe 수준) before linking feature units",
+    );
+  }
+
+  for (const unitDir of featureDirs) {
+    const markdownFiles = fs
+      .readdirSync(unitDir)
+      .filter((entry) => entry.endsWith(".md"))
+      .map((entry) => path.join(unitDir, entry));
+    const linkedCategories = new Set(
+      markdownFiles
+        .map((filePath) => findCategoryForLink(categories, toPosix(path.relative(path.dirname(wikiPath), filePath))))
+        .filter(Boolean),
+    );
+
+    for (const category of linkedCategories) {
+      if (DISALLOWED_FEATURE_WIKI_CATEGORIES.has(category)) {
+        addError(
+          `feature raw unit must not be linked under broad wiki category "${category}": ${toPosix(path.relative(process.cwd(), unitDir))}`,
+        );
+      }
+    }
+  }
+}
+
 function unitDirs(type) {
   const base = repoPath("docs", "raw", type);
   if (!pathExists(base)) return [];
@@ -109,6 +167,30 @@ function unitDirs(type) {
     .readdirSync(base, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => path.join(base, entry.name));
+}
+
+function parseWikiCategories(wiki) {
+  const categories = [];
+  let current = null;
+  for (const line of wiki.split(/\r?\n/)) {
+    const match = /^### (.+)$/.exec(line);
+    if (match) {
+      current = { name: match[1].trim(), lines: [] };
+      categories.push(current);
+      continue;
+    }
+    if (current) current.lines.push(line);
+  }
+  return categories;
+}
+
+function findCategoryForLink(categories, relativeLink) {
+  for (const category of categories) {
+    if (category.lines.some((line) => line.includes(`](${relativeLink})`))) {
+      return category.name;
+    }
+  }
+  return null;
 }
 
 function assertRawUnits() {
@@ -567,6 +649,7 @@ assertNoHarnessDocsNamespace();
 assertProjectDocsPresent();
 assertWikiShape();
 assertWikiLinks();
+assertWikiFeatureTaxonomy();
 assertRawUnits();
 assertRawUnitsLinked();
 assertCurrentBranchRawUnit();

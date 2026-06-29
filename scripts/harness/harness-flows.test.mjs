@@ -24,6 +24,49 @@ describe("wiki-ingest", () => {
       expect(occurrences).toBe(1);
     });
   });
+
+  it("requires --category for feature units", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "needs-category", "prd.md"),
+        `${frontmatter({ title: "Needs Category", status: "draft", unit_type: "feature" })}\n# Needs Category\n`,
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/needs-category"],
+        { cwd: projectRoot, encoding: "utf8" },
+      );
+
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("--category");
+    });
+  });
+
+  it("rejects broad feature categories", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "broad-category", "prd.md"),
+        `${frontmatter({ title: "Broad Category", status: "draft", unit_type: "feature" })}\n# Broad Category\n`,
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"),
+          "docs/raw/feature/broad-category",
+          "--category",
+          "Product & Architecture",
+        ],
+        { cwd: projectRoot, encoding: "utf8" },
+      );
+
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("너무 넓습니다");
+    });
+  });
 });
 
 describe("artifact-check status transitions", () => {
@@ -293,6 +336,42 @@ describe("artifact-check required sections", () => {
   });
 });
 
+describe("artifact-check wiki taxonomy", () => {
+  it("fails when feature wiki taxonomy only has broad buckets", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "wiki", "index.md"),
+        `# Project Wiki Index
+
+## Raw Units
+
+### Product & Architecture
+
+- **Taxonomy** — [PRD](../raw/feature/taxonomy/prd.md)
+
+### 프로젝트 운영
+
+## Maintenance
+`,
+      );
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "taxonomy", "prd.md"),
+        `${frontmatter({ title: "Taxonomy", status: "draft", unit_type: "feature" })}\n# Taxonomy\n`,
+      );
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "taxonomy", "adr.md"),
+        `${frontmatter({ title: "Taxonomy", status: "proposed", unit_type: "feature" })}\n# Taxonomy\n`,
+      );
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("fine-grained feature categories");
+      expect(`${result.stdout}${result.stderr}`).toContain('broad wiki category "Product & Architecture"');
+    });
+  });
+});
+
 function seedDecisionUnit(projectRoot, adrStatus, adrApproval) {
   attach(projectRoot);
   const unitDir = path.join(projectRoot, "docs", "raw", "feature", "decision");
@@ -342,12 +421,18 @@ function attach(projectRoot) {
   );
 }
 
-function ingest(projectRoot, unitPath) {
+function ingest(projectRoot, unitPath, category = defaultCategoryFor(unitPath)) {
+  const args = [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath];
+  if (category) args.push("--category", category);
   execFileSync(
     process.execPath,
-    [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath],
+    args,
     { cwd: projectRoot, encoding: "utf8" },
   );
+}
+
+function defaultCategoryFor(unitPath) {
+  return unitPath.includes("/feature/") ? "기반 · 인프라" : null;
 }
 
 function runVerifyMsg(projectRoot, msgPath) {

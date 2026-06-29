@@ -18,6 +18,7 @@ npm run harness:ingest -- docs/raw/<type>/<slug>
 - raw 본문 내용을 wiki에 요약하지 않는다.
 - 적절한 카테고리 아래에 링크 한 줄만 추가한다.
 - 새 wiki page, log, frontmatter sync, rebuild metadata를 만들지 않는다.
+- feature는 `아키텍처`, `기능`, `Product & Architecture`, `Project Operations` 같은 broad bucket에 넣지 않는다.
 
 ## 분류 체계 (카테고리)
 
@@ -26,19 +27,28 @@ ingest할 때 raw unit의 내용(PRD/ADR)을 근거로 index의 기존 카테고
 하나를 고른다. 맞는 카테고리가 없으면 새 카테고리를 만든다. **분류는 의미 판단이므로
 `--category`로 명시한다.**
 
+특히 feature는 html-editor-fe처럼 사용자 경험/도메인 축의 **세부 카테고리**로 분류한다.
+예: `기반 · 인프라`, `텍스트 서식`, `블록 구조`, `리치 콘텐츠`, `디자인 시스템 · UI`.
+중요한 점은 카테고리 이름이 아니라 **분류 수준**이다. `아키텍처`처럼 너무 넓은
+이름 하나로 몰아넣지 않는다.
+
 ```sh
 npm run harness:ingest -- docs/raw/<type>/<slug> --category "<분류 이름>"
 ```
 
-`--category`를 생략하면 아래 type 기반 fallback으로 떨어지고, ingest가 현재 index의
-기존 분류 목록을 함께 출력한다. fallback은 분류를 지정하지 않았을 때의 최소 기본값일
-뿐이며, 정확한 분류는 모델이 내용을 보고 고른다.
+feature는 `--category`가 **필수**다. 또한 `--category` 값은 이미 `docs/wiki/index.md`
+에 존재하는 `###` 세부 카테고리 중 하나여야 한다. 새 세부 카테고리가 필요하면
+ingest 전에 `index.md` 헤딩을 먼저 추가한다. 이렇게 해야 세션마다 분류 체계가 흔들리지
+않고, wiki index가 프로젝트 공용 taxonomy로 유지된다.
+
+bugfix/chore는 `--category`를 생략할 수 있고, 이 경우 프로젝트 운영 카테고리로
+fallback한다.
 
 | raw type | fallback 카테고리 |
 | --- | --- |
-| `feature` | `Product & Architecture` |
-| `bugfix` | `Project Operations` |
-| `chore` | `Project Operations` |
+| `feature` | 없음 (`--category` 필수) |
+| `bugfix` | `프로젝트 운영` |
+| `chore` | `프로젝트 운영` |
 
 카테고리는 프로젝트가 자유롭게 정의·조정하는 분류축이다. 상세 내용은 링크된 raw에
 두고, 카테고리는 그 분류축만 제공한다.
@@ -63,7 +73,8 @@ npm run harness:check
 ```
 
 검사는 wiki link가 실제 raw file을 가리키는지, 모든 raw unit이 wiki에서
-찾을 수 있는지 확인한다.
+찾을 수 있는지 확인한다. feature unit이 broad bucket에 들어갔는지, 그리고 wiki가
+html-editor-fe 수준의 세부 카테고리(최소 4개)를 갖췄는지도 함께 본다.
 
 ## 실패 모드
 

@@ -22,9 +22,26 @@
 각 항목은 raw source(PRD/ADR/Bugfix/Notes)로의 링크다. 카테고리는 네비게이션
 라벨일 뿐이며, 상세는 링크된 문서를 직접 Read한다.
 
-### Product & Architecture
+카테고리 설계 원칙:
 
-### Project Operations
+- feature는 `아키텍처`, `기능`, `기타`, `Product & Architecture` 같은 큰 바구니에 넣지 않는다.
+- html-editor-fe처럼 사용자 경험/도메인 축의 **세부 카테고리**를 먼저 4개 이상 정의한다.
+- 새 feature를 ingest할 때는 반드시 기존 세부 카테고리 하나를 `--category`로 지정한다.
+- 새 세부 카테고리가 필요하면 ingest 전에 `docs/wiki/index.md`에 `###` 헤딩을 먼저 추가한다.
+
+### 기반 · 인프라
+
+### 핵심 사용자 흐름
+
+### 도메인 모델 · 데이터 입출력
+
+### 상호작용 · 워크플로우
+
+### 리치 콘텐츠 · 외부 통합
+
+### 디자인 시스템 · UI
+
+### 프로젝트 운영
 
 ## Maintenance
 
