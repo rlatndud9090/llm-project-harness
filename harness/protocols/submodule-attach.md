@@ -38,8 +38,8 @@ package.json
 이때 `docs/wiki/index.md`의 초기 골격은
 `.harness/harness/templates/wiki/index.md`를 그대로 사용한다. 소비 프로젝트는 이
 파일을 출발점으로 삼되, 자기 제품의 방향성과 분류 체계에 맞게 TODO와 카테고리를
-채운다. 특히 feature 분류는 `아키텍처` 같은 broad bucket이 아니라 html-editor-fe
-수준의 세부 카테고리 taxonomy를 먼저 잡고 시작한다.
+채운다. 특히 feature 분류는 다른 프로젝트 taxonomy를 복사하지 말고, 자기 제품에
+맞는 세부 카테고리를 필요할 때마다 추가해 간다.
 
 `attach-submodule.mjs`가 추가하는 하네스 adapter 링크:
 

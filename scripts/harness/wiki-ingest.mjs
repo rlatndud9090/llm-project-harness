@@ -137,26 +137,20 @@ function resolveCategory({ type, requested, categories }) {
 }
 
 function resolveFeatureCategory(requested, categories) {
-  const featureCategories = categories.filter((category) => !OPERATIONS_CATEGORIES.includes(category));
   if (!requested) {
+    const featureCategories = categories.filter((category) => !OPERATIONS_CATEGORIES.includes(category));
     const hint = featureCategories.length
-      ? ` 현재 세부 카테고리: ${featureCategories.join(", ")}`
-      : " docs/wiki/index.md에 세부 카테고리(최소 4개)를 먼저 정의하세요.";
+      ? ` 현재 분류: ${featureCategories.join(", ")}`
+      : " 아직 feature 카테고리가 없어도 괜찮습니다. --category로 프로젝트에 맞는 새 분류를 바로 지정하세요.";
     fail(
-      `feature raw unit은 --category가 필수입니다. html-editor-fe처럼 세부 카테고리(예: 텍스트 서식, 블록 구조, 리치 콘텐츠) 중 하나를 명시하세요.${hint}`,
+      `feature raw unit은 --category가 필수입니다. 프로젝트에 맞는 카테고리를 명시하면 새 분류여도 wiki index에 자동으로 추가됩니다.${hint}`,
     );
   }
 
   const category = requested.trim();
   if (BROAD_FEATURE_CATEGORIES.has(category) || OPERATIONS_CATEGORIES.includes(category)) {
     fail(
-      `feature category "${category}"는 너무 넓습니다. html-editor-fe 수준의 세부 카테고리로 나누고 --category에 그중 하나를 지정하세요.`,
-    );
-  }
-
-  if (!categories.includes(category)) {
-    fail(
-      `feature category "${category}"가 docs/wiki/index.md에 없습니다. 새 세부 카테고리가 필요하면 index.md에 ### ${category} 헤딩을 먼저 추가한 뒤 다시 실행하세요.`,
+      `feature category "${category}"는 너무 넓습니다. 이 프로젝트의 실제 기능 축에 맞는 더 구체적인 카테고리로 나눠서 지정하세요.`,
     );
   }
 

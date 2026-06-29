@@ -24,7 +24,7 @@
 
 - `templates/raw/` — raw PRD/ADR/bugfix/notes starter templates
 - `templates/wiki/index.md` — 소비 프로젝트 `docs/wiki/index.md` starter template
-  - feature taxonomy는 broad bucket이 아니라 html-editor-fe 수준의 세부 카테고리를 기본 전제로 둔다
+  - feature taxonomy는 broad bucket이 아니라 프로젝트별 세부 카테고리를 점진적으로 추가하는 방식을 전제로 둔다
 
 ## 소비 프로젝트 실행 흐름
 

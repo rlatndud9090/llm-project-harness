@@ -67,6 +67,22 @@ describe("wiki-ingest", () => {
       expect(`${result.stdout}${result.stderr}`).toContain("너무 넓습니다");
     });
   });
+
+  it("creates a new feature category when the requested category does not exist yet", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "new-category", "prd.md"),
+        `${frontmatter({ title: "New Category", status: "draft", unit_type: "feature" })}\n# New Category\n`,
+      );
+
+      ingest(projectRoot, "docs/raw/feature/new-category", "맞춤 기능 축");
+
+      const wiki = read(path.join(projectRoot, "docs", "wiki", "index.md"));
+      expect(wiki).toContain("### 맞춤 기능 축");
+      expect(wiki).toContain("[PRD](../raw/feature/new-category/prd.md)");
+    });
+  });
 });
 
 describe("artifact-check status transitions", () => {
@@ -337,7 +353,7 @@ describe("artifact-check required sections", () => {
 });
 
 describe("artifact-check wiki taxonomy", () => {
-  it("fails when feature wiki taxonomy only has broad buckets", () => {
+  it("fails when feature wiki taxonomy uses a broad bucket", () => {
     withProject((projectRoot) => {
       attach(projectRoot);
       writeFile(
@@ -366,7 +382,6 @@ describe("artifact-check wiki taxonomy", () => {
 
       const result = runCheck(projectRoot);
       expect(result.status).not.toBe(0);
-      expect(`${result.stdout}${result.stderr}`).toContain("fine-grained feature categories");
       expect(`${result.stdout}${result.stderr}`).toContain('broad wiki category "Product & Architecture"');
     });
   });
@@ -432,7 +447,7 @@ function ingest(projectRoot, unitPath, category = defaultCategoryFor(unitPath)) 
 }
 
 function defaultCategoryFor(unitPath) {
-  return unitPath.includes("/feature/") ? "기반 · 인프라" : null;
+  return unitPath.includes("/feature/") ? "맞춤 기능 축" : null;
 }
 
 function runVerifyMsg(projectRoot, msgPath) {

@@ -41,7 +41,6 @@ const DISALLOWED_FEATURE_WIKI_CATEGORIES = new Set([
   "Project Operations",
   "프로젝트 운영",
 ]);
-const OPERATIONS_WIKI_CATEGORIES = new Set(["Project Operations", "프로젝트 운영"]);
 
 function addError(message) {
   errors.push(message);
@@ -131,13 +130,6 @@ function assertWikiFeatureTaxonomy() {
   const wikiPath = repoPath("docs", "wiki", "index.md");
   const wiki = readText(wikiPath);
   const categories = parseWikiCategories(wiki);
-  const featureTaxonomy = categories.filter((category) => !OPERATIONS_WIKI_CATEGORIES.has(category.name));
-
-  if (featureTaxonomy.length < 4) {
-    addError(
-      "docs/wiki/index.md must define at least 4 fine-grained feature categories (html-editor-fe 수준) before linking feature units",
-    );
-  }
 
   for (const unitDir of featureDirs) {
     const markdownFiles = fs

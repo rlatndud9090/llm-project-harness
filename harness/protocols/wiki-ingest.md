@@ -27,19 +27,19 @@ ingest할 때 raw unit의 내용(PRD/ADR)을 근거로 index의 기존 카테고
 하나를 고른다. 맞는 카테고리가 없으면 새 카테고리를 만든다. **분류는 의미 판단이므로
 `--category`로 명시한다.**
 
-특히 feature는 html-editor-fe처럼 사용자 경험/도메인 축의 **세부 카테고리**로 분류한다.
-예: `기반 · 인프라`, `텍스트 서식`, `블록 구조`, `리치 콘텐츠`, `디자인 시스템 · UI`.
-중요한 점은 카테고리 이름이 아니라 **분류 수준**이다. `아키텍처`처럼 너무 넓은
-이름 하나로 몰아넣지 않는다.
+특히 feature 카테고리 이름과 분류축은 **각 프로젝트가 직접 정한다**. 다른 프로젝트의
+카테고리를 복사하는 것이 아니라, 현재 제품의 사용자 경험/도메인 구조에 맞는 분류를
+그때그때 추가해 간다. 중요한 점은 `아키텍처`처럼 너무 넓은 이름 하나로 몰아넣지 않는
+것이다.
 
 ```sh
 npm run harness:ingest -- docs/raw/<type>/<slug> --category "<분류 이름>"
 ```
 
-feature는 `--category`가 **필수**다. 또한 `--category` 값은 이미 `docs/wiki/index.md`
-에 존재하는 `###` 세부 카테고리 중 하나여야 한다. 새 세부 카테고리가 필요하면
-ingest 전에 `index.md` 헤딩을 먼저 추가한다. 이렇게 해야 세션마다 분류 체계가 흔들리지
-않고, wiki index가 프로젝트 공용 taxonomy로 유지된다.
+feature는 `--category`가 **필수**다. 다만 그 카테고리가 아직 `docs/wiki/index.md`에
+없어도 괜찮다. 새 분류가 필요하면 `--category "<새 이름>"`로 바로 지정하고, ingest가
+새 `###` 헤딩을 자동으로 추가한다. 이렇게 해야 초기 프로젝트에서도 taxonomy를 점진적으로
+키울 수 있고, 세션마다 분류 체계가 다른 프로젝트에 맞춰 자라난다.
 
 bugfix/chore는 `--category`를 생략할 수 있고, 이 경우 프로젝트 운영 카테고리로
 fallback한다.
@@ -73,8 +73,7 @@ npm run harness:check
 ```
 
 검사는 wiki link가 실제 raw file을 가리키는지, 모든 raw unit이 wiki에서
-찾을 수 있는지 확인한다. feature unit이 broad bucket에 들어갔는지, 그리고 wiki가
-html-editor-fe 수준의 세부 카테고리(최소 4개)를 갖췄는지도 함께 본다.
+찾을 수 있는지 확인한다. feature unit이 broad bucket에 들어갔는지도 함께 본다.
 
 ## 실패 모드
 

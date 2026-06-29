@@ -23,7 +23,7 @@ scripts/harness/    장착, raw 생성, wiki ingest, artifact check, gate 스크
 소비 프로젝트에 처음 생성하는 `docs/wiki/index.md` 골격은
 `harness/templates/wiki/index.md`를 source of truth로 사용합니다.
 이 템플릿은 feature를 `Product & Architecture` 같은 큰 바구니가 아니라
-html-editor-fe 수준의 세부 카테고리로 분류하도록 강제합니다.
+프로젝트별 taxonomy로 점진적으로 분류하도록 강제합니다.
 
 ## 소비 프로젝트에 장착하기
 
