@@ -96,3 +96,11 @@ return { results: results.filter(Boolean) }
 - 게이트 판정과 커밋은 이 스크립트가 아니라 메인 루프에서 한다(위 "자율 레인의 제약").
 
 규칙 변경은 `.claude`가 아니라 `.harness/harness`를 먼저 수정한다.
+
+## Claude Code — Background 세션 result 형식 (필수)
+
+background 세션에서 `result:` 라인을 출력할 때 — 중간 보고든 완료든 — **맨 앞에 반드시 `[feature-develop]`를 붙인다.**
+
+- 형식: `result: [feature-develop] {한 줄 요약}`
+- 예: `result: [feature-develop] 구현+검증 완료 — N개 파일 변경, harness:gate 통과`
+- agents 화면(FleetView) result 열에서 어느 단계의 세션인지 한눈에 구분하기 위함이다.

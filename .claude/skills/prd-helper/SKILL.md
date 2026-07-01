@@ -28,3 +28,11 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
   돌린다. researcher와 reviewer를 동시에 돌려 루프를 빠르게 하려면 `/team`으로 가속할 수
   있다(선택). 단순한 PRD면 서브에이전트로 충분하다.
 - `$deep-interview`가 있으면 인터뷰 가속기로 쓰고, 없으면 `AskUserQuestion`이 기본이다.
+
+## Claude Code — Background 세션 result 형식 (필수)
+
+background 세션에서 `result:` 라인을 출력할 때 — 중간 보고든 완료든 — **맨 앞에 반드시 `[prd-helper]`를 붙인다.**
+
+- 형식: `result: [prd-helper] {한 줄 요약}`
+- 예: `result: [prd-helper] PRD 초안 review 상태로 작성 완료 — ADR 필요`
+- agents 화면(FleetView) result 열에서 어느 단계의 세션인지 한눈에 구분하기 위함이다.

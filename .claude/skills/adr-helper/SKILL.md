@@ -26,3 +26,11 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
 - 결정 선택지/제약 질문은 `AskUserQuestion`으로 제시한다.
 - `researcher`, `architect`, `reviewer` 서브에이전트(Agent 도구)로 트레이드오프 조사,
   결정 작성, 선택지 검토를 진행한다.
+
+## Claude Code — Background 세션 result 형식 (필수)
+
+background 세션에서 `result:` 라인을 출력할 때 — 중간 보고든 완료든 — **맨 앞에 반드시 `[adr-helper]`를 붙인다.**
+
+- 형식: `result: [adr-helper] {한 줄 요약}`
+- 예: `result: [adr-helper] ADR proposed 작성 — 선택지 3개 비교`
+- agents 화면(FleetView) result 열에서 어느 단계의 세션인지 한눈에 구분하기 위함이다.

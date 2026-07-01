@@ -44,3 +44,11 @@ trailer를 유지한다.
 
 커밋에는 `Related: docs/raw/<type>/<slug>/`와
 커밋 에이전트의 co-author 정체성(Codex는 `OmX <omx@oh-my-codex.dev>`, ClaudeCode는 해당 도구의 co-author)을 포함한다.
+
+## Claude Code — Background 세션 result 형식 (필수)
+
+background 세션에서 `result:` 라인을 출력할 때 — 중간 보고든 완료든 — **맨 앞에 반드시 `[commit]`를 붙인다.**
+
+- 형식: `result: [commit] {한 줄 요약}`
+- 예: `result: [commit] harness:gate 통과 후 커밋·푸시 완료`
+- agents 화면(FleetView) result 열에서 어느 단계의 세션인지 한눈에 구분하기 위함이다.
