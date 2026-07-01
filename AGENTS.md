@@ -86,10 +86,13 @@ the name always matches a shipped skill adapter. Load-bearing handoffs name the
 skill in plain language too, so the marker is never the only signal.
 
 `$deep-interview`, `$ralph`, `$ralplan`, and `/team` are OPTIONAL external
-accelerators (oh-my-claudecode / OMX); this harness does not ship them. When they
-are absent, use the harness-native default each protocol defines (a one-question
-interview, and the `architect → domain/ui/test → integrator` role chain) and do
-not block on them.
+accelerators (oh-my-claudecode / OMX); this harness does not ship them. Question
+handling is surface-aware: prefer the current runtime's structured question tool
+first, use an OMX structured question surface only when the current surface can
+actually render it, and fall back to one concise plain-text question only when no
+structured question tool is available. When these accelerators are absent, keep
+using the harness-native execution rail (`architect → domain/ui/test →
+integrator`) and do not block on them.
 
 ## Development Rules
 

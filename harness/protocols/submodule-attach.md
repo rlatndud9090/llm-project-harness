@@ -69,8 +69,11 @@ package.json
 
 하네스는 `$deep-interview`, `$ralph`, `$ralplan`, `/team` 같은 oh-my-claudecode/OMX
 스킬을 배포하지 않는다. 이들이 설치돼 있지 않아도 하네스는 protocol에 정의된
-하네스-네이티브 기본 동작(명시 질문 인터뷰, `architect → domain/ui/test → integrator`
-role 체인)으로 동작한다. 가속기는 있으면 쓰고, 없으면 기본 동작으로 진행한다.
+하네스-네이티브 기본 동작으로 동작한다. 질문이 필요하면 현재 런타임의 구조화 질문
+도구를 우선 사용하고, 현재 surface가 실제로 지원할 때만 OMX 구조화 질문 surface를
+가속기로 쓴다. 구조화 질문 도구가 없을 때만 간결한 명시 질문으로 fallback한다.
+구현 레일은 기본적으로 `architect → domain/ui/test → integrator` role 체인으로
+진행한다.
 
 ## git 훅 (선택)
 

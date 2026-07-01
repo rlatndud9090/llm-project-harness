@@ -10,7 +10,7 @@ description: "PRD를 인터뷰·리서치·리뷰로 함께 작성할 때 사용
 ## 실행 순서
 
 1. `.harness/harness/protocols/prd-helper.md`를 읽는다.
-2. 사용자 의견과 결정 경계를 수집한다(`$deep-interview`가 있으면 활용, 없으면 명시 질문).
+2. 사용자 의견과 결정 경계를 수집한다(`$deep-interview`가 있으면 활용하고, 없으면 현재 런타임의 구조화 질문 도구를 우선 사용하며 그마저 없을 때만 명시 질문).
 3. `.harness/harness/roles/researcher.md`로 레퍼런스/선행 사례를 모은다(출처는 notes에).
 4. `.harness/harness/roles/prd-writer.md`로 PRD 초안을 작성한다.
 5. `.harness/harness/roles/reviewer.md`로 수용 기준/누락/모순을 지속 검토하고 다듬는다.
@@ -18,6 +18,13 @@ description: "PRD를 인터뷰·리서치·리뷰로 함께 작성할 때 사용
 
 PRD는 한국어로 작성하고 `review` 상태로 둔다. 사용자 명시 승인 전에는 `approved`로
 바꾸지 않는다.
+
+## 질문 도구
+
+- 질문이 필요하면 현재 런타임의 구조화 질문 도구를 우선 사용한다.
+- `$deep-interview`가 설치돼 있고 현재 surface가 그 구조화 질문 surface를 지원하면
+  가속기로 쓴다.
+- 구조화 질문 도구가 없을 때만 간결한 명시 질문으로 fallback한다.
 
 ## Claude Code 실행 (선택)
 
@@ -27,7 +34,8 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
 - `researcher`, `prd-writer`, `reviewer` 서브에이전트(Agent 도구)로 리서치↔작성↔리뷰를
   돌린다. researcher와 reviewer를 동시에 돌려 루프를 빠르게 하려면 `/team`으로 가속할 수
   있다(선택). 단순한 PRD면 서브에이전트로 충분하다.
-- `$deep-interview`가 있으면 인터뷰 가속기로 쓰고, 없으면 `AskUserQuestion`이 기본이다.
+- 질문은 `AskUserQuestion`을 기본으로 쓰고, 현재 surface가 `$deep-interview`의 구조화
+  인터뷰 surface를 실제로 지원할 때만 그걸 가속기로 쓴다.
 
 ## Claude Code — Background 세션 result 형식 (필수)
 
