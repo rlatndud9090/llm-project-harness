@@ -24,9 +24,10 @@
 ### Phase 1: 의견 수집
 
 결정해야 하는 선택지와 제약, 사용자가 직접 골라야 하는 경계를 끌어낸다.
-현재 런타임의 구조화 질문 도구를 우선 사용하고, `$deep-interview`가 설치돼 있으며
-현재 surface가 그 구조화 질문 surface를 지원하면 가속기로 쓴다. 구조화 질문
-도구가 없을 때만 한 번에 하나씩 간결한 명시 질문으로 fallback한다.
+`$deep-interview`가 설치돼 있으면 그 스킬을 우선 사용하고, 질문 transport는
+deep-interview 내부에서 현재 surface에 맞게 선택한다. `$deep-interview`가 없을
+때만 현재 런타임의 구조화 질문 도구로 직접 질문하고, 구조화 질문 도구가 없을
+때만 한 번에 하나씩 간결한 명시 질문으로 fallback한다.
 
 ### Phase 2: 레퍼런스 수집 (`researcher`)
 

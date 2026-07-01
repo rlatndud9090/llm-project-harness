@@ -17,11 +17,12 @@
   적용한다. 하네스 저장소 자체에 같은 정책을 강제하지 않는다.
 - 프로토콜 본문의 `$skill-name`은 "그 하네스 skill을 호출하라"는 표시다(ClaudeCode는
   Skill 도구나 `/skill-name`, Codex는 skill 프롬프트). `$deep-interview`, `$ralph`,
-  `$ralplan`, `/team`은 하네스가 배포하지 않는 선택적 외부 가속기다. 질문이
-  필요하면 현재 런타임의 구조화 질문 도구를 우선 사용하고, 현재 surface가 실제로
-  렌더링할 수 있을 때만 OMX 구조화 질문 surface를 가속기로 쓴다. 구조화 질문
-  도구가 없을 때만 간결한 plain-text 질문으로 fallback하고, 가속기가 없더라도
-  protocol의 하네스-네이티브 기본 실행 레일은 그대로 진행한다.
+  `$ralplan`, `/team`은 하네스가 배포하지 않는 선택적 외부 가속기다. 프로토콜이
+  `$deep-interview`를 명시할 때는 그 스킬을 최우선으로 사용하고, 질문 transport는
+  deep-interview 내부에서 현재 surface에 맞게 선택한다. `$deep-interview`가 없을
+  때만 현재 런타임의 구조화 질문 도구로 직접 fallback하고, 그마저 없을 때만 간결한
+  plain-text 질문을 사용한다. 가속기가 없더라도 protocol의 하네스-네이티브 기본
+  실행 레일은 그대로 진행한다.
 
 ## 템플릿
 
