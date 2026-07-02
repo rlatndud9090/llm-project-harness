@@ -57,6 +57,7 @@ package.json
 {
   "scripts": {
     "harness:kickoff": "node .harness/scripts/harness/kickoff.mjs",
+    "harness:approve": "node .harness/scripts/harness/approve.mjs",
     "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
     "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
     "harness:gate": "node .harness/scripts/harness/gate.mjs",
