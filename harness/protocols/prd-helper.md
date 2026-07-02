@@ -8,8 +8,10 @@
 - `researcher` 역할로 레퍼런스/선행 사례/참고 자료를 수집한다.
 - `reviewer` 역할로 작성 중인 PRD를 지속 검토한다.
 
-전제: `$kickoff`로 raw unit(`docs/raw/<type>/<slug>/prd.md`)이 이미 생성돼 있다.
-PRD는 `review` 상태로 작성하고, 사용자 명시 승인 전에는 `approved`로 바꾸지 않는다.
+전제: `$kickoff`로 raw unit(`docs/raw/<type>/<slug>/`)이 이미 생성돼 있고, 그 안에
+단계 체크포인트 원장 `state.md`가 있다. PRD는 `review` 상태로 작성하고, 사용자 명시
+승인 전에는 `approved`로 바꾸지 않는다. `approved` 전환은 오직 `harness:approve`로만
+한다(직접 frontmatter 편집 금지 — 런타임 훅과 `harness:check`가 막는다).
 
 ## 언어
 
@@ -87,7 +89,7 @@ ADR "작성"이 선택이라는 뜻이지 `adr.md` 파일은 선택이 아니다
 불필요하면 본문에 "불필요: <이유>" 한 줄만 남기고 status는 `proposed`로 둔다. 파일을
 지우지 않는다.
 
-## 정리
+## 정리와 승인
 
 PRD 초안이 자리를 잡으면:
 
@@ -96,10 +98,31 @@ npm run harness:ingest -- docs/raw/<type>/<slug>
 npm run harness:check
 ```
 
-이 단계는 PRD를 `review` 상태로 마무리한다. `approved` 전환은 형님이 명시 승인하는
-시점에 이뤄진다: 형님이 승인하면 에이전트가 직접 status를 `approved`로 바꾸고
-`approval: "user:YYYY-MM-DD:<근거>"`를 함께 기록한다(별도 사람 커밋은 필요 없다).
-구현은 그 이후 `feature-develop`에서 진행한다.
+이 단계는 PRD를 `review` 상태로 마무리한다. `review`로 올릴 때 `state.md`의 `stage`를
+`prd-review`로, `prd_status`를 `review`로 갱신하고 단계 로그에 한 줄 남긴다. 여기까지가
+이 프로토콜의 끝이다. **여기서 절대로 approved로 넘어가지 않는다.**
+
+### 승인은 오직 명시 의례로만
+
+`approved` 전환은 사용자의 명시 승인이 있을 때만, 오직 `harness:approve`로만 한다.
+
+1. 현재 런타임의 구조화 질문 도구(ClaudeCode는 `AskUserQuestion`)로, **대상 문서와 전환
+   상태를 명시해** 승인을 요청한다. 예: "이 PRD를 approved로 전환할까요? (승인 / 아직)".
+2. 사용자가 분명히 승인하면 **그 발화를 그대로 인용**해 실행한다.
+
+```sh
+npm run harness:approve -- --unit docs/raw/<type>/<slug> --quote "<사용자의 승인 발화 verbatim>" [--adr]
+```
+
+`harness:approve`가 status·`approval:` 근거·`state.md` 승인 이벤트를 원자적으로 함께
+기록한다. 에이전트가 직접 frontmatter status를 `approved`로 고치지 않는다.
+
+**승인으로 간주하지 않는 것(중요):** "이렇게 하려고 했어", "이거 작업해야 돼", "좋아
+보인다", 목표·범위·아이디어 설명, 인터뷰 질문에 대한 답 — 이 중 어느 것도 승인이
+아니다. 승인은 위 승인 요청에 대한 사용자의 분명한 긍정 응답만을 뜻한다. 조금이라도
+모호하면 승인이 아니며, `review`로 둔 채 다시 구조화 질문으로 확인한다.
+
+구현은 승인이 `state.md`에 기록된 이후 `feature-develop`에서 진행한다.
 
 ## 품질 게이트
 
@@ -123,4 +146,7 @@ PRD 초안은 아래 질문에 답할 수 있어야 한다.
 - **좋음:** `reviewer` 리뷰 → 수정 루프로 수용 기준과 비목표를 다듬는다.
 
 - **나쁨:** PRD 초안을 작성하자마자 `approved`로 둔다.
-- **좋음:** `review`로 두고, 사용자 승인 시 `approval:` 근거와 함께 `approved`로 바꾼다.
+- **좋음:** `review`로 두고, 사용자 명시 승인 발화를 받아 `harness:approve`로 `approved`로 바꾼다.
+
+- **나쁨:** "이렇게 하려고 했어" 같은 의도·아이디어 발화를 승인으로 오인해 바로 전환·구현한다.
+- **좋음:** 그런 발화는 승인이 아니라고 보고, 구조화 질문으로 명시 승인을 다시 확인한다.

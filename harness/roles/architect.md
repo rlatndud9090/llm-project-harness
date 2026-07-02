@@ -81,7 +81,7 @@
     - Good: data contract, state model, engine boundary 같은 결정을 먼저 기록한다.
 
     - Bad: 에이전트 판단으로 ADR status를 `accepted`로 바꾼다.
-    - Good: 형님 승인 전에는 `proposed`로 두고 승인 필요 항목을 출력한다.
+    - Good: 사용자 승인 전에는 `proposed`로 두고 승인 필요 항목을 출력한다.
 
     - Bad: 소비 프로젝트의 도메인 특수성을 하네스 공용 규칙에 박아 넣는다.
     - Good: 공용 하네스에는 절차와 경계만 두고, 도메인 특수성은 프로젝트 raw/ADR에 남긴다.

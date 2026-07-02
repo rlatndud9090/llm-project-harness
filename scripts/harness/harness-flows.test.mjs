@@ -387,6 +387,289 @@ describe("artifact-check wiki taxonomy", () => {
   });
 });
 
+describe("state ledger approval gate", () => {
+  it("kickoff creates a state.md checkpoint at stage kickoff", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      runKickoff(projectRoot, "feature", "ledger-init", "원장 초기화");
+      const state = read(path.join(projectRoot, "docs", "raw", "feature", "ledger-init", "state.md"));
+      expect(state).toContain("stage: kickoff");
+      expect(state).toContain("prd_status: draft");
+      expect(state).toContain("## 승인 이벤트");
+    });
+  });
+
+  it("harness:approve flips a review PRD (and ADR) and passes harness:check", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "share");
+      runKickoff(projectRoot, "feature", "share", "결과 공유");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Share", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "Share", status: "proposed", unit_type: "feature", related_prd: "./prd.md" })}\n${fullAdrBody()}`,
+      );
+      ingest(projectRoot, "docs/raw/feature/share", "공유 기능");
+
+      const approve = runApprove(projectRoot, "docs/raw/feature/share", ["--quote", "그래 이 PRD랑 ADR 승인할게, 진행해", "--adr"]);
+      expect(approve.status).toBe(0);
+
+      const prd = read(path.join(unitDir, "prd.md"));
+      const adr = read(path.join(unitDir, "adr.md"));
+      const state = read(path.join(unitDir, "state.md"));
+      expect(prd).toContain("status: approved");
+      expect(adr).toContain("status: accepted");
+      expect(state).toContain("stage: approved");
+      expect(state).toContain("- APPROVAL prd 20");
+      expect(state).toContain("- APPROVAL adr 20");
+      expect(state).toContain("그래 이 PRD랑 ADR 승인할게, 진행해");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("harness:approve refuses a PRD that is not in review", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      runKickoff(projectRoot, "feature", "early", "이른 승인");
+      const approve = runApprove(projectRoot, "docs/raw/feature/early", ["--quote", "승인"]);
+      expect(approve.status).not.toBe(0);
+      expect(`${approve.stdout}${approve.stderr}`).toContain("review");
+    });
+  });
+
+  it("harness:approve refuses without a --quote", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "noquote");
+      runKickoff(projectRoot, "feature", "noquote", "인용 없음");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "NoQuote", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      const approve = runApprove(projectRoot, "docs/raw/feature/noquote", []);
+      expect(approve.status).not.toBe(0);
+      expect(`${approve.stdout}${approve.stderr}`).toContain("quote");
+    });
+  });
+
+  it("harness:approve refuses the canned example quote", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "canned");
+      runKickoff(projectRoot, "feature", "canned", "예시 인용");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Canned", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      const approve = runApprove(projectRoot, "docs/raw/feature/canned", ["--quote", "응 이대로 승인, 구현 들어가"]);
+      expect(approve.status).not.toBe(0);
+      expect(`${approve.stdout}${approve.stderr}`).toContain("template/example");
+    });
+  });
+
+  it("harness:approve refuses a future --date", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "future");
+      runKickoff(projectRoot, "feature", "future", "미래 날짜");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Future", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      const approve = runApprove(projectRoot, "docs/raw/feature/future", ["--quote", "그래 승인할게", "--date", "2999-12-31"]);
+      expect(approve.status).not.toBe(0);
+      expect(`${approve.stdout}${approve.stderr}`).toContain("future");
+    });
+  });
+
+  it("fails harness:check when a PRD is approved with no approval event in state.md", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "forged");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Forged", status: "approved", unit_type: "feature", approval: "user:2026-01-01:사용자 승인함" })}\n${fullPrdBody()}`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "Forged", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      // Mirror says approved, but there is no recorded APPROVAL event to back it.
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({ stage: "approved", prd_status: "approved", adr_status: "proposed", approvals: [] }),
+      );
+      ingest(projectRoot, "docs/raw/feature/forged", "공유 기능");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("no matching approval event");
+    });
+  });
+
+  it("fails harness:check when prd.md is approved but state.md was left behind (mirror mismatch)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "mismatch");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Mismatch", status: "approved", unit_type: "feature", approval: "user:2026-01-01:사용자 승인함" })}\n${fullPrdBody()}`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "Mismatch", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({ stage: "prd-review", prd_status: "review", adr_status: "proposed", approvals: [] }),
+      );
+      ingest(projectRoot, "docs/raw/feature/mismatch", "공유 기능");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("disagrees with prd.md status");
+    });
+  });
+
+  it("requires a state.md ledger for an approved PRD", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "no-state");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "NoState", status: "approved", unit_type: "feature", approval: "user:2026-01-01:사용자 승인함" })}\n${fullPrdBody()}`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "NoState", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      ingest(projectRoot, "docs/raw/feature/no-state", "공유 기능");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("approved PRD requires a state.md ledger");
+    });
+  });
+
+  it("blocks a backward stage regression recorded in git history", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "regress");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Regress", status: "approved", unit_type: "feature", approval: "user:2026-01-01:사용자 승인함" })}\n${fullPrdBody()}`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "Regress", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({ stage: "approved", prd_status: "approved", adr_status: "proposed", approvals: [{ target: "prd", quote: "승인" }] }),
+      );
+      ingest(projectRoot, "docs/raw/feature/regress", "공유 기능");
+      commitAll(projectRoot);
+
+      // Rewind the checkpoint out of the approved stage while the PRD stays approved.
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({ stage: "prd-review", prd_status: "approved", adr_status: "proposed", approvals: [{ target: "prd", quote: "승인" }] }),
+      );
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("forbidden stage regression approved -> prd-review");
+    });
+  });
+});
+
+describe("claude-approval-guard", () => {
+  it("blocks an Edit that flips prd.md status to approved", () => {
+    const result = runGuard({
+      tool_name: "Edit",
+      tool_input: { file_path: "docs/raw/feature/x/prd.md", old_string: "status: review", new_string: "status: approved" },
+    });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("harness:approve");
+  });
+
+  it("blocks a Write that sets adr.md status to accepted", () => {
+    const result = runGuard({
+      tool_name: "Write",
+      tool_input: { file_path: "/abs/docs/raw/feature/x/adr.md", content: "---\nstatus: accepted\n---\n# ADR\n" },
+    });
+    expect(result.status).toBe(2);
+  });
+
+  it("allows an ordinary body edit to prd.md", () => {
+    const result = runGuard({
+      tool_name: "Edit",
+      tool_input: { file_path: "docs/raw/feature/x/prd.md", old_string: "a", new_string: "## 배경\n\n내용" },
+    });
+    expect(result.status).toBe(0);
+  });
+
+  it("ignores files that are not prd.md/adr.md", () => {
+    const result = runGuard({
+      tool_name: "Write",
+      tool_input: { file_path: "docs/raw/feature/x/notes.md", content: "status: approved" },
+    });
+    expect(result.status).toBe(0);
+  });
+
+  it("blocks a value-only Edit that turns review into approved (reconstructs the file)", () => {
+    withProject((projectRoot) => {
+      const prdPath = path.join(projectRoot, "docs", "raw", "feature", "vo", "prd.md");
+      writeFile(prdPath, `${frontmatter({ title: "VO", status: "review", unit_type: "feature" })}\n# PRD\n`);
+      const result = runGuard({ tool_name: "Edit", tool_input: { file_path: prdPath, old_string: "review", new_string: "approved" } });
+      expect(result.status).toBe(2);
+    });
+  });
+
+  it("blocks a status flip regardless of filename case (PRD.md)", () => {
+    const result = runGuard({
+      tool_name: "Edit",
+      tool_input: { file_path: "docs/raw/feature/x/PRD.md", old_string: "status: review", new_string: "status: approved" },
+    });
+    expect(result.status).toBe(2);
+  });
+
+  it("blocks a MultiEdit that splits the status flip across edits", () => {
+    withProject((projectRoot) => {
+      const prdPath = path.join(projectRoot, "docs", "raw", "feature", "me", "prd.md");
+      writeFile(prdPath, `${frontmatter({ title: "ME", status: "review", unit_type: "feature" })}\n# PRD\n`);
+      const result = runGuard({
+        tool_name: "MultiEdit",
+        tool_input: {
+          file_path: prdPath,
+          edits: [
+            { old_string: "status: review", new_string: "status: " },
+            { old_string: "status: ", new_string: "status: approved" },
+          ],
+        },
+      });
+      expect(result.status).toBe(2);
+    });
+  });
+
+  it("blocks hand-writing an approval into state.md", () => {
+    withProject((projectRoot) => {
+      const statePath = path.join(projectRoot, "docs", "raw", "feature", "st", "state.md");
+      writeFile(statePath, `${frontmatter({ title: "St", stage: "prd-review", prd_status: "review", adr_status: "proposed" })}\n# 원장\n`);
+      const result = runGuard({
+        tool_name: "Edit",
+        tool_input: { file_path: statePath, old_string: "prd_status: review", new_string: "prd_status: approved" },
+      });
+      expect(result.status).toBe(2);
+    });
+  });
+
+  it("allows advancing state.md stage to implementing on an already-approved unit", () => {
+    withProject((projectRoot) => {
+      const statePath = path.join(projectRoot, "docs", "raw", "feature", "impl", "state.md");
+      writeFile(statePath, `${frontmatter({ title: "Impl", stage: "approved", prd_status: "approved", adr_status: "proposed" })}\n# 원장\n`);
+      const result = runGuard({
+        tool_name: "Edit",
+        tool_input: { file_path: statePath, old_string: "stage: approved", new_string: "stage: implementing" },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
 function seedDecisionUnit(projectRoot, adrStatus, adrApproval) {
   attach(projectRoot);
   const unitDir = path.join(projectRoot, "docs", "raw", "feature", "decision");
@@ -395,14 +678,142 @@ function seedDecisionUnit(projectRoot, adrStatus, adrApproval) {
     path.join(unitDir, "adr.md"),
     `${frontmatter({ title: "Decision", status: adrStatus, unit_type: "feature", approval: adrApproval })}\n# Decision\n`,
   );
+  writeFile(
+    path.join(unitDir, "state.md"),
+    stateLedger({
+      stage: "adr-review",
+      prd_status: "draft",
+      adr_status: adrStatus,
+      approvals: adrStatus === "accepted" ? [{ target: "adr", quote: "approved" }] : [],
+    }),
+  );
   ingest(projectRoot, "docs/raw/feature/decision");
   commitAll(projectRoot);
 }
 
 function regressAdrStatus(projectRoot, status) {
-  const adrPath = path.join(projectRoot, "docs", "raw", "feature", "decision", "adr.md");
-  // superseded/deprecated keep no approval requirement; proposed has none either
-  writeFile(adrPath, `${frontmatter({ title: "Decision", status, unit_type: "feature" })}\n# Decision\n`);
+  const unitDir = path.join(projectRoot, "docs", "raw", "feature", "decision");
+  // superseded/deprecated keep no approval requirement; proposed has none either.
+  // Keep state.md's mirror in step with the new status so this isolates the
+  // adr.md status-transition rule under test.
+  writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "Decision", status, unit_type: "feature" })}\n# Decision\n`);
+  writeFile(
+    path.join(unitDir, "state.md"),
+    stateLedger({ stage: "adr-review", prd_status: "draft", adr_status: status, approvals: [] }),
+  );
+}
+
+// Builds a state.md ledger string. Callers keep the mirror (prd_status/adr_status)
+// and approval events consistent with the prd.md/adr.md they write alongside.
+function stateLedger({ stage, prd_status, adr_status, approvals = [] }) {
+  const lines = ["---", 'title: "Ledger"', "date: 2026-01-01", `stage: ${stage}`];
+  if (prd_status) lines.push(`prd_status: ${prd_status}`);
+  if (adr_status) lines.push(`adr_status: ${adr_status}`);
+  lines.push("---");
+  const events = approvals.map((a) => `- APPROVAL ${a.target} ${a.date ?? "2026-01-01"} harness:approve :: ${a.quote}`);
+  const eventsBlock = events.length ? events.join("\n") : "(아직 승인 없음 — 구현 진입 불가)";
+  return `${lines.join("\n")}\n\n# 원장\n\n## 단계 로그 (append-only)\n\n- 2026-01-01 kickoff\n\n## 승인 이벤트\n\n${eventsBlock}\n`;
+}
+
+function fullPrdBody() {
+  return [
+    "# PRD",
+    "",
+    "## 배경",
+    "",
+    "결과를 외부와 공유할 방법이 없다.",
+    "",
+    "## 목표",
+    "",
+    "- [ ] 사용자가 결과를 링크로 공유한다",
+    "",
+    "## 비목표",
+    "",
+    "- 계정 로그인은 다루지 않는다",
+    "",
+    "## 요구사항",
+    "",
+    "### 기능 요구사항",
+    "",
+    "- [ ] 공유 링크를 생성한다",
+    "",
+    "## 수용 기준",
+    "",
+    "- [ ] 공유 링크로 결과를 열 수 있다",
+    "",
+  ].join("\n");
+}
+
+function fullAdrBody() {
+  return [
+    "# ADR",
+    "",
+    "## 컨텍스트",
+    "",
+    "PRD 요구와 현재 제약을 고려한다.",
+    "",
+    "## 결정",
+    "",
+    "링크 기반 공유를 채택한다.",
+    "",
+    "## 선택지",
+    "",
+    "### 선택지 A: 링크 공유",
+    "",
+    "- 장점: 단순하다",
+    "- 단점: 만료 관리가 필요하다",
+    "",
+    "### 선택지 B: 계정 공유",
+    "",
+    "- 장점: 권한 제어가 쉽다",
+    "- 단점: 구현이 복잡하다",
+    "",
+    "## 선택 근거",
+    "",
+    "링크 공유가 더 단순하고 요구를 충족한다.",
+    "",
+    "## 결과",
+    "",
+    "### 긍정적 영향",
+    "",
+    "- 빠르게 공유한다",
+    "",
+    "### 부정적 영향 / 트레이드오프",
+    "",
+    "- 만료 처리가 필요하다",
+    "",
+    "## 후속 작업",
+    "",
+    "- 만료 정책을 정한다",
+    "",
+    "## 검증",
+    "",
+    "- 링크로 결과 열람을 확인한다",
+    "",
+  ].join("\n");
+}
+
+function runKickoff(projectRoot, type, slug, title) {
+  return execFileSync(
+    process.execPath,
+    [path.join(projectRoot, ".harness", "scripts", "harness", "kickoff.mjs"), "--type", type, "--slug", slug, "--title", title],
+    { cwd: projectRoot, encoding: "utf8" },
+  );
+}
+
+function runApprove(projectRoot, unitPath, extraArgs = []) {
+  return spawnSync(
+    process.execPath,
+    [path.join(projectRoot, ".harness", "scripts", "harness", "approve.mjs"), "--unit", unitPath, ...extraArgs],
+    { cwd: projectRoot, encoding: "utf8" },
+  );
+}
+
+function runGuard(payload) {
+  return spawnSync(process.execPath, [path.join(repoRoot, "scripts", "harness", "claude-approval-guard.mjs")], {
+    input: JSON.stringify(payload),
+    encoding: "utf8",
+  });
 }
 
 function frontmatter(fields) {

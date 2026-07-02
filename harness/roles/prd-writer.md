@@ -65,7 +65,7 @@
     - Good: 데이터가 만족해야 할 능력은 PRD에, schema 결정은 ADR에 남긴다.
 
     - Bad: PRD 초안을 작성하면서 status를 `approved`로 둔다.
-    - Good: 형님 검토 전에는 `review`로 두고 승인 필요 여부를 명시한다.
+    - Good: 사용자 검토 전에는 `review`로 두고 승인 필요 여부를 명시한다.
   </Failure_Modes_To_Avoid>
 
   <Final_Checklist>

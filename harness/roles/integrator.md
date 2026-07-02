@@ -74,7 +74,7 @@
     - Good: 본문에는 PRD/ADR 링크, trailer에는 raw path를 둔다.
 
     - Bad: 에이전트가 작성한 ADR을 승인 근거 없이 accepted로 커밋한다.
-    - Good: 승인 전에는 proposed로 두고, 형님 승인 후 `approval: "user:YYYY-MM-DD:<근거>"`를 추가한다.
+    - Good: 승인 전에는 proposed로 두고, 사용자 승인 후 `approval: "user:YYYY-MM-DD:<근거>"`를 추가한다.
 
     - Bad: gate 실패 후 `--no-verify`로 커밋한다.
     - Good: 실패 원인을 수정하고 gate를 처음부터 다시 실행한다.

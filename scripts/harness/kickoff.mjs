@@ -74,6 +74,44 @@ function materialize(templateName, outputName) {
   return true;
 }
 
+// Every unit gets a state.md checkpoint ledger. Feature units use the full
+// template (it carries the PRD/ADR approval gate); bugfix/chore units get a
+// lean ledger since their statuses do not require user approval.
+function materializeStateLedger() {
+  const outputPath = path.join(unitDir, "state.md");
+  if (pathExists(outputPath)) return false;
+
+  if (type === "feature") {
+    let content = readText(harnessPath("harness", "templates", "raw", "state.md"));
+    for (const [pattern, value] of replacements) {
+      content = content.replace(pattern, value);
+    }
+    writeText(outputPath, content);
+    return true;
+  }
+
+  writeText(
+    outputPath,
+    `---
+title: "${title}"
+date: "${date}"
+stage: kickoff
+---
+
+# 작업 단계 원장: ${title}
+
+이 파일은 이 작업 단위의 **단계 체크포인트**다. 새 세션이나 새 에이전트가
+작업을 이어받을 때 가장 먼저 이 파일을 읽어 지금 어느 단계인지 판단한다.
+단계가 바뀌면 아래 로그에 한 줄 append 하고 \`stage\`를 갱신한다.
+
+## 단계 로그 (append-only)
+
+- ${date} kickoff: 브랜치와 raw 골격 생성
+`,
+  );
+  return true;
+}
+
 fs.mkdirSync(unitDir, { recursive: true });
 
 const created = [];
@@ -87,6 +125,7 @@ if (type === "feature") {
 } else {
   if (materialize("chore.md", "notes.md")) created.push("notes.md");
 }
+if (materializeStateLedger()) created.push("state.md");
 
 // Reconcile against the unit next-feature recorded, then consume the anchor.
 // A mismatch means the chosen unit drifted between recommendation and kickoff.

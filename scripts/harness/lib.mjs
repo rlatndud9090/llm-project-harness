@@ -268,3 +268,85 @@ export function isForbiddenTransition(baseName, fromStatus, toStatus) {
   if (!transitions) return false;
   return transitions.some(([from, to]) => from === fromStatus && to === toStatus);
 }
+
+// The per-unit state ledger (state.md) is the workflow checkpoint AND the
+// machine-checkable approval evidence. A resuming session reads it first to
+// learn exactly which stage the unit is in, and artifact-check cross-checks it
+// against the PRD/ADR statuses so a fabricated or skipped approval cannot pass.
+export const STAGE_VALUES = new Set([
+  "kickoff",
+  "prd-draft",
+  "prd-review",
+  "adr-draft",
+  "adr-review",
+  "awaiting-approval",
+  "approved",
+  "implementing",
+  "integrated",
+]);
+
+// Stages that only exist once the user has approved. Moving out of one of these
+// back into a pre-approval stage is an "un-approval" and is forbidden (a new
+// session must never silently rewind past a recorded approval). Forward moves,
+// and rework that stays at/after `approved`, are allowed.
+export const POST_APPROVAL_STAGES = new Set(["approved", "implementing", "integrated"]);
+export const PRE_APPROVAL_STAGES = new Set([
+  "kickoff",
+  "prd-draft",
+  "prd-review",
+  "adr-draft",
+  "adr-review",
+  "awaiting-approval",
+]);
+
+export function isForbiddenStageTransition(fromStage, toStage) {
+  return POST_APPROVAL_STAGES.has(fromStage) && PRE_APPROVAL_STAGES.has(toStage);
+}
+
+// Replaces (or inserts) a single `key: value` line inside the frontmatter block
+// while leaving the body and other keys untouched. Used by kickoff/approve so
+// status flips are surgical edits, never a full-file rewrite.
+export function setFrontmatterField(content, key, value) {
+  const line = `${key}: ${value}`;
+  if (!content.startsWith("---\n")) {
+    return `---\n${line}\n---\n\n${content}`;
+  }
+  const end = content.indexOf("\n---", 4);
+  if (end === -1) return content;
+
+  const frontmatter = content.slice(4, end);
+  const rest = content.slice(end); // begins with "\n---"
+  const keyPattern = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:`);
+  let replaced = false;
+  const lines = frontmatter.split("\n").map((existing) => {
+    if (!replaced && keyPattern.test(existing)) {
+      replaced = true;
+      return line;
+    }
+    return existing;
+  });
+  if (!replaced) lines.push(line);
+  return `---\n${lines.join("\n")}${rest}`;
+}
+
+// state.md records each approval as one strict, regex-parseable line so the CLI
+// (writer) and artifact-check (reader) share an unambiguous format. The verbatim
+// user quote is everything after `::` on the line.
+//   - APPROVAL prd 2026-07-02 harness:approve :: 응 이대로 승인, 구현 들어가
+export const APPROVAL_EVENT_RE = /^- APPROVAL (prd|adr) (\d{4}-\d{2}-\d{2}) (\S+) :: (.+)$/;
+
+export function formatApprovalEvent({ target, date, transport, quote }) {
+  const oneLine = quote.replace(/\s+/g, " ").trim();
+  return `- APPROVAL ${target} ${date} ${transport} :: ${oneLine}`;
+}
+
+export function parseApprovalEvents(content) {
+  const events = [];
+  for (const rawLine of content.split(/\r?\n/)) {
+    const match = APPROVAL_EVENT_RE.exec(rawLine.trim());
+    if (match) {
+      events.push({ target: match[1], date: match[2], transport: match[3], quote: match[4].trim() });
+    }
+  }
+  return events;
+}

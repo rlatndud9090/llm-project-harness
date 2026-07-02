@@ -20,8 +20,17 @@ npm run harness:check
 - feature raw unit에는 `prd.md`와 `adr.md`가 있다.
 - frontmatter 문서에는 `title`, `date`, `status`, `unit_type`이 있다.
 - `approved` PRD와 `accepted` ADR에는 `approval: "user:YYYY-MM-DD:<근거>"` 형식의 승인
-  근거가 기록돼 있다. 자동 검사는 근거의 형식과 존재를 강제한다. 근거가 형님의 실제
+  근거가 기록돼 있다. 자동 검사는 근거의 형식과 존재를 강제한다. 근거가 사용자의 실제
   동의를 반영하는지는 아래 수동 검토 항목에서 확인한다.
+- feature 단위의 `state.md`(단계 체크포인트 원장)가 정합적이다.
+  - `approved` PRD / `accepted` ADR에는 `state.md`에 대응하는 승인 이벤트(사용자 발화
+    verbatim)가 있어야 한다. 없으면 실패한다(형식만 맞는 위조를 걸러낸다).
+  - `state.md`의 승인 축(`prd_status`/`adr_status`)이 실제 PRD/ADR status와 일치한다.
+    손으로 status만 바꾸고 원장을 안 고치면 불일치로 실패한다.
+  - `stage`는 유효한 값이고, `approved`/`implementing`/`integrated` stage는 승인된 PRD를
+    전제한다. `state.md`의 `stage`는 승인 이후 승인 이전 단계로 후퇴할 수 없다(git 대비).
+- 승인 전환은 오직 `npm run harness:approve`로만 한다. 이 명령이 status·`approval:`·
+  `state.md` 승인 이벤트를 원자적으로 함께 기록한다.
 - raw unit의 status는 git 기록 대비 명백한 후퇴로 바뀌지 않는다(예: PRD `approved`→`draft`, ADR `accepted`→`proposed`). reopen(`rejected`→`draft`)이나 retire(`accepted`→`superseded`)는 허용한다.
 - ADR의 `related_prd`와 `supersedes` 링크는 실제 파일을 가리킨다(값이 비어 있으면 검사하지 않는다).
 - `accepted`/`deprecated`/`superseded` ADR의 본문은 git 기록 대비 바뀌지 않는다. status/approval 같은 frontmatter 변경은 허용한다.

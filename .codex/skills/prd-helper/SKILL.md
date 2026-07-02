@@ -19,6 +19,13 @@ description: "PRD를 인터뷰·리서치·리뷰로 함께 작성할 때 사용
 PRD는 한국어로 작성하고 `review` 상태로 둔다. 사용자 명시 승인 전에는 `approved`로
 바꾸지 않는다.
 
+`approved` 전환은 오직 사용자의 명시 승인 뒤 `npm run harness:approve -- --unit
+docs/raw/<type>/<slug> --quote "<사용자 발화 verbatim>"`로만 한다(직접 frontmatter 편집
+금지 — 런타임 훅과 `harness:check`가 막는다). "이렇게 하려고 했어" 같은 의도·아이디어
+발화는 승인이 아니다. 승인은 대상 문서와 전환 상태를 명시한 승인 요청에 대한 사용자의
+분명한 긍정 응답만을 뜻하며, 모호하면 `review`로 둔 채 다시 확인한다. `review`로 올릴
+때 `state.md`의 `stage`/`prd_status`를 갱신한다.
+
 ## 질문 도구
 
 - `$deep-interview`가 설치돼 있으면 그 스킬을 먼저 사용한다.

@@ -10,6 +10,7 @@
     "test": "vitest",
     "test:run": "vitest run --passWithNoTests",
     "harness:kickoff": "node scripts/harness/kickoff.mjs",
+    "harness:approve": "node scripts/harness/approve.mjs",
     "harness:ingest": "node scripts/harness/wiki-ingest.mjs",
     "harness:check": "node scripts/harness/artifact-check.mjs",
     "harness:gate": "node scripts/harness/gate.mjs",

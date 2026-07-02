@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   FORBIDDEN_STATUS_TRANSITIONS,
+  formatApprovalEvent,
+  isForbiddenStageTransition,
   isForbiddenTransition,
+  parseApprovalEvents,
   parseFrontmatter,
   parseWorkBranch,
   resolveTimezone,
+  setFrontmatterField,
   stripKnownPrefix,
   titleFromSlug,
   today,
@@ -106,5 +110,53 @@ describe("isForbiddenTransition", () => {
 describe("toPosix", () => {
   it("keeps posix separators intact", () => {
     expect(toPosix("docs/raw/feature/x")).toBe("docs/raw/feature/x");
+  });
+});
+
+describe("isForbiddenStageTransition", () => {
+  it("blocks rewinding out of a post-approval stage", () => {
+    expect(isForbiddenStageTransition("approved", "prd-review")).toBe(true);
+    expect(isForbiddenStageTransition("implementing", "awaiting-approval")).toBe(true);
+    expect(isForbiddenStageTransition("integrated", "kickoff")).toBe(true);
+  });
+
+  it("allows forward progress and post-approval rework", () => {
+    expect(isForbiddenStageTransition("kickoff", "prd-review")).toBe(false);
+    expect(isForbiddenStageTransition("awaiting-approval", "approved")).toBe(false);
+    expect(isForbiddenStageTransition("approved", "implementing")).toBe(false);
+    expect(isForbiddenStageTransition("integrated", "implementing")).toBe(false);
+  });
+});
+
+describe("setFrontmatterField", () => {
+  it("replaces an existing key without touching the body", () => {
+    const input = ['---', 'title: "X"', "status: review", "---", "", "# body", "status: review (in prose)"].join("\n");
+    const out = setFrontmatterField(input, "status", "approved");
+    expect(out).toContain("status: approved");
+    expect(out).not.toContain("status: review\n");
+    expect(out).toContain("# body");
+    expect(out).toContain("status: review (in prose)"); // body line untouched
+  });
+
+  it("inserts a missing key into the frontmatter block", () => {
+    const input = ['---', 'title: "X"', "status: approved", "---", "", "# body"].join("\n");
+    const out = setFrontmatterField(input, "approval", '"user:2026-01-01:ok"');
+    const fields = parseFrontmatter(out);
+    expect(fields.approval).toBe("user:2026-01-01:ok");
+    expect(fields.title).toBe("X");
+    expect(fields.status).toBe("approved");
+  });
+});
+
+describe("approval events", () => {
+  it("round-trips a formatted approval event", () => {
+    const line = formatApprovalEvent({ target: "prd", date: "2026-07-02", transport: "harness:approve", quote: "응 이대로\n승인해" });
+    expect(line).toBe("- APPROVAL prd 2026-07-02 harness:approve :: 응 이대로 승인해");
+    const events = parseApprovalEvents(`잡음\n${line}\n잡음`);
+    expect(events).toEqual([{ target: "prd", date: "2026-07-02", transport: "harness:approve", quote: "응 이대로 승인해" }]);
+  });
+
+  it("ignores lines that are not approval events", () => {
+    expect(parseApprovalEvents("- 그냥 로그\n- APPROVAL foo 2026 x :: y")).toEqual([]);
   });
 });

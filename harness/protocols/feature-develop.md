@@ -11,9 +11,11 @@
 출력: 구현 완료 + wiki ingest + harness gate 통과 + Lore commit
 ```
 
-feature raw unit은 `prd.md`, `adr.md`, `notes.md`를 가진다. 에이전트는 PRD/ADR
-초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를 `approved`, ADR을 `accepted`로
-바꾸지 않는다. 구현은 승인된 PRD/ADR을 기준으로만 시작한다.
+feature raw unit은 `prd.md`, `adr.md`, `notes.md`, `state.md`를 가진다. 에이전트는
+PRD/ADR 초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를 `approved`, ADR을
+`accepted`로 바꾸지 않는다. 승인 전환은 오직 `harness:approve`로만 하며, 그 근거는
+`state.md`의 승인 이벤트에 사용자 발화 verbatim으로 기록된다. 구현은 `state.md`에 승인이
+기록된 이후에만 시작한다.
 
 ## 역할
 
@@ -25,13 +27,26 @@ feature raw unit은 `prd.md`, `adr.md`, `notes.md`를 가진다. 에이전트는
 | `test-engineer` | 도메인/통합/UI 검증 전략과 테스트 구현 |
 | `integrator` | raw/wiki 검증, gate 실행, 커밋 프로토콜 |
 
-## Phase 0: 실행 모드 결정
+## Phase 0: 승인 게이트 (하드 차단)
+
+구현 앞에 반드시 통과해야 하는 게이트다. 이 게이트를 건너뛰고 구현으로 넘어가지 않는다.
 
 1. 현재 branch와 raw path를 확인한다.
-2. `docs/raw/feature/<slug>/prd.md`와 `adr.md`를 읽는다.
-3. PRD `approved`, ADR `accepted`, `approval:` 근거를 확인한다.
-4. 사용자 요청이 신규 구현, 재작업, 부분 수정, PRD 보강 중 무엇인지 분류한다.
-5. 계획 게이트 필요 여부와 실행 레일(기본 role 체인 또는 설치된 가속기)을 한 줄로 보고한다.
+2. **`state.md`를 먼저 읽는다.** `stage`와 `## 승인 이벤트`가 단일 진실원이다(채팅
+   히스토리로 승인 여부를 판단하지 않는다).
+3. `docs/raw/feature/<slug>/prd.md`와 `adr.md`를 읽고 status와 `approval:` 근거를 확인한다.
+4. `npm run harness:check`를 실행해 승인 정합성(승인 이벤트 backing, state↔status)을 확인한다.
+5. **차단 조건:** 아래 중 하나라도 참이면 구현하지 않는다.
+   - PRD가 `approved`가 아니다.
+   - `state.md`에 PRD 승인 이벤트가 없다(사용자 발화 verbatim 미기록).
+   - ADR 결정이 필요한데 ADR이 `accepted`가 아니다.
+
+   이 경우 `$prd-helper`/`$adr-helper`로 되돌아가 사용자의 명시 승인을 구조화 질문으로
+   받고, 승인 전환은 오직 `harness:approve`로 한다. **에이전트가 스스로 승인을 만들거나
+   상태를 전환하지 않는다.**
+6. 게이트를 통과했으면 `state.md`의 `stage`를 `implementing`으로 갱신한다.
+7. 사용자 요청이 신규 구현, 재작업, 부분 수정, PRD 보강 중 무엇인지 분류한다.
+8. 계획 게이트 필요 여부와 실행 레일(기본 role 체인 또는 설치된 가속기)을 한 줄로 보고한다.
 
 | 조건 | 실행 모드 | 동작 |
 | --- | --- | --- |
@@ -76,7 +91,7 @@ integrator` role 체인이다. 계획 게이트가 필요한 변경은 `architec
 자율 실행을 어떤 수단으로 병렬화할지는 도구별 어댑터가 정의한다. 수단과 무관하게 위
 분리 원칙(자율 구간 안에서 인간 게이트·커밋 금지)은 동일하게 적용된다.
 
-형님의 제품 판단이나 승인처럼 질문이 필요한 순간에는 현재 런타임의 구조화 질문
+사용자의 제품 판단이나 승인처럼 질문이 필요한 순간에는 현재 런타임의 구조화 질문
 도구를 우선 사용한다. 현재 surface가 실제로 지원할 때만 OMX 구조화 질문 surface를
 가속기로 쓰고, 구조화 질문 도구가 없을 때만 간결한 plain-text 질문으로 fallback한다.
 
@@ -102,12 +117,12 @@ integrator` role 체인이다. 계획 게이트가 필요한 변경은 `architec
 
 - ADR이 proposed placeholder 상태이면 구현으로 넘어가지 않는다.
 - 사용자가 명시 승인하지 않은 ADR은 `proposed`로 유지한다.
-- PRD가 아직 `review`이고 ADR이 `proposed`이면 형님에게 명시 승인을 요청한다. 형님이
-  승인하면(이 단계에서, 별도 사람 커밋 없이) 에이전트가 직접 status를 `approved`/`accepted`로
-  바꾸고 `approval: "user:YYYY-MM-DD:<근거>"`를 같이 기록한다. 승인 근거 없이 status만
-  바꾸지 않는다(`harness:check`가 막는다).
-- PRD `approved` 또는 ADR `accepted`로 전환하려면 위 `approval:` frontmatter가 반드시 동반된다.
-- 형님 승인을 받지 못했으면 구현하지 않고 `$prd-helper`/`$adr-helper`로 되돌린다.
+- PRD가 아직 `review`이고 ADR이 `proposed`이면 사용자에게 **구조화 질문으로** 명시 승인을
+  요청한다(대상 문서와 전환 상태를 명시). 사용자가 분명히 승인하면 그 발화를 그대로 인용해
+  `npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<발화>" [--adr]`로만
+  전환한다. 에이전트가 직접 frontmatter status를 고치지 않는다(런타임 훅과 `harness:check`가 막는다).
+- "이렇게 하려고 했어" 같은 의도·아이디어 발화는 승인이 아니다. 모호하면 승인이 아니다.
+- 사용자 승인을 받지 못했으면 구현하지 않고 `$prd-helper`/`$adr-helper`로 되돌린다.
 - 사용자의 제품 판단이 필요한 질문은 숨기지 않고 보고하며, 현재 런타임의 구조화
   질문 도구를 우선 사용한다.
 
@@ -155,7 +170,7 @@ npm run harness:gate
 - **좋음:** data contract, state model, engine boundary 같은 결정을 ADR에 남긴 뒤 구현한다.
 
 - **나쁨:** 에이전트가 ADR을 작성한 뒤 곧바로 `accepted`로 바꾼다.
-- **좋음:** ADR은 `proposed`로 남기고, 형님 승인 후 `approval:` 근거와 함께 `accepted`로 바꾼다.
+- **좋음:** ADR은 `proposed`로 남기고, 사용자 명시 승인 후 `harness:approve --adr`로 `accepted`로 바꾼다.
 
 - **나쁨:** UI가 권한, 가격, 판정, 시뮬레이션 같은 핵심 규칙을 컴포넌트 안에서 직접 계산한다.
 - **좋음:** UI는 domain/application result를 렌더링하고 판정은 핵심 로직에 둔다.

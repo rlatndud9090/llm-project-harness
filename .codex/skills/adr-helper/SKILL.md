@@ -19,6 +19,10 @@ description: "PRD에서 ADR이 필요하다고 결론났을 때 아키텍처 결
 ADR은 `proposed` 상태로 작성하고, 사용자 명시 승인 전에는 `accepted`로 바꾸지
 않는다. accepted ADR 본문은 고쳐 쓰지 않는다.
 
+`accepted` 전환은 오직 사용자의 명시 승인 뒤 `npm run harness:approve -- --unit
+docs/raw/feature/<slug> --quote "<사용자 발화 verbatim>" --adr`로만 한다(직접 frontmatter
+편집 금지). 결정 방향을 논의한 대화는 승인이 아니다. `state.md`의 `stage`를 갱신한다.
+
 ## 질문 도구
 
 - `$deep-interview`가 설치돼 있으면 그 스킬을 먼저 사용한다.

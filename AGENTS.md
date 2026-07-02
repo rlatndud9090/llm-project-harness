@@ -3,7 +3,10 @@
 This repository builds and maintains a reusable cross-agent harness that can be
 mounted into product repositories as a `.harness` git submodule.
 
-Answer the user in Korean honorifics and call the user `형님`.
+Answer the user in Korean, using polite honorifics. Refer to the user with a
+neutral term such as `사용자`; do not hard-code a personal nickname. A personal
+form of address belongs in an individual user's own global config, not in this
+shared harness or the documents (PRD/ADR) it produces.
 
 ## Project Boundary
 

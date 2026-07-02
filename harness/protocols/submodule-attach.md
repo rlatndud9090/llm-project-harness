@@ -94,6 +94,41 @@ retrofit으로 `harness:*`가 `llm-harness:*`로 보존된 프로젝트는 pre-c
 npm run harness:hooks -- --command "npm run llm-harness:check"
 ```
 
+## CI 강제 (승인 게이트의 durable 계층 — 권장)
+
+로컬 pre-commit 훅과 ClaudeCode PreToolUse 가드는 **클라이언트 사이드 편의 장치**다.
+`git commit --no-verify`, Bash 직접 쓰기(`sed`/`tee`/redirect), 파일 rename, 또는
+MCP/원격 API 쓰기로 우회할 수 있다. 승인 게이트(승인 이벤트 없는 `approved`/`accepted`
+차단, `state.md` 정합성)를 **우회 불가능하게** 강제하는 유일한 계층은 서버사이드 CI다.
+
+소비 프로젝트는 push/PR마다 `harness:check`(또는 `harness:gate`)를 CI에서 돌리고
+main 브랜치를 보호한다. 하네스 저장소의 `.github/workflows/harness.yml`을 출발점으로
+쓸 수 있다.
+
+```yaml
+# .github/workflows/harness.yml
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git-history 기반 검사(전이/불변/stage 후퇴)가 HEAD 대비 비교하므로 필요
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run harness:check
+```
+
+CI가 없으면 승인 게이트는 "모델 규율 + opt-in 로컬 훅"까지로만 보장된다. 진짜
+아무도 우회 못 하게 하려면 CI + branch protection이 필요하다.
+
 ## 기존 프로젝트에 붙이기
 
 이미 진행 중인 프로젝트에는 `--retrofit`을 사용한다. 신규 프로젝트 장착 경로와

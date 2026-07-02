@@ -8,8 +8,9 @@
 `$prd-helper`의 `## ADR 필요 여부` 단계에서 판단하고, 필요하다고 결론났을 때만
 이 단계로 들어온다.
 
-전제: feature raw unit에 `adr.md`가 있다(`$kickoff`가 생성). ADR은 `proposed`
-상태로 작성하고, 사용자 명시 승인 전에는 `accepted`로 바꾸지 않는다.
+전제: feature raw unit에 `adr.md`와 `state.md`가 있다(`$kickoff`가 생성). ADR은
+`proposed` 상태로 작성하고, 사용자 명시 승인 전에는 `accepted`로 바꾸지 않는다.
+`accepted` 전환은 오직 `harness:approve --adr`로만 한다.
 
 ## ADR이 필요한 경우
 
@@ -67,8 +68,23 @@ deep-interview 내부에서 현재 surface에 맞게 선택한다. `$deep-interv
 
 ## 승인과 불변성
 
-ADR은 에이전트가 단독으로 `accepted` 처리하지 않는다. 사용자 명시 승인이 있을
-때만 status를 전환하고 `approval: "user:YYYY-MM-DD:<근거>"`를 남긴다.
+ADR은 에이전트가 단독으로 `accepted` 처리하지 않는다. 이 단계는 ADR을 `proposed`로만
+마무리하고, `state.md`의 `stage`를 `adr-review`로 갱신한다.
+
+`accepted` 전환은 사용자의 명시 승인이 있을 때만, 오직 `harness:approve --adr`로만 한다.
+승인은 보통 PRD 승인과 함께 이뤄진다:
+
+```sh
+npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의 승인 발화 verbatim>" --adr
+```
+
+`harness:approve`가 status·`approval: "user:YYYY-MM-DD:<근거>"`·`state.md` 승인 이벤트를
+함께 기록한다. 에이전트가 직접 frontmatter status를 `accepted`로 고치지 않는다(런타임
+훅과 `harness:check`가 막는다).
+
+**승인으로 간주하지 않는 것:** 결정 방향을 설명하거나 "그렇게 하자" 정도의 대화는
+승인이 아니다. 승인은 "이 ADR을 accepted로 전환한다"는 명시 요청에 대한 사용자의 분명한
+긍정 응답만을 뜻한다. 모호하면 `proposed`로 둔다.
 
 accepted ADR 본문은 과거 결정의 근거이므로 고쳐 쓰지 않는다. 결정이 바뀌면 새
 ADR을 추가하고 옛 ADR을 `superseded`로 표시한다.
@@ -87,4 +103,4 @@ PRD/ADR이 모두 자리를 잡고 사용자 승인까지 끝나면 `feature-dev
 - **좋음:** 선택지 2개 이상과 선택 근거(채택·기각 사유)를 함께 남겨 결정 근거를 보존한다.
 
 - **나쁨:** 에이전트가 ADR을 작성한 뒤 곧바로 `accepted`로 바꾼다.
-- **좋음:** `proposed`로 두고, 사용자 승인 후 `approval:` 근거와 함께 `accepted`로 바꾼다.
+- **좋음:** `proposed`로 두고, 사용자 명시 승인 후 `harness:approve --adr`로 `accepted`로 바꾼다.

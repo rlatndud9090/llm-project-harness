@@ -2,15 +2,19 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  POST_APPROVAL_STAGES,
   REPO_ROOT,
+  STAGE_VALUES,
   bodyAfterFrontmatter,
   fail,
   findHarnessRoot,
   getCurrentBranch,
   gitShow,
+  isForbiddenStageTransition,
   isForbiddenTransition,
   isHarnessRepository,
   listMarkdownFiles,
+  parseApprovalEvents,
   parseFrontmatter,
   parseWorkBranch,
   pathExists,
@@ -441,6 +445,99 @@ function assertStatusTransitions() {
   }
 }
 
+// state.md는 이 작업 단위의 단계 체크포인트이자 승인 증거다. 이 검사가 (1) 승인
+// 이벤트 없는 approved/accepted 차단, (2) state.md ↔ prd/adr status 정합성(승인 축),
+// (3) 스테이지 enum과 후진(un-approval) 차단을 기계강제한다. 형식만 맞는 위조가
+// 통과하던 구멍을 닫고, 손으로 status만 바꾸면 정합성에서 걸리게 만든다.
+function assertStateLedger() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  for (const unitDir of unitDirs("feature")) {
+    const rel = toPosix(path.relative(process.cwd(), unitDir));
+    const prdPath = path.join(unitDir, "prd.md");
+    const adrPath = path.join(unitDir, "adr.md");
+    const statePath = path.join(unitDir, "state.md");
+
+    const prdStatus = pathExists(prdPath) ? parseFrontmatter(readText(prdPath))?.status : undefined;
+    const adrStatus = pathExists(adrPath) ? parseFrontmatter(readText(adrPath))?.status : undefined;
+
+    if (!pathExists(statePath)) {
+      // Hard-require the ledger only where it is load-bearing (an approval
+      // happened). Pre-approval units without state.md only get a nudge, so
+      // upgrading the harness never breaks a legacy draft unit.
+      if (prdStatus === "approved") addError(`approved PRD requires a state.md ledger with an approval event: ${rel}`);
+      if (adrStatus === "accepted") addError(`accepted ADR requires a state.md ledger with an approval event: ${rel}`);
+      if (prdStatus === "review") {
+        console.warn(`[harness:check] WARNING: ${rel} has a review PRD but no state.md checkpoint; run npm run harness:kickoff to create it.`);
+      }
+      continue;
+    }
+
+    const stateContent = readText(statePath);
+    const state = parseFrontmatter(stateContent) ?? {};
+    const stage = state.stage;
+
+    if (!stage || !STAGE_VALUES.has(stage)) {
+      addError(`state.md has an invalid or missing stage "${stage ?? ""}": ${rel}`);
+    }
+
+    // Approval-axis consistency (both directions): the ledger and the artifact
+    // must agree on approved-ness, catching a hand-flipped status that skipped
+    // harness:approve.
+    if ((prdStatus === "approved") !== (state.prd_status === "approved")) {
+      addError(`state.md prd_status ("${state.prd_status ?? ""}") disagrees with prd.md status ("${prdStatus ?? ""}"): ${rel}`);
+    }
+    if ((adrStatus === "accepted") !== (state.adr_status === "accepted")) {
+      addError(`state.md adr_status ("${state.adr_status ?? ""}") disagrees with adr.md status ("${adrStatus ?? ""}"): ${rel}`);
+    }
+
+    // Approval-event backing: an approved/accepted artifact must carry a
+    // recorded, quoted approval event in the ledger.
+    const events = parseApprovalEvents(stateContent);
+    if (prdStatus === "approved" && !events.some((event) => event.target === "prd" && event.quote)) {
+      addError(`approved PRD has no matching approval event in state.md: ${rel}`);
+    }
+    if (adrStatus === "accepted" && !events.some((event) => event.target === "adr" && event.quote)) {
+      addError(`accepted ADR has no matching approval event in state.md: ${rel}`);
+    }
+
+    // Stage/status coherence: post-approval stages require an approved PRD.
+    if (POST_APPROVAL_STAGES.has(stage) && prdStatus !== "approved") {
+      addError(`state.md stage "${stage}" requires an approved PRD (prd.md status "${prdStatus ?? ""}"): ${rel}`);
+    }
+
+    assertNoStageRegression(statePath, stage, rel);
+  }
+
+  // bugfix/chore units keep state.md only as a checkpoint; validate its shape
+  // and forbid un-approval regressions, but do not require prd/adr backing.
+  for (const type of ["bugfix", "chore"]) {
+    for (const unitDir of unitDirs(type)) {
+      const statePath = path.join(unitDir, "state.md");
+      if (!pathExists(statePath)) continue;
+
+      const rel = toPosix(path.relative(process.cwd(), unitDir));
+      const stage = parseFrontmatter(readText(statePath))?.stage;
+      if (!stage || !STAGE_VALUES.has(stage)) {
+        addError(`state.md has an invalid or missing stage "${stage ?? ""}": ${rel}`);
+        continue;
+      }
+      assertNoStageRegression(statePath, stage, rel);
+    }
+  }
+}
+
+function assertNoStageRegression(statePath, stage, rel) {
+  const relativePosix = toPosix(path.relative(REPO_ROOT, statePath));
+  const previousContent = gitShow(relativePosix);
+  if (!previousContent) return;
+
+  const previousStage = parseFrontmatter(previousContent)?.stage;
+  if (previousStage && stage && isForbiddenStageTransition(previousStage, stage)) {
+    addError(`forbidden stage regression ${previousStage} -> ${stage}: ${rel}`);
+  }
+}
+
 // ADR frontmatter의 related_prd/supersedes가 실제 파일을 가리키는지 검증한다.
 // assertWikiLinks와 같은 클래스의 link-resolution 게이트다. 값이 비어 있으면
 // 건너뛴다(supersedes는 비어 있는 게 정상이다). 경로는 ADR 디렉토리 기준이다.
@@ -649,6 +746,7 @@ assertFrontmatter();
 assertNoPlaceholders();
 assertRequiredSections();
 assertStatusTransitions();
+assertStateLedger();
 assertAdrReferences();
 assertImmutableAdrBody();
 assertPublicSafeDocs();

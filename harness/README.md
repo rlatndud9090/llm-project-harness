@@ -50,7 +50,10 @@
 4. `.harness/harness/protocols/adr-helper.md` — ADR 작성 보조(선택)
 
 각 단계는 PRD/ADR을 `review`/`proposed`로만 만든다. 구현과 `approved`/`accepted`
-전환은 사용자 명시 승인 이후 별도로 진행한다.
+전환은 사용자 명시 승인 이후 별도로 진행한다. `$kickoff`는 각 단위에 단계 체크포인트
+원장 `state.md`를 만든다. 승인 전환은 오직 `npm run harness:approve`로만 하며(사용자 발화
+verbatim을 원장에 기록), 에이전트가 직접 frontmatter status를 `approved`/`accepted`로
+고치지 않는다. `harness:check`가 승인 이벤트 없는 전환과 원장 불일치를 막는다.
 
 ### 3. 기능 개발
 
@@ -109,11 +112,17 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 
 ```sh
 npm run harness:kickoff -- --type feature --slug main-layout --title "메인 레이아웃"
+npm run harness:approve -- --unit docs/raw/feature/main-layout --quote "<사용자 승인 발화>" --adr
 npm run harness:ingest -- docs/raw/feature/main-layout
 npm run harness:check
 npm run harness:gate
 npm run harness:hooks   # 선택: 현재 git 저장소에 pre-commit + commit-msg 훅 설치
 ```
+
+`harness:approve`는 PRD를 `review`→`approved`(및 `--adr`로 ADR `proposed`→`accepted`)로
+전환하는 **유일한 정규 경로**다. 사용자의 명시 승인 발화 없이는 실행하지 않는다.
+ClaudeCode는 추가로 승인 상태 직접 편집을 런타임에서 차단하는 PreToolUse 가드 훅을
+배선할 수 있다(`scripts/harness/claude-approval-guard.mjs`, `.claude` 어댑터 참고).
 
 `harness:gate`는 `harness:check`, `lint`, `build`, `test:run`을 순서대로 실행한다.
 실패하면 다음 단계로 넘어가지 않는다.

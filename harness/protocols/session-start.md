@@ -24,9 +24,13 @@
    ```txt
    feature/foo -> docs/raw/feature/foo/
    ```
-6. 해당 raw unit이 있으면 `prd.md`, `adr.md`, `notes.md`를 필요한 만큼 읽는다.
-7. 브랜치가 `main`이면 wiki index에서 현재 요청과 관련된 raw link만 따라간다.
-8. product/architecture 결정을 하기 전에는 반드시 관련 PRD/ADR을 읽는다.
+6. 해당 raw unit이 있으면 **`state.md`를 가장 먼저 읽는다.** `stage`와 `## 승인 이벤트`가
+   이 작업 단위의 현재 단계·승인 여부의 단일 진실원이다. 그다음 필요한 만큼 `prd.md`,
+   `adr.md`, `notes.md`를 읽는다.
+7. 새 세션/새 에이전트로 이어받을 때는 `state.md`의 `stage`에서 재개한다. 채팅 히스토리나
+   추측으로 승인 여부를 판단하지 않는다. 승인 이벤트가 없으면 아직 미승인이다.
+8. 브랜치가 `main`이면 wiki index에서 현재 요청과 관련된 raw link만 따라간다.
+9. product/architecture 결정을 하기 전에는 반드시 관련 PRD/ADR을 읽는다.
 
 ## 분기 판단
 
@@ -54,6 +58,9 @@ ClaudeCode에서 같은 단계가 `/command`와 skill 두 표면으로 노출되
 - 모든 raw 파일을 무작정 읽지 않는다.
 - 브랜치명과 raw path가 다를 때 조용히 진행하지 않는다.
 - product/architecture 결정을 채팅에만 남기지 않는다.
+- `state.md`의 승인 이벤트 없이 PRD를 `approved`, ADR을 `accepted`로 전환하거나 구현을
+  시작하지 않는다. 승인 전환은 오직 `harness:approve`로만 한다.
+- 사용자의 의도·아이디어 발화("이렇게 하려고 했어" 등)를 승인으로 추론하지 않는다.
 
 ## 출력
 

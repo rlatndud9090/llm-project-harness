@@ -1,0 +1,26 @@
+name: harness
+
+# Server-side gate: runs on every push and PR so the harness checks (artifact
+# integrity, the state.md approval-ledger consistency, lint, build, tests) cannot
+# be skipped with `git commit --no-verify` or by a client that never installed
+# the local pre-commit hook. This is the durable, non-bypassable enforcement
+# layer; the pre-commit hook and the ClaudeCode PreToolUse guard are only
+# convenience tripwires ahead of it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git-history checks (status transitions, ADR immutability, stage regression) compare against HEAD
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run harness:gate

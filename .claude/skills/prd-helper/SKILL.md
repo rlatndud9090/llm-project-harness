@@ -19,6 +19,13 @@ description: "PRD를 인터뷰·리서치·리뷰로 함께 작성할 때 사용
 PRD는 한국어로 작성하고 `review` 상태로 둔다. 사용자 명시 승인 전에는 `approved`로
 바꾸지 않는다.
 
+`approved` 전환은 오직 사용자의 명시 승인 뒤 `npm run harness:approve -- --unit
+docs/raw/<type>/<slug> --quote "<사용자 발화 verbatim>"`로만 한다(직접 frontmatter 편집
+금지 — 런타임 훅과 `harness:check`가 막는다). "이렇게 하려고 했어" 같은 의도·아이디어
+발화는 승인이 아니다. 승인은 대상 문서와 전환 상태를 명시한 승인 요청에 대한 사용자의
+분명한 긍정 응답만을 뜻하며, 모호하면 `review`로 둔 채 다시 확인한다. `review`로 올릴
+때 `state.md`의 `stage`/`prd_status`를 갱신한다.
+
 ## 질문 도구
 
 - `$deep-interview`가 설치돼 있으면 그 스킬을 먼저 사용한다.
@@ -31,6 +38,10 @@ PRD는 한국어로 작성하고 `review` 상태로 둔다. 사용자 명시 승
 ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절차는 동일).
 
 - 의견/결정 경계 질문은 `AskUserQuestion`으로 선택지를 제시한다.
+- **승인 요청도 `AskUserQuestion`으로 한다.** 대상 문서와 전환 상태를 명시한 질문(예:
+  "이 PRD를 approved로 전환할까요?")에 "승인 / 아직" 같은 명시 선택지를 준다. 사용자가
+  "승인"을 고른 그 응답만 승인이며, 그 발화를 그대로 `harness:approve --quote`에 넣는다.
+  사용자의 실제 선택 없이 승인을 만들어내지 않는다.
 - `researcher`, `prd-writer`, `reviewer` 서브에이전트(Agent 도구)로 리서치↔작성↔리뷰를
   돌린다. researcher와 reviewer를 동시에 돌려 루프를 빠르게 하려면 `/team`으로 가속할 수
   있다(선택). 단순한 PRD면 서브에이전트로 충분하다.

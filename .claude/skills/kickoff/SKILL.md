@@ -19,6 +19,9 @@ npm run harness:kickoff -- --title "<한국어 제목>"
 무엇을 할지 아직 정하지 못했으면 먼저 `$next-feature`로 후보를 추천받는다.
 raw 골격이 생기면 `$prd-helper`로 PRD 작성을 잇는다.
 
+`$kickoff`는 각 단위에 단계 체크포인트 원장 `state.md`도 만든다(승인 게이트·세션
+인수인계용). 새 세션은 이 파일을 가장 먼저 읽어 현재 단계와 승인 여부를 판단한다.
+
 ## Claude Code — agents 화면 세션 제목 (필수)
 
 `npm run harness:kickoff`으로 브랜치·raw 골격을 만든 직후 **즉시** 현재 세션의 agents
