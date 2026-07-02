@@ -260,16 +260,17 @@ function assertFrontmatter() {
 
   const files = listMarkdownFiles(repoPath("docs", "raw"));
   const required = ["title", "date", "status", "unit_type"];
+  // chore units are notes-only (notes.md, no status lifecycle), so only these
+  // three carry a machine-checked status.
   const allowedStatuses = {
     "prd.md": new Set(["draft", "review", "approved", "rejected"]),
     "adr.md": new Set(["proposed", "accepted", "deprecated", "superseded"]),
     "bugfix.md": new Set(["draft", "review", "fixed", "rejected"]),
-    "chore.md": new Set(["draft", "done", "rejected"]),
   };
 
   for (const filePath of files) {
     const baseName = path.basename(filePath);
-    if (!["prd.md", "adr.md", "bugfix.md", "chore.md"].includes(baseName)) continue;
+    if (!["prd.md", "adr.md", "bugfix.md"].includes(baseName)) continue;
 
     const relative = toPosix(path.relative(process.cwd(), filePath));
     const fields = parseFrontmatter(readText(filePath));
@@ -330,6 +331,10 @@ const PLACEHOLDER_SENTINELS = {
     statuses: new Set(["accepted"]),
     markers: ["후속 작업 1"],
   },
+  "bugfix.md": {
+    statuses: new Set(["review", "fixed"]),
+    markers: ["재발을 막는 테스트 또는 검증"],
+  },
 };
 
 function assertNoPlaceholders() {
@@ -371,6 +376,12 @@ const REQUIRED_SECTIONS = {
   "adr.md": {
     statuses: new Set(["accepted"]),
     sections: ["컨텍스트", "결정", "선택지", "선택 근거", "결과", "후속 작업", "검증"],
+  },
+  // A bugfix.md is the lightweight PRD-equivalent for a bug: it must preserve the
+  // symptom, root cause, fix, and regression guard once it has settled.
+  "bugfix.md": {
+    statuses: new Set(["review", "fixed"]),
+    sections: ["증상", "원인", "수정", "회귀 방지"],
   },
 };
 
@@ -427,7 +438,7 @@ function assertStatusTransitions() {
 
   for (const filePath of listMarkdownFiles(repoPath("docs", "raw"))) {
     const baseName = path.basename(filePath);
-    if (!["prd.md", "adr.md", "bugfix.md", "chore.md"].includes(baseName)) continue;
+    if (!["prd.md", "adr.md", "bugfix.md"].includes(baseName)) continue;
 
     const relativePosix = toPosix(path.relative(REPO_ROOT, filePath));
     const previousContent = gitShow(relativePosix);

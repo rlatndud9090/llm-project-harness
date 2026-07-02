@@ -90,7 +90,6 @@ describe("isForbiddenTransition", () => {
     expect(isForbiddenTransition("adr.md", "accepted", "proposed")).toBe(true);
     expect(isForbiddenTransition("adr.md", "superseded", "accepted")).toBe(true);
     expect(isForbiddenTransition("bugfix.md", "fixed", "draft")).toBe(true);
-    expect(isForbiddenTransition("chore.md", "done", "draft")).toBe(true);
   });
 
   it("allows forward progress, reopening, and retiring", () => {
@@ -104,6 +103,9 @@ describe("isForbiddenTransition", () => {
   it("ignores files without a transition policy", () => {
     expect(isForbiddenTransition("notes.md", "draft", "done")).toBe(false);
     expect(FORBIDDEN_STATUS_TRANSITIONS["notes.md"]).toBeUndefined();
+    // chore is notes-only now: no status lifecycle, so no transition policy.
+    expect(isForbiddenTransition("chore.md", "done", "draft")).toBe(false);
+    expect(FORBIDDEN_STATUS_TRANSITIONS["chore.md"]).toBeUndefined();
   });
 });
 

@@ -387,6 +387,72 @@ describe("artifact-check wiki taxonomy", () => {
   });
 });
 
+describe("artifact-check bugfix required sections", () => {
+  it("fails a review bugfix.md missing required sections", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "bugfix", "sec-bug");
+      writeFile(
+        path.join(unitDir, "bugfix.md"),
+        `${frontmatter({ title: "Bug", status: "review", unit_type: "bugfix" })}\n# Bugfix\n\n## 증상\n\n실패한다.\n`,
+      );
+      ingest(projectRoot, "docs/raw/bugfix/sec-bug");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("missing required section");
+    });
+  });
+
+  it("passes a review bugfix.md with symptom/cause/fix/regression sections", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "bugfix", "ok-bug");
+      writeFile(
+        path.join(unitDir, "bugfix.md"),
+        `${frontmatter({ title: "Bug", status: "review", unit_type: "bugfix" })}\n# Bugfix\n\n## 증상\n\n세션 복원이 실패한다.\n\n## 원인\n\n키 계산이 어긋난다.\n\n## 수정\n\n키 계산을 고친다.\n\n## 회귀 방지\n\n- [ ] 복원 회귀 테스트를 추가한다\n`,
+      );
+      ingest(projectRoot, "docs/raw/bugfix/ok-bug");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("fails a fixed bugfix.md that still has the template regression placeholder", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "bugfix", "ph-bug");
+      writeFile(
+        path.join(unitDir, "bugfix.md"),
+        `${frontmatter({ title: "Bug", status: "fixed", unit_type: "bugfix" })}\n# Bugfix\n\n## 증상\n\nx\n\n## 원인\n\nx\n\n## 수정\n\nx\n\n## 회귀 방지\n\n- [ ] 재발을 막는 테스트 또는 검증.\n`,
+      );
+      ingest(projectRoot, "docs/raw/bugfix/ph-bug");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("template placeholder");
+    });
+  });
+});
+
+describe("artifact-check chore is notes-only", () => {
+  it("does not status-check a chore unit (notes.md carries no lifecycle)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      // A chore unit's notes.md can hold arbitrary frontmatter; it is not gated.
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "chore", "tidy", "notes.md"),
+        `${frontmatter({ title: "Tidy", status: "whatever", unit_type: "chore" })}\n# Chore\n`,
+      );
+      ingest(projectRoot, "docs/raw/chore/tidy");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
 describe("state ledger approval gate", () => {
   it("kickoff creates a state.md checkpoint at stage kickoff", () => {
     withProject((projectRoot) => {

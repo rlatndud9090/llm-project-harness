@@ -260,7 +260,8 @@ export const FORBIDDEN_STATUS_TRANSITIONS = {
     ["fixed", "draft"],
     ["fixed", "review"],
   ],
-  "chore.md": [["done", "draft"]],
+  // chore units are notes-only (no status lifecycle); their file is notes.md,
+  // which carries no machine-checked status, so there is no chore transition rule.
 };
 
 export function isForbiddenTransition(baseName, fromStatus, toStatus) {
