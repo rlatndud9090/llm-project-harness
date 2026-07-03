@@ -34,16 +34,23 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
 
 ## Claude Code — agents 화면 세션 제목 (필수)
 
-이 스킬을 실행하면 **즉시** 현재 세션의 agents 화면(FleetView) 제목을 `next-feature`로
-바꾼다. 어떤 세션이 "다음 작업 단위 탐색" 중인지 목록에서 한눈에 보이게 하기 위함이다.
-(대화형·background 세션 모두 항상 실행한다.)
+이 스킬을 실행하면 **즉시** 현재 세션의 agents 화면(FleetView) 제목을
+`<프로젝트 약어> next-feature` 형식으로 바꾼다. 어떤 프로젝트의 어떤 세션이 "다음 작업
+단위 탐색" 중인지 목록에서 한눈에 보이게 하기 위함이다. (대화형·background 세션 모두 항상 실행한다.)
 
+- **프로젝트 약어**: 현재 프로젝트 폴더명(git 루트 basename)을 `-`/`_`/공백으로 나눈 각
+  토큰의 첫 글자를 대문자로 모아 `<...>`로 감싼다. 예: `poke-battle-quiz` → `<PBQ>`.
+  약어가 1글자 이하로 나오면 폴더명 앞 3글자를 대문자로 쓴다(`frontend` → `<FRO>`). 아래
+  스니펫이 자동 계산하며, 어색하면 사람이 읽기 좋은 2~4글자로 바꿔도 된다.
 - agents 화면 제목은 `~/.claude/jobs/<job>/state.json`의 `name` 필드다. 아래 스크립트로
-  현재 세션(`$CLAUDE_CODE_SESSION_ID`)에 해당하는 job의 `name`을 `next-feature`로 설정하고
-  `nameSource`를 `user`로 지정한다(`user`여야 Claude Code 자동 영문 이름이 덮어쓰지 않는다).
+  현재 세션(`$CLAUDE_CODE_SESSION_ID`)에 해당하는 job의 `name`을 `<약어> next-feature`로
+  설정하고 `nameSource`를 `user`로 지정한다(`user`여야 Claude Code 자동 영문 이름이 덮어쓰지 않는다).
 
 ```bash
-python3 - "$CLAUDE_CODE_SESSION_ID" "next-feature" <<'PY'
+proj="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+abbr="$(printf '%s' "$proj" | tr '_ ' '--' | awk -F'-' '{s="";for(i=1;i<=NF;i++)if($i!="")s=s toupper(substr($i,1,1));print s}')"
+[ "${#abbr}" -lt 2 ] && abbr="$(printf '%s' "$proj" | tr '[:lower:]' '[:upper:]' | cut -c1-3)"
+python3 - "$CLAUDE_CODE_SESSION_ID" "<$abbr> next-feature" <<'PY'
 import json, sys, glob, os
 sid, title = sys.argv[1], sys.argv[2]
 if not sid:
@@ -67,7 +74,8 @@ print("agents 화면 제목 설정:", title)
 PY
 ```
 
-> 작업 단위를 확정해 `$kickoff`로 넘어가면, kickoff이 이 제목을 브랜치 slug로 교체한다.
+> 작업 단위를 확정해 `$kickoff`로 넘어가면, kickoff이 제목의 `next-feature` 부분을
+> 확정된 작업명으로 교체한다(약어 prefix는 유지).
 
 ## Claude Code — Background 세션 result 형식 (필수)
 
