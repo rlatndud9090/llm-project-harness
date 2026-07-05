@@ -14,6 +14,7 @@ const prune = !args["no-prune"];
 const jsonOutput = Boolean(args.json);
 const reportPath = typeof args.report === "string" ? path.resolve(projectRoot, args.report) : null;
 const updatePackageScripts = !args["no-package-scripts"];
+const writeClaudeSettings = !args["no-claude-settings"];
 
 if (sameRealPath(projectRoot, harnessRoot)) {
   fail("run this from a consuming project root, not from the harness repository root");
@@ -41,6 +42,7 @@ for (const [toolDir, childDir] of PRUNE_ADAPTER_DIRS) pruneStaleLinks(toolDir, c
 if (prune) pruneEmptyLegacyAdapterDirs();
 
 ensureProjectDocs();
+if (writeClaudeSettings) ensureClaudeSettings();
 if (updatePackageScripts) ensurePackageScripts();
 writeReport();
 
@@ -330,6 +332,78 @@ function ensurePackageScripts() {
   if (dryRun) return;
 
   fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
+}
+
+// Ensures the consumer's committed `.claude/settings.json` disables background
+// git-worktree isolation (`worktree.bgIsolation: "none"`). Consumer harness
+// projects are single-branch personal repos where a forced EnterWorktree on
+// background sessions breaks flows that write to the main working copy (e.g.
+// next-feature's docs/raw/.next-unit anchor, kickoff scaffolding). Merge is
+// non-destructive: other settings and an explicit opposite override are kept
+// unless --force. Codex has no equivalent setting, so only `.claude` is touched.
+function ensureClaudeSettings() {
+  const settingsPath = path.join(projectRoot, ".claude", "settings.json");
+  const rel = relative(settingsPath);
+
+  if (!exists(settingsPath)) {
+    operations.push(`create ${rel} (worktree.bgIsolation: none)`);
+    if (!dryRun) {
+      fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+      writeJsonFile(settingsPath, { worktree: { bgIsolation: "none" } });
+    }
+    return;
+  }
+
+  let settings;
+  try {
+    settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+  } catch {
+    operations.push(`kept ${rel} (unparseable JSON)`);
+    conflicts.push(`settings not merged: ${rel} is not valid JSON`);
+    warnings.push(`${rel} is not valid JSON; set worktree.bgIsolation to "none" manually`);
+    return;
+  }
+  if (settings === null || typeof settings !== "object" || Array.isArray(settings)) {
+    operations.push(`kept ${rel} (unexpected shape)`);
+    conflicts.push(`settings not merged: ${rel} is not a JSON object`);
+    warnings.push(`${rel} is not a JSON object; set worktree.bgIsolation to "none" manually`);
+    return;
+  }
+
+  const worktree = settings.worktree;
+  const worktreeIsObject = worktree !== null && typeof worktree === "object" && !Array.isArray(worktree);
+
+  // A `worktree` value that is present but not an object is malformed; never
+  // clobber it silently.
+  if (worktree !== undefined && !worktreeIsObject && !force) {
+    operations.push(`kept ${rel} (worktree is not an object)`);
+    conflicts.push(`settings override: worktree in ${rel} is not an object`);
+    warnings.push(`worktree in ${rel} is not an object; fix it or re-run with --force`);
+    return;
+  }
+
+  const currentValue = worktreeIsObject ? worktree.bgIsolation : undefined;
+  if (currentValue === "none") {
+    operations.push(`kept ${rel} worktree.bgIsolation: none`);
+    return;
+  }
+
+  // An explicit opposite value is a local override; preserve it unless --force.
+  if (currentValue !== undefined && !force) {
+    operations.push(`kept ${rel} worktree.bgIsolation: ${currentValue}`);
+    conflicts.push(`settings override: worktree.bgIsolation is "${currentValue}" in ${rel}`);
+    warnings.push(`worktree.bgIsolation is "${currentValue}" in ${rel}; re-run with --force to set it to "none"`);
+    return;
+  }
+
+  const nextWorktree = worktreeIsObject ? { ...worktree, bgIsolation: "none" } : { bgIsolation: "none" };
+  const next = { ...settings, worktree: nextWorktree };
+  operations.push(`${currentValue === undefined ? "set" : "replace"} ${rel} worktree.bgIsolation: none`);
+  if (!dryRun) writeJsonFile(settingsPath, next);
+}
+
+function writeJsonFile(filePath, value) {
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 function ensureDirectory(directory) {

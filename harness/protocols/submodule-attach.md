@@ -33,6 +33,7 @@ docs/raw/README.md
 docs/wiki/
 docs/wiki/index.md
 package.json
+.claude/settings.json
 ```
 
 이때 `docs/wiki/index.md`의 초기 골격은
@@ -65,6 +66,35 @@ package.json
   }
 }
 ```
+
+## ClaudeCode background 격리 설정
+
+`attach-submodule.mjs`는 소비 프로젝트의 커밋되는 `.claude/settings.json`에
+`worktree.bgIsolation: "none"`을 심는다.
+
+```json
+{
+  "worktree": {
+    "bgIsolation": "none"
+  }
+}
+```
+
+- **이유**: 하네스 소비 프로젝트는 대개 단일 브랜치 개인 레포다. Claude Code의 기본값
+  `worktree.bgIsolation: "worktree"`는 background 세션을 git worktree로 강제 격리하는데,
+  이는 메인 워킹카피에 쓰는 하네스 플로우(예: `$next-feature`의 `docs/raw/.next-unit`
+  anchor 기록, `$kickoff` 골격 생성)를 background에서 막는다. `"none"`은 background
+  세션이 워킹카피를 직접 편집하도록 허용한다.
+- **비파괴 병합**: 기존 `.claude/settings.json`의 다른 설정은 보존한다. `worktree`
+  아래 다른 키(예: hooks/permissions와 무관한 worktree 옵션)도 유지하고
+  `bgIsolation`만 추가한다.
+- **명시 override 존중**: 이미 `worktree.bgIsolation`이 다른 값으로 지정돼 있으면
+  그 값을 그대로 두고 경고만 남긴다. `--force`로만 `"none"`으로 덮어쓴다.
+- **opt-out**: `--no-claude-settings`로 이 설정 주입을 건너뛴다.
+- Codex에는 대응 설정이 없으므로 `.codex`는 건드리지 않는다.
+- worktree 다중 브랜치 워크플로가 필요한 프로젝트(예: 여러 브랜치를 동시에 다루는
+  레포)라면 이 값을 프로젝트에서 `"worktree"`로 되돌리거나 `--no-claude-settings`로
+  장착한다.
 
 ## 선택적 외부 가속기
 

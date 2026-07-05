@@ -29,8 +29,54 @@ describe("attach-submodule", () => {
       expect(isSymlink(path.join(projectRoot, ".codex", "skills", "next-feature"))).toBe(true);
       expect(isSymlink(path.join(projectRoot, ".claude", "skills", "next-feature"))).toBe(true);
       expect(pathExists(path.join(projectRoot, ".agents"))).toBe(false);
+      expect(readJson(path.join(projectRoot, ".claude", "settings.json"))).toEqual({
+        worktree: { bgIsolation: "none" },
+      });
 
       runHarnessCheck(projectRoot);
+    });
+  });
+
+  it("merges worktree.bgIsolation into an existing .claude/settings.json without clobbering other keys", () => {
+    withProject((projectRoot) => {
+      writeJson(path.join(projectRoot, ".claude", "settings.json"), {
+        permissions: { allow: ["Bash(git status:*)"] },
+        worktree: { autoCleanup: true },
+      });
+
+      runAttach(projectRoot);
+
+      expect(readJson(path.join(projectRoot, ".claude", "settings.json"))).toEqual({
+        permissions: { allow: ["Bash(git status:*)"] },
+        worktree: { autoCleanup: true, bgIsolation: "none" },
+      });
+
+      runHarnessCheck(projectRoot);
+    });
+  });
+
+  it("preserves an explicit worktree.bgIsolation override unless --force", () => {
+    withProject((projectRoot) => {
+      const settingsPath = path.join(projectRoot, ".claude", "settings.json");
+      writeJson(settingsPath, { worktree: { bgIsolation: "worktree" } });
+
+      const output = runAttach(projectRoot);
+      expect(output).toContain('worktree.bgIsolation is "worktree"');
+      expect(readJson(settingsPath)).toEqual({ worktree: { bgIsolation: "worktree" } });
+
+      runAttach(projectRoot, ["--force"]);
+      expect(readJson(settingsPath)).toEqual({ worktree: { bgIsolation: "none" } });
+    });
+  });
+
+  it("skips .claude/settings.json when --no-claude-settings is set and during dry-run", () => {
+    withProject((projectRoot) => {
+      runAttach(projectRoot, ["--no-claude-settings"]);
+      expect(pathExists(path.join(projectRoot, ".claude", "settings.json"))).toBe(false);
+
+      const output = runAttach(projectRoot, ["--dry-run"]);
+      expect(output).toContain("[dry-run] create .claude/settings.json (worktree.bgIsolation: none)");
+      expect(pathExists(path.join(projectRoot, ".claude", "settings.json"))).toBe(false);
     });
   });
 
