@@ -5,8 +5,11 @@ import {
   POST_APPROVAL_STAGES,
   REPO_ROOT,
   STAGE_VALUES,
+  adrBodyLooksAuthored,
   bodyAfterFrontmatter,
   fail,
+  isPreAdrStage,
+  skeletonAdrBody,
   findHarnessRoot,
   getCurrentBranch,
   gitShow,
@@ -549,6 +552,35 @@ function assertNoStageRegression(statePath, stage, rel) {
   }
 }
 
+// Step separation between $prd-helper and $adr-helper, enforced at git time (the
+// non-bypassable backstop to the PreToolUse guard). The ADR must not be authored
+// while the unit is still in the PRD phase: if state.md stage is pre-ADR
+// (kickoff/prd-draft/prd-review/awaiting-approval), adr.md must remain the kickoff
+// skeleton. The ADR-need decision belongs in prd.md "## ADR 필요 여부"; the ADR body
+// is authored only after $adr-helper advances the stage to adr-draft.
+function assertAdrPhaseGate() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  const skeleton = skeletonAdrBody();
+  for (const unitDir of unitDirs("feature")) {
+    const statePath = path.join(unitDir, "state.md");
+    const adrPath = path.join(unitDir, "adr.md");
+    if (!pathExists(statePath) || !pathExists(adrPath)) continue;
+
+    const stage = parseFrontmatter(readText(statePath))?.stage;
+    if (!isPreAdrStage(stage)) continue;
+
+    if (adrBodyLooksAuthored(readText(adrPath), skeleton)) {
+      const rel = toPosix(path.relative(process.cwd(), unitDir));
+      addError(
+        `ADR authored during the PRD phase (state.md stage "${stage}"): ${rel}. ` +
+          `Keep the ADR-need decision in prd.md "## ADR 필요 여부" and leave adr.md as the kickoff skeleton; ` +
+          `author adr.md only after entering $adr-helper (advance state.md stage to adr-draft).`,
+      );
+    }
+  }
+}
+
 // ADR frontmatter의 related_prd/supersedes가 실제 파일을 가리키는지 검증한다.
 // assertWikiLinks와 같은 클래스의 link-resolution 게이트다. 값이 비어 있으면
 // 건너뛴다(supersedes는 비어 있는 게 정상이다). 경로는 ADR 디렉토리 기준이다.
@@ -758,6 +790,7 @@ assertNoPlaceholders();
 assertRequiredSections();
 assertStatusTransitions();
 assertStateLedger();
+assertAdrPhaseGate();
 assertAdrReferences();
 assertImmutableAdrBody();
 assertPublicSafeDocs();

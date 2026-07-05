@@ -13,6 +13,21 @@
 승인 전에는 `approved`로 바꾸지 않는다. `approved` 전환은 오직 `harness:approve`로만
 한다(직접 frontmatter 편집 금지 — 런타임 훅과 `harness:check`가 막는다).
 
+## 이 단계의 범위 (엄격한 단계 분리)
+
+**`$prd-helper`는 `prd.md`만 편집한다. `adr.md`는 절대 건드리지 않는다.** `$kickoff`가
+`adr.md` 스켈레톤을 미리 만들어 두더라도 이 단계에서는 스켈레톤 그대로 둔다. ADR을
+작성하는 것은 다음 단계인 `$adr-helper`의 몫이며, `adr.md` 작성은 `state.md`의 `stage`가
+`adr-draft` 이상으로 올라간 뒤에만 허용된다(그 전에는 런타임 가드와 `harness:check`가
+막는다). ADR이 필요한지 여부와 그 이유는 `adr.md`가 아니라 **PRD의 `## ADR 필요 여부`
+섹션**에 기록한다.
+
+이 단계의 산출물은 오직 두 갈래로만 끝난다:
+
+- **ADR 불필요**로 판정 → PRD 단독 승인을 대기한다(아래 "정리와 승인").
+- **ADR 필요**로 판정 → PRD 승인을 아직 요청하지 않고 `$adr-helper`로 넘긴다. 승인은
+  ADR까지 작성된 뒤 PRD·ADR을 **한 번에** 받는다(`$adr-helper`가 담당).
+
 ## 언어
 
 PRD는 한국어로 작성한다. branch name, file path, command, TypeScript identifier처럼
@@ -76,18 +91,22 @@ PRD는 한국어로 작성한다. branch name, file path, command, TypeScript id
 
 리뷰 → 수정 루프는 위 질문에 모두 답할 수 있을 때까지 반복한다.
 
-### Phase 5: ADR 필요 여부 판단
+### Phase 5: ADR 필요 여부 판단 (여기서 판단만 하고 ADR은 쓰지 않는다)
 
-`## ADR 필요 여부` 섹션에서 구조/데이터/엔진/의존성 같은 durable decision이
-필요한지 판단한다.
+PRD의 `## ADR 필요 여부` 섹션에서 구조/데이터/엔진/의존성 같은 durable decision이
+필요한지 판단하고, **그 결론과 이유를 이 PRD 섹션에 적는다.** 이 판단은 `$prd-helper`가
+하지만, ADR 본문 작성은 여기서 하지 않는다(`adr.md`를 편집하지 않는다).
 
-- 필요하면 `$adr-helper`로 넘어가 ADR을 작성한다(ADR은 `proposed` 상태 초안).
-- 필요 없으면 그 이유를 한 줄로 남긴다. ADR 작성은 선택이다.
+- **필요하면**: PRD의 `## ADR 필요 여부`에 "필요: <이유>"를 적고, **여기서 멈춘다.**
+  PRD 승인을 요청하지 말고 `state.md`의 `stage`를 `prd-review`로 둔 채 다음 스킬로
+  `$adr-helper`를 안내한다. `adr.md`는 스켈레톤 그대로 둔다.
+- **필요 없으면**: PRD의 `## ADR 필요 여부`에 "불필요: <이유>"를 적는다. `adr.md`는
+  손대지 않고 스켈레톤(status `proposed`)으로 그대로 둔다. 그다음 아래 "정리와 승인"의
+  **PRD 단독 승인**으로 진행한다.
 
-ADR "작성"이 선택이라는 뜻이지 `adr.md` 파일은 선택이 아니다. feature 단위는 항상
-`adr.md`를 유지한다(`$kickoff`가 생성하고 `harness:check`가 존재를 요구한다). ADR이
-불필요하면 본문에 "불필요: <이유>" 한 줄만 남기고 status는 `proposed`로 둔다. 파일을
-지우지 않는다.
+`adr.md` 파일 자체는 삭제하지 않는다. feature 단위는 항상 `adr.md`를 유지한다(`$kickoff`가
+생성하고 `harness:check`가 존재를 요구한다). ADR이 불필요해도 그 사유는 `adr.md`가 아니라
+PRD의 `## ADR 필요 여부`에 남기고, `adr.md`는 미작성 스켈레톤으로 둔다.
 
 ## 정리와 승인
 
@@ -102,7 +121,16 @@ npm run harness:check
 `prd-review`로, `prd_status`를 `review`로 갱신하고 단계 로그에 한 줄 남긴다. 여기까지가
 이 프로토콜의 끝이다. **여기서 절대로 approved로 넘어가지 않는다.**
 
-### 승인은 오직 명시 의례로만
+### 승인 분기: ADR 필요 여부에 따라 갈린다
+
+- **ADR 필요로 판정한 경우 — 여기서 승인을 요청하지 않는다.** PRD는 `review`,
+  `state.md`는 `prd-review`로 둔 채 `$adr-helper`로 넘어간다. PRD·ADR 통합 승인은
+  `$adr-helper`가 담당한다(ADR 피드백을 반영하다 PRD를 함께 고쳐야 할 수 있으므로 한
+  번에 승인한다).
+- **ADR 불필요로 판정한 경우에만 — 여기서 PRD 단독 승인을 요청한다.** 아래 명시 의례를
+  따른다.
+
+### PRD 단독 승인은 오직 명시 의례로만 (ADR 불필요일 때)
 
 `approved` 전환은 사용자의 명시 승인이 있을 때만, 오직 `harness:approve`로만 한다.
 
@@ -111,11 +139,12 @@ npm run harness:check
 2. 사용자가 분명히 승인하면 **그 발화를 그대로 인용**해 실행한다.
 
 ```sh
-npm run harness:approve -- --unit docs/raw/<type>/<slug> --quote "<사용자의 승인 발화 verbatim>" [--adr]
+npm run harness:approve -- --unit docs/raw/<type>/<slug> --quote "<사용자의 승인 발화 verbatim>"
 ```
 
 `harness:approve`가 status·`approval:` 근거·`state.md` 승인 이벤트를 원자적으로 함께
-기록한다. 에이전트가 직접 frontmatter status를 `approved`로 고치지 않는다.
+기록한다(`--adr` 없이 PRD만 전환한다). 에이전트가 직접 frontmatter status를 `approved`로
+고치지 않는다.
 
 **승인으로 간주하지 않는 것(중요):** "이렇게 하려고 했어", "이거 작업해야 돼", "좋아
 보인다", 목표·범위·아이디어 설명, 인터뷰 질문에 대한 답 — 이 중 어느 것도 승인이
@@ -150,3 +179,10 @@ PRD 초안은 아래 질문에 답할 수 있어야 한다.
 
 - **나쁨:** "이렇게 하려고 했어" 같은 의도·아이디어 발화를 승인으로 오인해 바로 전환·구현한다.
 - **좋음:** 그런 발화는 승인이 아니라고 보고, 구조화 질문으로 명시 승인을 다시 확인한다.
+
+- **나쁨:** PRD를 쓰다 같은 흐름으로 `adr.md`까지 채워 넣는다(단계가 뒤섞인다).
+- **좋음:** `adr.md`는 손대지 않고, ADR 필요 여부·이유만 PRD `## ADR 필요 여부`에 남긴 뒤
+  필요하면 `$adr-helper`로 넘긴다. `adr.md` 작성은 `stage`가 `adr-draft`로 올라간 다음이다.
+
+- **나쁨:** ADR이 필요한데 PRD만 먼저 승인받고 `$adr-helper`로 넘어간다.
+- **좋음:** ADR이 필요하면 PRD 승인을 미루고, ADR까지 작성한 뒤 PRD·ADR을 한 번에 승인받는다.

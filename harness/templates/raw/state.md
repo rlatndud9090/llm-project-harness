@@ -19,6 +19,12 @@ adr_status: proposed
 - 아래 `## 승인 이벤트`에 사용자의 명시 승인이 기록되기 전에는 PRD를 `approved`,
   ADR을 `accepted`로 둘 수 없다(`harness:check`가 막고, 구현도 시작할 수 없다).
 - 단계가 바뀌면 `## 단계 로그`에 한 줄 append 하고 `stage`를 갱신한다.
+- **`adr.md`는 `stage`가 `adr-draft` 이상으로 올라간 뒤에만 편집한다.** `$prd-helper`
+  단계(`kickoff`/`prd-draft`/`prd-review`)에서는 `adr.md`를 스켈레톤 그대로 두고, ADR
+  필요 여부·이유는 PRD `## ADR 필요 여부`에 남긴다(런타임 가드와 `harness:check`가 강제).
+- 단계 순서: `kickoff` → `prd-draft` → `prd-review` → (ADR 필요 시 `adr-draft` →
+  `adr-review`) → `approved` → `implementing` → `integrated`. ADR이 불필요하면 ADR 단계를
+  건너뛰고 PRD 단독 승인으로 `approved`에 진입한다.
 
 ## 단계 로그 (append-only)
 

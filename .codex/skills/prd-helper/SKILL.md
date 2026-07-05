@@ -14,17 +14,22 @@ description: "PRD를 인터뷰·리서치·리뷰로 함께 작성할 때 사용
 3. `.harness/harness/roles/researcher.md`로 레퍼런스/선행 사례를 모은다(출처는 notes에).
 4. `.harness/harness/roles/prd-writer.md`로 PRD 초안을 작성한다.
 5. `.harness/harness/roles/reviewer.md`로 수용 기준/누락/모순을 지속 검토하고 다듬는다.
-6. `## ADR 필요 여부`를 판단하고, 필요하면 `$adr-helper`로 넘긴다.
+6. `## ADR 필요 여부`를 PRD에 판단해 적는다. **이 단계는 `prd.md`만 편집하고 `adr.md`는
+   건드리지 않는다.** 필요하면 PRD 승인을 미루고 `$adr-helper`로 넘기고, 불필요하면 PRD
+   단독 승인으로 진행한다.
 
-PRD는 한국어로 작성하고 `review` 상태로 둔다. 사용자 명시 승인 전에는 `approved`로
+PRD는 한국어로 작성하고 `review` 상태로 둔다. **`adr.md`는 절대 편집하지 않는다** —
+`adr.md` 작성은 `$adr-helper`에서 `state.md`의 `stage`를 `adr-draft`로 올린 뒤에만
+허용된다(런타임 가드와 `harness:check`가 강제). 사용자 명시 승인 전에는 `approved`로
 바꾸지 않는다.
 
-`approved` 전환은 오직 사용자의 명시 승인 뒤 `npm run harness:approve -- --unit
-docs/raw/<type>/<slug> --quote "<사용자 발화 verbatim>"`로만 한다(직접 frontmatter 편집
-금지 — 런타임 훅과 `harness:check`가 막는다). "이렇게 하려고 했어" 같은 의도·아이디어
-발화는 승인이 아니다. 승인은 대상 문서와 전환 상태를 명시한 승인 요청에 대한 사용자의
-분명한 긍정 응답만을 뜻하며, 모호하면 `review`로 둔 채 다시 확인한다. `review`로 올릴
-때 `state.md`의 `stage`/`prd_status`를 갱신한다.
+**승인 분기.** ADR이 필요하면 여기서 승인을 요청하지 않고 PRD를 `review`로 둔 채
+`$adr-helper`로 넘긴다(PRD·ADR 통합 승인은 `$adr-helper`가 담당). ADR이 불필요할 때만
+여기서 PRD 단독 승인을 요청한다: 사용자의 명시 승인 뒤 `npm run harness:approve -- --unit
+docs/raw/<type>/<slug> --quote "<사용자 발화 verbatim>"`로만 전환한다(`--adr` 없이 PRD만;
+직접 frontmatter 편집 금지 — 런타임 훅과 `harness:check`가 막는다). "이렇게 하려고 했어"
+같은 의도·아이디어 발화는 승인이 아니다. 모호하면 `review`로 둔 채 다시 확인한다.
+`review`로 올릴 때 `state.md`의 `stage`/`prd_status`를 갱신한다.
 
 ## 질문 도구
 

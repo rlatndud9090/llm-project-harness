@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   FORBIDDEN_STATUS_TRANSITIONS,
+  adrBodyLooksAuthored,
   formatApprovalEvent,
   isForbiddenStageTransition,
   isForbiddenTransition,
+  isPreAdrStage,
   parseApprovalEvents,
   parseFrontmatter,
   parseWorkBranch,
   resolveTimezone,
   setFrontmatterField,
+  skeletonAdrBody,
   stripKnownPrefix,
   titleFromSlug,
   today,
@@ -147,6 +150,62 @@ describe("setFrontmatterField", () => {
     expect(fields.approval).toBe("user:2026-01-01:ok");
     expect(fields.title).toBe("X");
     expect(fields.status).toBe("approved");
+  });
+});
+
+describe("isPreAdrStage", () => {
+  it("treats PRD-phase stages (and awaiting-approval) as pre-ADR", () => {
+    for (const stage of ["kickoff", "prd-draft", "prd-review", "awaiting-approval"]) {
+      expect(isPreAdrStage(stage)).toBe(true);
+    }
+  });
+
+  it("treats the ADR phase and beyond as not pre-ADR", () => {
+    for (const stage of ["adr-draft", "adr-review", "approved", "implementing", "integrated"]) {
+      expect(isPreAdrStage(stage)).toBe(false);
+    }
+  });
+
+  it("fails open (false) for an unknown or missing stage", () => {
+    expect(isPreAdrStage("nonsense")).toBe(false);
+    expect(isPreAdrStage(undefined)).toBe(false);
+  });
+});
+
+describe("adrBodyLooksAuthored (ADR phase gate)", () => {
+  const wrap = (body) => `---\ntitle: "x"\n---\n${body}`;
+
+  it("reads the pristine kickoff skeleton as not authored", () => {
+    expect(adrBodyLooksAuthored(wrap(skeletonAdrBody()))).toBe(false);
+  });
+
+  it("is title-independent (a substituted H1 does not count as authoring)", () => {
+    const withTitle = skeletonAdrBody().replace("# ADR: {제목}", "# ADR: 데이터 계약");
+    expect(adrBodyLooksAuthored(wrap(withTitle))).toBe(false);
+  });
+
+  it("reads a fully authored ADR as authored", () => {
+    expect(adrBodyLooksAuthored(wrap("# ADR: x\n\n## 결정\n\n링크 기반 공유를 채택한다.\n"))).toBe(true);
+  });
+
+  it("reads partial authoring that leaves a template token as authored (the token-heuristic bypass)", () => {
+    // The decision sections are written, but the 선택지 headers still carry {이름}.
+    // A naive `contains {…}` heuristic would wrongly call this a skeleton.
+    const partial = skeletonAdrBody()
+      .replace("어떤 상황에서 이 결정이 필요했는가?", "PRD 요구로 링크 공유가 필요하다.")
+      .replace("무엇을 결정했는가?", "링크 기반 공유를 채택한다.");
+    expect(partial).toContain("{이름}");
+    expect(adrBodyLooksAuthored(wrap(partial))).toBe(true);
+  });
+
+  it("does not let a removed H1 line pass as the skeleton", () => {
+    // Skeleton body with only the H1 title line stripped must still differ from the
+    // skeleton (canonicalizing, not dropping, the H1 closes this gap).
+    const noH1 = skeletonAdrBody()
+      .split("\n")
+      .filter((line) => !/^#\s/.test(line.trim()))
+      .join("\n");
+    expect(adrBodyLooksAuthored(wrap(noH1))).toBe(true);
   });
 });
 

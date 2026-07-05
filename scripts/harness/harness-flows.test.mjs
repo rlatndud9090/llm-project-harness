@@ -642,6 +642,76 @@ describe("state ledger approval gate", () => {
   });
 });
 
+describe("artifact-check ADR phase gate (step separation)", () => {
+  it("fails when adr.md is authored while the unit is still in the PRD phase", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "leak");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Leak", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "Leak", status: "proposed", unit_type: "feature", related_prd: "./prd.md" })}\n${fullAdrBody()}`,
+      );
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({ stage: "prd-review", prd_status: "review", adr_status: "proposed", approvals: [] }),
+      );
+      ingest(projectRoot, "docs/raw/feature/leak", "공유 기능");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("ADR authored during the PRD phase");
+    });
+  });
+
+  it("passes when adr.md is left exactly as the real kickoff skeleton during the PRD phase", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      // Use the REAL kickoff output so the gate is anchored to the actual template,
+      // not a hand-built stand-in (guards against template/heuristic drift).
+      runKickoff(projectRoot, "feature", "skeleton", "스켈레톤");
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "skeleton");
+      // PRD advances to review; adr.md is left untouched as kickoff generated it.
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "Skeleton", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      const statePath = path.join(unitDir, "state.md");
+      writeFile(statePath, read(statePath).replace("stage: kickoff", "stage: prd-review").replace("prd_status: draft", "prd_status: review"));
+      ingest(projectRoot, "docs/raw/feature/skeleton", "공유 기능");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("allows authoring adr.md once the unit has entered the ADR phase (stage adr-draft)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "adr-phase");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "AdrPhase", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "AdrPhase", status: "proposed", unit_type: "feature", related_prd: "./prd.md" })}\n${fullAdrBody()}`,
+      );
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({ stage: "adr-draft", prd_status: "review", adr_status: "proposed", approvals: [] }),
+      );
+      ingest(projectRoot, "docs/raw/feature/adr-phase", "공유 기능");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
 describe("claude-approval-guard", () => {
   it("blocks an Edit that flips prd.md status to approved", () => {
     const result = runGuard({
@@ -730,6 +800,35 @@ describe("claude-approval-guard", () => {
       const result = runGuard({
         tool_name: "Edit",
         tool_input: { file_path: statePath, old_string: "stage: approved", new_string: "stage: implementing" },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("blocks an adr.md edit while the unit is still in the PRD phase (stage prd-review)", () => {
+    withProject((projectRoot) => {
+      const statePath = path.join(projectRoot, "docs", "raw", "feature", "gate", "state.md");
+      writeFile(statePath, `${frontmatter({ title: "Gate", stage: "prd-review", prd_status: "review", adr_status: "proposed" })}\n# 원장\n`);
+      const adrPath = path.join(projectRoot, "docs", "raw", "feature", "gate", "adr.md");
+      writeFile(adrPath, `${frontmatter({ title: "Gate", status: "proposed", unit_type: "feature" })}\n# ADR\n\n### 선택지 A: {이름}\n`);
+      const result = runGuard({
+        tool_name: "Edit",
+        tool_input: { file_path: adrPath, old_string: "### 선택지 A: {이름}", new_string: "### 선택지 A: 링크 공유\n\n- 장점: 단순" },
+      });
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("adr-draft");
+    });
+  });
+
+  it("allows an adr.md edit once the unit has entered the ADR phase (stage adr-draft)", () => {
+    withProject((projectRoot) => {
+      const statePath = path.join(projectRoot, "docs", "raw", "feature", "gate2", "state.md");
+      writeFile(statePath, `${frontmatter({ title: "Gate2", stage: "adr-draft", prd_status: "review", adr_status: "proposed" })}\n# 원장\n`);
+      const adrPath = path.join(projectRoot, "docs", "raw", "feature", "gate2", "adr.md");
+      writeFile(adrPath, `${frontmatter({ title: "Gate2", status: "proposed", unit_type: "feature" })}\n# ADR\n\n### 선택지 A: {이름}\n`);
+      const result = runGuard({
+        tool_name: "Edit",
+        tool_input: { file_path: adrPath, old_string: "### 선택지 A: {이름}", new_string: "### 선택지 A: 링크 공유" },
       });
       expect(result.status).toBe(0);
     });

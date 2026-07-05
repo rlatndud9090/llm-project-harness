@@ -93,6 +93,8 @@ npm run harness:check
 
 ## 다음 단계
 
-raw 골격이 생기면 `$prd-helper`로 PRD를 작성한다. PRD 작성 과정에서 ADR이
-필요하다고 판단되면 `$adr-helper`로 ADR을 작성한다. wiki ingest는 PRD 초안이
-자리를 잡은 뒤 실행한다.
+raw 골격이 생기면 `$prd-helper`로 **PRD만** 작성한다. `$kickoff`가 만든 `adr.md`
+스켈레톤은 이 시점에 건드리지 않는다 — ADR 작성은 별도 단계(`$adr-helper`)의 몫이고,
+`state.md`의 `stage`가 `adr-draft`로 올라간 뒤에만 허용된다(그 전에는 런타임 가드와
+`harness:check`가 막는다). `$prd-helper`는 ADR 필요 여부만 판단해 PRD `## ADR 필요 여부`에
+남기고, 필요하면 `$adr-helper`로 넘긴다. wiki ingest는 PRD 초안이 자리를 잡은 뒤 실행한다.

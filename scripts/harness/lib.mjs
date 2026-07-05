@@ -304,6 +304,55 @@ export function isForbiddenStageTransition(fromStage, toStage) {
   return POST_APPROVAL_STAGES.has(fromStage) && PRE_APPROVAL_STAGES.has(toStage);
 }
 
+// Step separation between $prd-helper and $adr-helper is machine-enforced on the
+// `stage` axis: the ADR may only be authored once the unit has explicitly entered
+// the ADR phase (stage adr-draft) or later. Before that, adr.md stays the kickoff
+// skeleton and the ADR-need decision lives in prd.md "## ADR 필요 여부". This stops
+// a PRD session from drifting into ADR authoring.
+export const ADR_AUTHORING_STAGES = new Set(["adr-draft", "adr-review", "approved", "implementing", "integrated"]);
+
+// True only for a recognized stage that precedes the ADR phase. An unknown or
+// missing stage returns false so callers fail open (they never gate on an
+// unparseable ledger; artifact-check flags an invalid stage separately).
+export function isPreAdrStage(stage) {
+  return STAGE_VALUES.has(stage) && !ADR_AUTHORING_STAGES.has(stage);
+}
+
+// "Authored" is decided by comparing adr.md against the pristine kickoff skeleton:
+// at a pre-ADR stage the ADR body must still BE that skeleton. We compare the body
+// (title-independent — the H1 "# ADR: <title>" line is dropped and whitespace is
+// normalized) against the canonical template body. ANY substantive deviation reads
+// as authored: a filled decision, a stub, a legacy "불필요" one-liner, or partial
+// authoring that leaves a template token behind. This is deliberately stricter than
+// a token check — a single leftover `{…}` placeholder (e.g. an un-renamed 선택지
+// header) would defeat a token heuristic while the decision sections are fully
+// written, which is exactly the drift this gate must catch.
+function normalizeAdrBody(body) {
+  return body
+    .split(/\r?\n/)
+    .map((line) => {
+      const trimmedEnd = line.replace(/\s+$/, "");
+      // Canonicalize the H1 "# ADR: <title>" line to a title-free form. Canonicalizing
+      // (rather than dropping) keeps the check title-independent while still detecting a
+      // removed/altered H1 — dropping the line would let "skeleton minus its H1" pass.
+      return /^#\s/.test(trimmedEnd.trim()) ? "# ADR:" : trimmedEnd;
+    })
+    .join("\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+// The canonical ADR skeleton body, read from the same harness template kickoff
+// materializes from. Resolving it here (not hard-coding markers) keeps the gate
+// correct even if the template's sections change.
+export function skeletonAdrBody() {
+  return bodyAfterFrontmatter(readText(harnessPath("harness", "templates", "raw", "feature-adr.md")));
+}
+
+export function adrBodyLooksAuthored(adrContent, skeletonBody = skeletonAdrBody()) {
+  return normalizeAdrBody(bodyAfterFrontmatter(adrContent)) !== normalizeAdrBody(skeletonBody);
+}
+
 // Replaces (or inserts) a single `key: value` line inside the frontmatter block
 // while leaving the body and other keys untouched. Used by kickoff/approve so
 // status flips are surgical edits, never a full-file rewrite.

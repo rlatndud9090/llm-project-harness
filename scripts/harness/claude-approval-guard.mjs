@@ -6,8 +6,12 @@
 //   - prd.md / adr.md whose resulting `status:` is approved/accepted
 //   - state.md whose resulting `prd_status: approved` / `adr_status: accepted`,
 //     or that introduces an `- APPROVAL ...` ledger line
-// Only `npm run harness:approve` should set those, and it writes via Node fs
-// (not the Edit/Write tools), so the sanctioned path never trips this hook.
+//   - adr.md edited while the sibling state.md stage is still pre-ADR (the PRD
+//     phase): $prd-helper must not drift into ADR authoring — the ADR is authored
+//     only after $adr-helper advances the stage to adr-draft.
+// Only `npm run harness:approve` should set the approval statuses, and it writes
+// via Node fs (not the Edit/Write tools), so the sanctioned path never trips
+// this hook.
 //
 // It inspects the RECONSTRUCTED post-edit file (not just the edit fragment), so
 // a value-only edit (old_string "review" -> new_string "approved") is caught,
@@ -26,7 +30,7 @@
 // so a hook bug never wedges normal editing — harness:check remains the backstop.
 import fs from "node:fs";
 import path from "node:path";
-import { parseFrontmatter } from "./lib.mjs";
+import { isPreAdrStage, parseFrontmatter } from "./lib.mjs";
 
 const STATUS_FLIP_RE = /^\s*status:\s*["']?(approved|accepted)\b/m;
 const APPROVAL_LINE_RE = /^\s*-\s*APPROVAL\s+(prd|adr)\b/m;
@@ -55,6 +59,22 @@ function run(input) {
   if (!GUARDED_BASENAMES.has(base)) process.exit(0);
 
   const cwd = typeof payload.cwd === "string" && payload.cwd ? payload.cwd : process.cwd();
+
+  // Step-separation gate: block ADR authoring while the unit is still in the PRD
+  // phase. This is independent of any status flip — even an ordinary body edit to
+  // adr.md is refused until the stage advances to adr-draft.
+  if (base === "adr.md") {
+    const stage = preAdrStageFor(cwd, filePath);
+    if (stage) {
+      process.stderr.write(
+        `단계 분리 차단: adr.md — state.md stage가 "${stage}"입니다 (아직 ADR 단계가 아닙니다).\n` +
+          `PRD 단계($prd-helper)에서는 adr.md를 편집하지 않습니다. ADR 필요 여부와 이유는 prd.md "## ADR 필요 여부"에 적으세요.\n` +
+          `ADR을 작성하려면 먼저 $adr-helper로 넘어가 state.md의 stage를 adr-draft로 올린 뒤 adr.md를 작성하세요.`,
+      );
+      process.exit(2);
+    }
+  }
+
   const currentContent = readCurrent(cwd, filePath);
   const nextContent = reconstruct(payload, toolInput, currentContent);
 
@@ -70,6 +90,20 @@ function run(input) {
   }
 
   process.exit(0);
+}
+
+// Returns the current pre-ADR stage of the unit owning `filePath` (read from the
+// sibling state.md), or null when the ADR phase has been entered, the ledger is
+// missing/unparseable, or the stage is unknown. Null means "do not gate" — the
+// git-time harness:check backs this up.
+function preAdrStageFor(cwd, filePath) {
+  try {
+    const stateFile = path.join(path.dirname(path.resolve(cwd, filePath)), "state.md");
+    const stage = parseFrontmatter(fs.readFileSync(stateFile, "utf8"))?.stage;
+    return isPreAdrStage(stage) ? stage : null;
+  } catch {
+    return null; // no sibling state.md / unreadable → fail open
+  }
 }
 
 function readCurrent(cwd, filePath) {
