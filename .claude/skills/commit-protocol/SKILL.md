@@ -45,6 +45,13 @@ trailer를 유지한다.
 커밋에는 `Related: docs/raw/<type>/<slug>/`와
 커밋 에이전트의 co-author 정체성(Codex는 `OmX <omx@oh-my-codex.dev>`, ClaudeCode는 해당 도구의 co-author)을 포함한다.
 
+## CHANGELOG (하네스 저장소 커밋)
+
+하네스 공용 표면(`harness/`, `scripts/harness/`, `.claude/`, `.codex/`)을 바꾸는 커밋은
+`CHANGELOG.md` 맨 위에 `## <YYYY-MM-DD> <slug>` 항목(변경 + 소비자 조치)을 추가해 stage
+한다. 소비 프로젝트는 서브모듈 업데이트 후 `harness:sync`로 이를 반영한다. 소비 프로젝트
+자신의 제품 커밋은 이 규칙 대상이 아니다.
+
 ## Claude Code — Background 세션 result 형식 (필수)
 
 background 세션에서 `result:` 라인을 출력할 때 — 중간 보고든 완료든 — **맨 앞에 반드시 `[commit]`를 붙인다.**

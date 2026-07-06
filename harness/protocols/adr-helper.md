@@ -112,6 +112,11 @@ npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의
 accepted ADR 본문은 과거 결정의 근거이므로 고쳐 쓰지 않는다. 결정이 바뀌면 새
 ADR을 추가하고 옛 ADR을 `superseded`로 표시한다.
 
+이 결정이 같은 영역의 이전 결정을 대체하면 wiki도 함께 신선하게 유지한다: 그 영역
+`### 헤딩` 아래에서 대체된 이전 줄에 `_(superseded by <대상>)_`를 달고, 새 결정 줄로
+`_(현재)_`를 옮긴다(navigation 라벨 1줄 수정이며 raw 본문 복제가 아니다). `harness:check`는
+영역당 `_(현재)_` 최대 1개와 superseded 줄에 현재 표시 금지만 구조로 강제한다.
+
 ## 다음 단계
 
 PRD/ADR이 모두 자리를 잡고 사용자 승인까지 끝나면 `feature-develop.md`로 넘어가

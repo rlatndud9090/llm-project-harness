@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { changelogHeadId } from "./lib.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -81,6 +82,366 @@ describe("wiki-ingest", () => {
       const wiki = read(path.join(projectRoot, "docs", "wiki", "index.md"));
       expect(wiki).toContain("### 맞춤 기능 축");
       expect(wiki).toContain("[PRD](../raw/feature/new-category/prd.md)");
+    });
+  });
+});
+
+describe("wiki-ingest area lineage", () => {
+  it("groups by prd.md frontmatter area with a dated line (no --area needed)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "a-screen", "prd.md"),
+        `${frontmatter({ title: "A화면 최초 구축", status: "review", unit_type: "feature", area: "A화면" })}\n# A화면 최초 구축\n`,
+      );
+
+      ingestArea(projectRoot, "docs/raw/feature/a-screen");
+
+      const wiki = read(path.join(projectRoot, "docs", "wiki", "index.md"));
+      expect(wiki).toContain("### A화면");
+      expect(wiki).toContain("- `2026-01-01` **A화면 최초 구축** — [PRD](../raw/feature/a-screen/prd.md)");
+    });
+  });
+
+  it("inserts bullets in ascending date order regardless of ingest order", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "later", "prd.md"),
+        `${frontmatter({ title: "고도화", status: "review", unit_type: "feature", area: "A화면", date: "2026-06-20" })}\n# 고도화\n`,
+      );
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "earlier", "prd.md"),
+        `${frontmatter({ title: "최초 구축", status: "review", unit_type: "feature", area: "A화면", date: "2024-03-15" })}\n# 최초 구축\n`,
+      );
+
+      ingestArea(projectRoot, "docs/raw/feature/later");
+      ingestArea(projectRoot, "docs/raw/feature/earlier");
+
+      const wiki = read(path.join(projectRoot, "docs", "wiki", "index.md"));
+      expect(wiki.indexOf("최초 구축")).toBeGreaterThan(-1);
+      expect(wiki.indexOf("최초 구축")).toBeLessThan(wiki.indexOf("고도화"));
+    });
+  });
+
+  it("links a multi-area unit under each area and stays idempotent per area", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "multi", "prd.md"),
+        `${frontmatter({ title: "교차 작업", status: "review", unit_type: "feature", area: "A화면, 인증 플로우" })}\n# 교차 작업\n`,
+      );
+
+      ingestArea(projectRoot, "docs/raw/feature/multi");
+      ingestArea(projectRoot, "docs/raw/feature/multi");
+
+      const wiki = read(path.join(projectRoot, "docs", "wiki", "index.md"));
+      expect(wiki).toContain("### A화면");
+      expect(wiki).toContain("### 인증 플로우");
+      const occurrences = wiki.split("](../raw/feature/multi/prd.md)").length - 1;
+      expect(occurrences).toBe(2);
+    });
+  });
+
+  it("prefers frontmatter area over --category and warns", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "feature", "conflict", "prd.md"),
+        `${frontmatter({ title: "충돌", status: "review", unit_type: "feature", area: "진짜영역" })}\n# 충돌\n`,
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/conflict", "--category", "가짜영역"],
+        { cwd: projectRoot, encoding: "utf8" },
+      );
+
+      expect(result.status).toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("--category 무시");
+      const wiki = read(path.join(projectRoot, "docs", "wiki", "index.md"));
+      expect(wiki).toContain("### 진짜영역");
+      expect(wiki).not.toContain("### 가짜영역");
+    });
+  });
+
+  it("preserves non-bullet content in an area section on re-ingest", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "note-a", { status: "review", area: "노트영역", date: "2024-01-01" });
+      ingestArea(projectRoot, "docs/raw/feature/note-a");
+
+      const wikiPath = path.join(projectRoot, "docs", "wiki", "index.md");
+      writeFile(wikiPath, read(wikiPath).replace("### 노트영역\n", "### 노트영역\n\n> 설계 노트: 보존되어야 함.\n"));
+
+      seedAreaFeature(projectRoot, "note-b", { status: "review", area: "노트영역", date: "2026-01-01" });
+      ingestArea(projectRoot, "docs/raw/feature/note-b");
+
+      expect(read(wikiPath)).toContain("설계 노트: 보존되어야 함.");
+    });
+  });
+
+  it("re-syncs a drifted timeline date on re-ingest (self-heal)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "resync", { status: "review", area: "리싱크영역", date: "2026-01-01" });
+      ingestArea(projectRoot, "docs/raw/feature/resync");
+
+      seedAreaFeature(projectRoot, "resync", { status: "review", area: "리싱크영역", date: "2025-05-05" }); // corrected date
+      ingestArea(projectRoot, "docs/raw/feature/resync");
+
+      const wiki = read(path.join(projectRoot, "docs", "wiki", "index.md"));
+      expect(wiki).toContain("`2025-05-05`");
+      expect(wiki).not.toContain("`2026-01-01`");
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("re-ingesting an area-less legacy unit with no args is a no-op, not a failure", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "legacy-unit", { status: "review" }); // no area
+      ingest(projectRoot, "docs/raw/feature/legacy-unit", "레거시축"); // legacy --category
+
+      const result = spawnSync(
+        process.execPath,
+        [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/legacy-unit"],
+        { cwd: projectRoot, encoding: "utf8" },
+      );
+
+      expect(result.status).toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("already linked");
+    });
+  });
+});
+
+describe("artifact-check area gates", () => {
+  it("fails when a declared area does not match the linked heading", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "mismatch", { status: "review" }); // no area yet
+      ingest(projectRoot, "docs/raw/feature/mismatch", "카테고리A"); // legacy category
+      declareArea(projectRoot, "mismatch", "다른영역"); // now declares a different area
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain('declares area "다른영역" but is not linked under "### 다른영역"');
+    });
+  });
+
+  it("fails a declared broad feature area", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "broad", { status: "review" });
+      ingest(projectRoot, "docs/raw/feature/broad", "정상영역");
+      declareArea(projectRoot, "broad", "아키텍처");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain('feature area "아키텍처" is too broad');
+    });
+  });
+
+  it("hard-requires an area on the active feature branch at review", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "active", { status: "review" }); // no area
+      ingest(projectRoot, "docs/raw/feature/active", "활성영역");
+      git(projectRoot, ["checkout", "-q", "-b", "feature/active"]);
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("must declare an area in prd.md frontmatter");
+    });
+  });
+
+  it("passes the active-branch unit once it declares an area", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "active", { status: "review", area: "활성영역" });
+      ingestArea(projectRoot, "docs/raw/feature/active");
+      git(projectRoot, ["checkout", "-q", "-b", "feature/active"]);
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("does not require an area on main (current-branch scope)", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "onmain", { status: "review" }); // no area, stays on main
+      ingest(projectRoot, "docs/raw/feature/onmain", "메인영역");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("fails when the wiki date does not match the raw frontmatter date", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "drift", { status: "review", area: "드리프트영역" });
+      ingestArea(projectRoot, "docs/raw/feature/drift");
+
+      const wikiPath = path.join(projectRoot, "docs", "wiki", "index.md");
+      writeFile(wikiPath, read(wikiPath).replace("`2026-01-01`", "`2020-01-01`"));
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("does not match");
+    });
+  });
+
+  it("fails when a section marks more than one current decision", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "old", { status: "review", area: "커런시영역", date: "2024-01-01" });
+      seedAreaFeature(projectRoot, "new", { status: "review", area: "커런시영역", date: "2026-01-01" });
+      ingestArea(projectRoot, "docs/raw/feature/old");
+      ingestArea(projectRoot, "docs/raw/feature/new");
+
+      const wikiPath = path.join(projectRoot, "docs", "wiki", "index.md");
+      const marked = read(wikiPath)
+        .split("\n")
+        .map((entry) => (entry.startsWith("- `") ? `${entry} _(현재)_` : entry))
+        .join("\n");
+      writeFile(wikiPath, marked);
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("current decisions");
+    });
+  });
+
+  it("passes a multi-area unit linked under each declared area", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "cross", { status: "review", area: "A화면, 인증 플로우" });
+      ingestArea(projectRoot, "docs/raw/feature/cross");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("fails a multi-area unit missing a link under one declared area", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "partial", { status: "review", area: "A화면, 인증 플로우" });
+      ingestArea(projectRoot, "docs/raw/feature/partial", "A화면"); // only the first area
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain('declares area "인증 플로우" but is not linked under "### 인증 플로우"');
+    });
+  });
+
+  it("does not mis-attribute a `## ` section's raw link to the preceding area", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "shipping", { status: "review", area: "배송" });
+      ingestArea(projectRoot, "docs/raw/feature/shipping");
+      seedAreaFeature(projectRoot, "paid", { status: "review", area: "결제" });
+
+      const wikiPath = path.join(projectRoot, "docs", "wiki", "index.md");
+      writeFile(
+        wikiPath,
+        read(wikiPath).replace("## Maintenance", "## 참고\n\n- 관련: [PRD](../raw/feature/paid/prd.md)\n\n## Maintenance"),
+      );
+
+      const result = runCheck(projectRoot);
+      // The paid link lives under `## 참고`, not `### 배송`, so it must not be
+      // counted as linked under 배송 (that would be a spurious grouping failure).
+      expect(`${result.stdout}${result.stderr}`).not.toContain('linked under "### 배송" but does not declare');
+    });
+  });
+
+  it("does not hard-require an area on a bugfix branch (bugfix area is optional)", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "bugfix", "leak-fix", "bugfix.md"),
+        `${frontmatter({ title: "누수 수정", status: "review", unit_type: "bugfix" })}\n# Bugfix\n\n## 증상\n\nx\n\n## 원인\n\nx\n\n## 수정\n\nx\n\n## 회귀 방지\n\n- [ ] 회귀 테스트\n`,
+      );
+      ingest(projectRoot, "docs/raw/bugfix/leak-fix"); // no --category → operations bucket
+      git(projectRoot, ["checkout", "-q", "-b", "bugfix/leak-fix"]);
+
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("passes a legacy project with no area and dateless wiki lines", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "legacy", { status: "review" });
+      writeFile(
+        path.join(projectRoot, "docs", "wiki", "index.md"),
+        [
+          "# Wiki",
+          "",
+          "## Raw Units",
+          "",
+          "### 레거시영역",
+          "",
+          "- **Legacy** — [PRD](../raw/feature/legacy/prd.md) · [ADR](../raw/feature/legacy/adr.md)",
+          "",
+          "### 프로젝트 운영",
+          "",
+          "## Maintenance",
+          "",
+        ].join("\n"),
+      );
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
+describe("harness sync reconciliation gate", () => {
+  it("attach seeds .harness-sync and a fresh consumer is in sync", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const head = changelogHeadId(read(path.join(projectRoot, ".harness", "CHANGELOG.md")));
+      expect(read(path.join(projectRoot, ".harness-sync")).trim()).toBe(head);
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("fails harness:check when .harness-sync is stale (submodule updated, not reconciled)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("not reconciled");
+    });
+  });
+
+  it("harness:sync shows the pending entries but leaves the marker until --ack", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
+
+      const sync = runSync(projectRoot);
+      expect(`${sync.stdout}${sync.stderr}`).toContain("반영 필요");
+      expect(read(path.join(projectRoot, ".harness-sync")).trim()).toBe("2020-01-01 old-entry");
+      expect(runCheck(projectRoot).status).not.toBe(0);
+    });
+  });
+
+  it("harness:sync --ack reconciles the marker and unblocks the check", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
+
+      const head = changelogHeadId(read(path.join(projectRoot, ".harness", "CHANGELOG.md")));
+      const sync = runSync(projectRoot, ["--ack"]);
+      expect(sync.status).toBe(0);
+      expect(read(path.join(projectRoot, ".harness-sync")).trim()).toBe(head);
+      expect(runCheck(projectRoot).status).toBe(0);
     });
   });
 });
@@ -1026,6 +1387,32 @@ function defaultCategoryFor(unitPath) {
   return unitPath.includes("/feature/") ? "맞춤 기능 축" : null;
 }
 
+// Ingests using the area path (frontmatter `area` when no explicit --area is
+// passed), mirroring how ingest resolves the durable axis in real usage.
+function ingestArea(projectRoot, unitPath, area) {
+  const args = [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath];
+  if (area) args.push("--area", area);
+  execFileSync(process.execPath, args, { cwd: projectRoot, encoding: "utf8" });
+}
+
+// Writes a review-ready feature unit (prd.md + adr.md skeleton). Passing `area`
+// declares it in the prd frontmatter; `date` overrides the timeline date.
+function seedAreaFeature(projectRoot, slug, { status = "review", area, date } = {}) {
+  const unitDir = path.join(projectRoot, "docs", "raw", "feature", slug);
+  const prdFields = { title: slug, status, unit_type: "feature" };
+  if (area) prdFields.area = area;
+  if (date) prdFields.date = date;
+  writeFile(path.join(unitDir, "prd.md"), `${frontmatter(prdFields)}\n${fullPrdBody()}`);
+  writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: slug, status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+}
+
+// Rewrites an existing feature unit's prd.md to declare an area, leaving the wiki
+// link where it was (so declaration↔render drift can be exercised).
+function declareArea(projectRoot, slug, area) {
+  const prdPath = path.join(projectRoot, "docs", "raw", "feature", slug, "prd.md");
+  writeFile(prdPath, `${frontmatter({ title: slug, status: "review", unit_type: "feature", area })}\n${fullPrdBody()}`);
+}
+
 function runVerifyMsg(projectRoot, msgPath) {
   return spawnSync(
     process.execPath,
@@ -1036,6 +1423,13 @@ function runVerifyMsg(projectRoot, msgPath) {
 
 function runCheck(projectRoot) {
   return spawnSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "artifact-check.mjs")], {
+    cwd: projectRoot,
+    encoding: "utf8",
+  });
+}
+
+function runSync(projectRoot, extraArgs = []) {
+  return spawnSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "sync.mjs"), ...extraArgs], {
     cwd: projectRoot,
     encoding: "utf8",
   });

@@ -10,6 +10,7 @@ import {
   rawUnitPath,
   readText,
   repoPath,
+  setFrontmatterField,
   titleFromSlug,
   today,
   validateTypeAndSlug,
@@ -130,8 +131,11 @@ if (materializeStateLedger()) created.push("state.md");
 // Reconcile against the unit next-feature recorded, then consume the anchor.
 // A mismatch means the chosen unit drifted between recommendation and kickoff.
 const anchorPath = repoPath("docs", "raw", ".next-unit");
+let anchorArea = "";
 if (pathExists(anchorPath)) {
-  const anchorUnit = (readText(anchorPath).trim().split("\n")[0] ?? "").split("|")[0].trim();
+  const anchorParts = (readText(anchorPath).trim().split("\n")[0] ?? "").split("|").map((part) => part.trim());
+  const anchorUnit = anchorParts[0] ?? "";
+  anchorArea = anchorParts[2] ?? "";
   const resolvedUnit = `${type}/${slug}`;
   if (anchorUnit && anchorUnit !== resolvedUnit) {
     console.warn(`[kickoff] WARNING: next-feature anchor (${anchorUnit}) != resolved unit (${resolvedUnit}); confirm this is intended`);
@@ -139,8 +143,21 @@ if (pathExists(anchorPath)) {
   fs.rmSync(anchorPath, { force: true });
 }
 
+// Seed the unit's area from --area (preferred) or the next-feature anchor's 3rd
+// field, so the durable area declaration lands in the primary artifact frontmatter.
+const area = (typeof args.area === "string" && args.area.trim()) || anchorArea;
+let seededArea = "";
+if (area && (type === "feature" || type === "bugfix")) {
+  const artifactPath = path.join(unitDir, type === "feature" ? "prd.md" : "bugfix.md");
+  if (pathExists(artifactPath)) {
+    writeText(artifactPath, setFrontmatterField(readText(artifactPath), "area", `"${area}"`));
+    seededArea = area;
+  }
+}
+
 console.log(`[kickoff] ${path.relative(process.cwd(), unitDir)}`);
 console.log(`- branch: ${branchInfo.branch}`);
 console.log(`- title: ${title}`);
 console.log(`- unit: ${type}/${slug}`);
 console.log(`- created: ${created.length ? created.join(", ") : "none (already existed)"}`);
+if (seededArea) console.log(`- area: ${seededArea}`);

@@ -4,6 +4,8 @@ date: "YYYY-MM-DD"
 status: draft # draft | review | fixed | rejected
 approval:
 unit_type: bugfix
+# area(영역, 선택): 이 버그가 속한 기능/구조 단위. 선언하면 그 영역 타임라인에 합류, 비우면 운영 버킷으로 간다. 위키 ### 헤딩과 정확히 일치.
+area:
 ---
 
 # Bugfix: 버그 수정 제목

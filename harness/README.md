@@ -111,13 +111,19 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 소비 프로젝트의 package scripts는 `.harness/scripts/harness/*.mjs`를 직접 호출한다.
 
 ```sh
-npm run harness:kickoff -- --type feature --slug main-layout --title "메인 레이아웃"
+npm run harness:kickoff -- --type feature --slug main-layout --title "메인 레이아웃" --area "메인 레이아웃"
 npm run harness:approve -- --unit docs/raw/feature/main-layout --quote "<사용자 승인 발화>" --adr
-npm run harness:ingest -- docs/raw/feature/main-layout
+npm run harness:ingest -- docs/raw/feature/main-layout --area "메인 레이아웃"
 npm run harness:check
+npm run harness:sync         # 서브모듈 업데이트 후 CHANGELOG 정합성(소비 프로젝트)
 npm run harness:gate
 npm run harness:hooks   # 선택: 현재 git 저장소에 pre-commit + commit-msg 훅 설치
 ```
+
+`harness:ingest`는 raw unit을 `docs/wiki/index.md`의 **영역(area)별 시간순 계보**에
+연결한다(area는 `prd.md`/`bugfix.md` frontmatter에 선언). 하네스 공용 표면을 바꾸는
+커밋은 `CHANGELOG.md`에 항목을 남기고, 소비 프로젝트는 서브모듈 업데이트 후
+`harness:sync`로 정합성을 맞춘다(맞추기 전 `harness:check`가 막는다).
 
 `harness:approve`는 PRD를 `review`→`approved`(및 `--adr`로 ADR `proposed`→`accepted`)로
 전환하는 **유일한 정규 경로**다. 사용자의 명시 승인 발화 없이는 실행하지 않는다.

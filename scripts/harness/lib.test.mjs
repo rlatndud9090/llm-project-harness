@@ -2,13 +2,19 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   FORBIDDEN_STATUS_TRANSITIONS,
   adrBodyLooksAuthored,
+  changelogEntriesAfter,
+  changelogHeadId,
+  datedBulletDate,
   formatApprovalEvent,
   isForbiddenStageTransition,
   isForbiddenTransition,
   isPreAdrStage,
   parseApprovalEvents,
+  parseAreaList,
+  parseAreaSections,
   parseFrontmatter,
   parseWorkBranch,
+  primaryArtifactName,
   resolveTimezone,
   setFrontmatterField,
   skeletonAdrBody,
@@ -206,6 +212,108 @@ describe("adrBodyLooksAuthored (ADR phase gate)", () => {
       .filter((line) => !/^#\s/.test(line.trim()))
       .join("\n");
     expect(adrBodyLooksAuthored(wrap(noH1))).toBe(true);
+  });
+});
+
+describe("changelog head / delta", () => {
+  const content = ["# CHANGELOG", "", "intro line", "", "## 2026-07-06 b", "b1", "", "## 2026-01-01 a", "a1", ""].join("\n");
+
+  it("reads the newest entry id as head, or null when there are none", () => {
+    expect(changelogHeadId(content)).toBe("2026-07-06 b");
+    expect(changelogHeadId("# 제목만 있고 항목 없음")).toBeNull();
+  });
+
+  it("returns only entries newer than the acked id", () => {
+    const after = changelogEntriesAfter(content, "2026-01-01 a");
+    expect(after).toContain("## 2026-07-06 b");
+    expect(after).not.toContain("## 2026-01-01 a");
+  });
+
+  it("returns all entries when the acked id is empty/unknown", () => {
+    const after = changelogEntriesAfter(content, "");
+    expect(after).toContain("## 2026-07-06 b");
+    expect(after).toContain("## 2026-01-01 a");
+  });
+});
+
+describe("parseAreaList", () => {
+  it("splits a comma list, trims, and drops empties", () => {
+    expect(parseAreaList("A화면, 인증 플로우")).toEqual(["A화면", "인증 플로우"]);
+    expect(parseAreaList("A, , B")).toEqual(["A", "B"]);
+  });
+
+  it("treats empty/undefined/hint/token values as no declaration", () => {
+    expect(parseAreaList("")).toEqual([]);
+    expect(parseAreaList(undefined)).toEqual([]);
+    expect(parseAreaList("# 힌트")).toEqual([]); // a leftover comment value
+    expect(parseAreaList("{area}")).toEqual([]); // an unsubstituted kickoff token
+  });
+
+  it("reads a bare `area:` (with a `#` hint line above) as undeclared", () => {
+    // The template keeps the hint on its own `#` line so parseFrontmatter never
+    // mistakes it for the value (the inline-comment strip only fires after a value).
+    const fields = parseFrontmatter(
+      ["---", "title: X", "# area(영역): 이 unit의 영역", "area:", "status: review", "---", "", "# body"].join("\n"),
+    );
+    expect(fields.area).toBe("");
+    expect(parseAreaList(fields.area)).toEqual([]);
+  });
+});
+
+describe("datedBulletDate / primaryArtifactName", () => {
+  it("extracts the backtick-wrapped ISO date prefix", () => {
+    expect(datedBulletDate("- `2026-01-01` **x** — [PRD](y)")).toBe("2026-01-01");
+    expect(datedBulletDate("- **x** — [PRD](y)")).toBeNull();
+  });
+
+  it("maps a unit type to its area-carrying artifact", () => {
+    expect(primaryArtifactName("feature")).toBe("prd.md");
+    expect(primaryArtifactName("bugfix")).toBe("bugfix.md");
+    expect(primaryArtifactName("chore")).toBeNull();
+  });
+});
+
+describe("parseAreaSections", () => {
+  const wiki = [
+    "## Raw Units",
+    "",
+    "### A화면",
+    "",
+    "- `2024-03-15` **최초** — [PRD](../raw/feature/a/prd.md) · [ADR](../raw/feature/a/adr.md) _(superseded by 정렬)_",
+    "- `2026-06-20` **고도화** — [PRD](../raw/feature/b/prd.md) · [ADR](../raw/feature/b/adr.md) _(현재)_",
+    "",
+    "### 프로젝트 운영",
+    "",
+    "- **버그** — [Bugfix](../raw/bugfix/x/bugfix.md)",
+    "",
+    "## Maintenance",
+    "",
+  ].join("\n");
+
+  it("splits `### ` sections with dated bullets, links, and markers", () => {
+    const sections = parseAreaSections(wiki);
+    expect(sections.map((s) => s.name)).toEqual(["A화면", "프로젝트 운영"]);
+
+    const area = sections[0];
+    expect(area.isOperations).toBe(false);
+    expect(area.lines).toHaveLength(2);
+    expect(area.lines[0]).toMatchObject({
+      date: "2024-03-15",
+      primaryLink: "../raw/feature/a/prd.md",
+      adrLink: "../raw/feature/a/adr.md",
+      hasSuperseded: true,
+      hasCurrent: false,
+    });
+    expect(area.lines[1]).toMatchObject({ date: "2026-06-20", hasCurrent: true, hasSuperseded: false });
+
+    const ops = sections[1];
+    expect(ops.isOperations).toBe(true);
+    expect(ops.lines[0]).toMatchObject({ date: null, primaryLink: "../raw/bugfix/x/bugfix.md" });
+  });
+
+  it("stops a section at the next `##` heading (Maintenance is not a bullet)", () => {
+    const sections = parseAreaSections(wiki);
+    expect(sections).toHaveLength(2);
   });
 });
 

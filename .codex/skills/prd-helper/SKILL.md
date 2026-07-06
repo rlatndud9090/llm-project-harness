@@ -18,6 +18,10 @@ description: "PRD를 인터뷰·리서치·리뷰로 함께 작성할 때 사용
    건드리지 않는다.** 필요하면 PRD 승인을 미루고 `$adr-helper`로 넘기고, 불필요하면 PRD
    단독 승인으로 진행한다.
 
+review로 올리기 전에 이 작업이 발전시키는 **영역(area)**을 판단해 `prd.md` frontmatter
+`area:`에 적는다(wiki `### 헤딩`과 정확히 일치, broad 금지, 여러 개는 콤마). wiki
+그룹핑·타임라인이 이 값에서 파생된다.
+
 PRD는 한국어로 작성하고 `review` 상태로 둔다. **`adr.md`는 절대 편집하지 않는다** —
 `adr.md` 작성은 `$adr-helper`에서 `state.md`의 `stage`를 `adr-draft`로 올린 뒤에만
 허용된다(런타임 가드와 `harness:check`가 강제). 사용자 명시 승인 전에는 `approved`로

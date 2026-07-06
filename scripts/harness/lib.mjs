@@ -400,3 +400,145 @@ export function parseApprovalEvents(content) {
   }
   return events;
 }
+
+// ─── Harness CHANGELOG + consumer sync ──────────────────────────────────────
+// Each harness commit appends a `## <id>` entry (newest-first) to CHANGELOG.md
+// describing the change and the consumer action needed to reconcile. A consuming
+// project records the entry id it last reconciled in a `.harness-sync` file;
+// artifact-check fails until that id matches the harness CHANGELOG head, forcing
+// the reconciliation step (e.g. rewriting docs/wiki to a new format) on update.
+
+// The id of the newest CHANGELOG entry (the text after the first `## `).
+export function changelogHeadId(content) {
+  const match = /^##\s+(.+)$/m.exec(content);
+  return match ? match[1].trim() : null;
+}
+
+// The CHANGELOG text of every entry newer than `ackedId` (from the top down to,
+// but excluding, the acked entry). When `ackedId` is not found, returns all
+// entries. Used by harness:sync to show a consumer exactly what to reconcile.
+export function changelogEntriesAfter(content, ackedId) {
+  const out = [];
+  let capturing = false;
+  for (const line of content.split(/\r?\n/)) {
+    const match = /^##\s+(.+)$/.exec(line);
+    if (match) {
+      if (ackedId && match[1].trim() === ackedId) break;
+      capturing = true;
+    }
+    if (capturing) out.push(line);
+  }
+  return out.join("\n").trim();
+}
+
+// ─── Wiki area taxonomy (shared by wiki-ingest.mjs and artifact-check.mjs) ───
+// An "area" is a narrow functional/structural unit of the product (a screen, a
+// flow, an engine). It replaces the old ephemeral `--category` CLI argument with
+// a durable axis declared in a unit's primary-artifact frontmatter, so the wiki
+// can group each area's work units into a dated evolution timeline with a current
+// decision pointer. These constants live here (promoted from the two scripts) so
+// the writer (ingest) and the reader (check) share one source of truth.
+
+// Reserved operations buckets: flat, not a product lineage. Excluded from the
+// timeline/current-pointer gates so bumps and chores never need an area.
+export const OPERATIONS_CATEGORIES = ["프로젝트 운영", "Project Operations"];
+
+// Names too broad to be a real area; a feature must pick a narrower one.
+export const BROAD_FEATURE_CATEGORIES = new Set([
+  "Product & Architecture",
+  "Architecture",
+  "Product",
+  "Products",
+  "Feature",
+  "Features",
+  "General",
+  "Misc",
+  "Miscellaneous",
+  "Other",
+  "기능",
+  "전체 기능",
+  "아키텍처",
+  "공통",
+  "기타",
+]);
+
+// The wiki navigation label marking a section's current (latest) decision. Only
+// its count/placement is machine-checked; which line earns it stays model-judged.
+export const CURRENT_MARKER = "_(현재)_";
+
+// A unit's `area` frontmatter is a comma-separated list (one work unit may evolve
+// more than one area). Split, trim, and drop entries that are not real
+// declarations: an empty value, a leftover `#` hint value, or an unsubstituted
+// `{area}` kickoff token all read as "no area declared".
+export function parseAreaList(value) {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && !entry.startsWith("#") && !entry.includes("{"));
+}
+
+// The artifact that carries a unit's area declaration: prd.md for a feature,
+// bugfix.md for a bugfix. chore units have no product area (operations bucket).
+export function primaryArtifactName(type) {
+  if (type === "feature") return "prd.md";
+  if (type === "bugfix") return "bugfix.md";
+  return null;
+}
+
+export function readUnitAreas(unitDir, type) {
+  const artifact = primaryArtifactName(type);
+  if (!artifact) return [];
+  const filePath = path.join(unitDir, artifact);
+  if (!pathExists(filePath)) return [];
+  return parseAreaList(parseFrontmatter(readText(filePath))?.area);
+}
+
+// A dated wiki bullet begins with a backtick-wrapped ISO date, e.g.
+//   - `2026-01-01` **Title** — [PRD](../raw/feature/x/prd.md)
+export const DATED_BULLET_RE = /^-\s+`(\d{4}-\d{2}-\d{2})`/;
+
+export function datedBulletDate(line) {
+  return DATED_BULLET_RE.exec(line)?.[1] ?? null;
+}
+
+// Raw-unit links on a wiki line (only the ../raw/... targets the checker keys on).
+export function rawLinksInLine(line) {
+  return [...line.matchAll(/\]\((\.\.\/raw\/[^)]+)\)/g)].map((match) => match[1]);
+}
+
+// Parses the wiki index into its `### ` area sections with their bullet lines,
+// stopping each section at the next `##`/`###` heading. Shared by the ingest
+// (chronological insert) and the check (timeline/currency/grouping gates).
+export function parseAreaSections(wiki) {
+  const sections = [];
+  let current = null;
+  for (const line of wiki.split(/\r?\n/)) {
+    const heading = /^###\s+(.+?)\s*$/.exec(line);
+    if (heading) {
+      const name = heading[1].trim();
+      current = { name, isOperations: OPERATIONS_CATEGORIES.includes(name), lines: [] };
+      sections.push(current);
+      continue;
+    }
+    if (/^##\s+/.test(line)) {
+      current = null;
+      continue;
+    }
+    if (current && /^-\s/.test(line)) {
+      const links = rawLinksInLine(line);
+      current.lines.push({
+        raw: line,
+        date: datedBulletDate(line),
+        links,
+        primaryLink: links[0] ?? null,
+        adrLink: links.find((link) => link.endsWith("/adr.md")) ?? null,
+        hasCurrent: line.includes(CURRENT_MARKER),
+        // Match only inside the reserved `_(superseded by …)_` navigation marker,
+        // not a free-text title that happens to contain the words.
+        hasSuperseded: /_\(superseded by/i.test(line),
+      });
+    }
+  }
+  return sections;
+}

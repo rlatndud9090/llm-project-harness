@@ -61,6 +61,27 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 작업 중 제품/도메인 durable decision이 생기면 notes-only 예외를 중단하고 PRD/ADR
 또는 ADR을 추가한다.
 
+## CHANGELOG (하네스 provider 저장소)
+
+하네스 저장소에서 **공용 표면**(`harness/`, `scripts/harness/`, `.claude/`, `.codex/`)을
+바꾸는 커밋은 루트 `CHANGELOG.md` 맨 위에 항목을 추가한다(newest-first).
+
+```md
+## <YYYY-MM-DD> <slug>
+
+**변경**
+- 무엇이 바뀌었는가(하네스 관점).
+
+**소비자 조치 (필수)**
+- 이 커밋을 서브모듈로 반영하는 소비 프로젝트가 정합성을 위해 해야 할 일. 없으면 "없음".
+```
+
+- 소비 프로젝트는 서브모듈 업데이트 후 `npm run harness:sync`로 이 항목을 읽고 반영한 뒤
+  `--ack`로 확인한다. 확인 전에는 소비자의 `harness:check`가 막는다(`.harness-sync` 게이트).
+- `harness:hooks`를 설치한 저장소는 pre-commit의 `verify-changelog`가 공용 표면 변경 커밋에
+  CHANGELOG 항목을 강제한다(소비 프로젝트에서는 no-op).
+- 소비 프로젝트 자신의 제품 커밋은 이 규칙 대상이 아니다(하네스 CHANGELOG는 하네스가 쓴다).
+
 ## 품질 게이트
 
 기본 게이트는 아래 명령 하나다.

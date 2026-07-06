@@ -25,6 +25,9 @@ adr_status: proposed
 - 단계 순서: `kickoff` → `prd-draft` → `prd-review` → (ADR 필요 시 `adr-draft` →
   `adr-review`) → `approved` → `implementing` → `integrated`. ADR이 불필요하면 ADR 단계를
   건너뛰고 PRD 단독 승인으로 `approved`에 진입한다.
+- 이 unit이 속한 **area(영역)**는 이 원장이 아니라 `prd.md`(feature)/`bugfix.md`(bugfix)
+  frontmatter의 `area:`에 산다. wiki는 그 area의 `### 헤딩` 아래 시간순으로 이 unit을 잇고,
+  `harness:check`가 선언한 area와 렌더된 헤딩의 일치를 강제한다.
 
 ## 단계 로그 (append-only)
 

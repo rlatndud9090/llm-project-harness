@@ -54,6 +54,18 @@ npm run harness:kickoff -- --title "데이터 계약"
 npm run harness:kickoff -- --type feature --slug data-contract --title "데이터 계약"
 ```
 
+### `--area` (선택): 영역 시드
+
+이 unit이 발전시키는 기능/구조 영역을 이미 알면 `--area "<영역>"`로 시드한다(여러
+영역은 콤마). kickoff이 `prd.md`(feature)/`bugfix.md`(bugfix) frontmatter의 `area:`에
+값을 채운다. `$next-feature`가 `docs/raw/.next-unit` 앵커에 영역을 남겼다면 kickoff이
+그 3번째 필드를 자동으로 읽어 시드한다. 미지정 시 `area:`는 비어 있고 `$prd-helper`가
+채운다.
+
+```sh
+npm run harness:kickoff -- --title "데이터 계약" --area "데이터 계약"
+```
+
 ## 생성 파일
 
 | type | 생성 파일 |

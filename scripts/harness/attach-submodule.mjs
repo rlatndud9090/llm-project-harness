@@ -42,6 +42,7 @@ for (const [toolDir, childDir] of PRUNE_ADAPTER_DIRS) pruneStaleLinks(toolDir, c
 if (prune) pruneEmptyLegacyAdapterDirs();
 
 ensureProjectDocs();
+ensureSyncFile();
 if (writeClaudeSettings) ensureClaudeSettings();
 if (updatePackageScripts) ensurePackageScripts();
 writeReport();
@@ -213,7 +214,7 @@ function ensureProjectDocs() {
     `## Harness Maintenance
 
 - 새 raw work unit은 \`docs/raw/{feature,bugfix,chore}/branch-slug/\` 아래에 둔다.
-- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug> --category "<분류>"\`를 실행한다.
+- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug> --area "<영역>"\`를 실행한다(레거시 별칭: \`--category\`).
 - 기존 문서는 강제로 이동하지 않는다. 새 작업부터 raw/wiki 규칙을 적용한다.
 `,
   );
@@ -265,6 +266,22 @@ This project uses the shared LLM Project Harness mounted at \`.harness\`.
   );
 }
 
+// Seeds `.harness-sync` with the current CHANGELOG head on first adoption (when
+// the marker is missing), so a newly-attached project starts synced at the
+// current version. It never advances an existing marker — once a consumer has a
+// committed `.harness-sync`, bumping the submodule makes it stale and
+// harness:check forces reconciliation via `harness:sync --ack`.
+function ensureSyncFile() {
+  const changelogPath = path.join(harnessRoot, "CHANGELOG.md");
+  if (!exists(changelogPath)) return;
+  const head = (/^##\s+(.+)$/m.exec(fs.readFileSync(changelogPath, "utf8")) ?? [])[1]?.trim();
+  if (!head) return;
+
+  const syncPath = path.join(projectRoot, ".harness-sync");
+  if (exists(syncPath)) return;
+  ensureFile(syncPath, `${head}\n`);
+}
+
 function ensurePackageScripts() {
   const packagePath = path.join(projectRoot, "package.json");
   const desiredScripts = {
@@ -272,6 +289,7 @@ function ensurePackageScripts() {
     "harness:approve": "node .harness/scripts/harness/approve.mjs",
     "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
     "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
+    "harness:sync": "node .harness/scripts/harness/sync.mjs",
     "harness:gate": "node .harness/scripts/harness/gate.mjs",
     "harness:hooks": "node .harness/scripts/harness/install-hooks.mjs",
   };
@@ -280,6 +298,7 @@ function ensurePackageScripts() {
     "harness:approve": "node scripts/harness/approve.mjs",
     "harness:ingest": "node scripts/harness/wiki-ingest.mjs",
     "harness:check": "node scripts/harness/artifact-check.mjs",
+    "harness:sync": "node scripts/harness/sync.mjs",
     "harness:gate": "node scripts/harness/gate.mjs",
     "harness:hooks": "node scripts/harness/install-hooks.mjs",
   };

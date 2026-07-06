@@ -20,9 +20,15 @@ const checkCommand = typeof args.command === "string" ? args.command : "npm run 
 const verifyScript = path.join(findHarnessRoot(), "scripts", "harness", "verify-commit-msg.mjs");
 const verifyMsgCommand = `node "${toPosix(path.relative(REPO_ROOT, verifyScript)) || verifyScript}" "$1"`;
 
+// The pre-commit runs the artifact check and, in the provider repo, requires a
+// CHANGELOG entry for shared-surface changes (verify-changelog no-ops elsewhere).
+const changelogScript = path.join(findHarnessRoot(), "scripts", "harness", "verify-changelog.mjs");
+const changelogCommand = `node "${toPosix(path.relative(REPO_ROOT, changelogScript)) || changelogScript}"`;
+const preCommitCommand = typeof args.command === "string" ? checkCommand : `${checkCommand} && ${changelogCommand}`;
+
 const hooksDir = resolveHooksDir();
 
-installHook("pre-commit", checkCommand);
+installHook("pre-commit", preCommitCommand);
 installHook("commit-msg", verifyMsgCommand);
 
 console.log("[install-hooks] ok");

@@ -61,11 +61,16 @@ package.json
     "harness:approve": "node .harness/scripts/harness/approve.mjs",
     "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
     "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
+    "harness:sync": "node .harness/scripts/harness/sync.mjs",
     "harness:gate": "node .harness/scripts/harness/gate.mjs",
     "harness:hooks": "node .harness/scripts/harness/install-hooks.mjs"
   }
 }
 ```
+
+최초 장착 시 `attach-submodule.mjs`는 현재 하네스 CHANGELOG head를 `.harness-sync`에
+기록한다(소비 프로젝트가 현재 버전에서 정합성 맞춘 상태로 시작). 이후 업데이트 때는
+아래 "업데이트"의 정합성 단계를 거친다.
 
 ## ClaudeCode background 격리 설정
 
@@ -207,14 +212,34 @@ npm run llm-harness:check
 git submodule update --remote .harness
 node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --dry-run
 node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
+npm run harness:sync            # 이후 CHANGELOG 항목의 소비자 조치를 읽는다
+# ↳ 각 항목의 소비자 조치를 실제로 반영한다(예: 위키를 최신 정책으로 재작성)
+npm run harness:sync -- --ack   # 반영 확인 → .harness-sync를 CHANGELOG head로 갱신
 npm run harness:gate
 git status --short
-git add .harness
+git add .harness .harness-sync
 git commit
 ```
 
+### 정합성 단계 (필수, 기계강제)
+
+서브모듈을 최신 커밋으로 올리면 소비 프로젝트의 `.harness-sync`가 하네스
+CHANGELOG head보다 뒤처진다. 이때 `harness:check`가 실패한다(정합성 미완료). 반드시
+아래를 거친다.
+
+1. `npm run harness:sync` — 마지막으로 맞춘 이후의 CHANGELOG 항목과 **소비자 조치**를 읽는다.
+2. 각 항목의 소비자 조치를 실제로 반영한다. 예: 이번 area-lineage 개편은
+   `docs/wiki/index.md`를 **영역(area)별 시간순 계보 체계로 전면 재작성**하고, 기존
+   `prd.md`/`bugfix.md` frontmatter에 `area:`를 추가하도록 요구한다.
+3. `npm run harness:sync -- --ack` — 반영을 확인한다(`.harness-sync`가 head로 갱신).
+4. `.harness-sync`를 서브모듈 pointer와 함께 커밋한다.
+
+이 게이트는 서브모듈만 bump하고 정책 변화를 놓치는 drift를 우회 불가능하게 막는다
+(로컬 훅과 달리 `harness:check`/CI에서 강제된다).
+
 attach를 다시 실행하면 새 하네스 어댑터와 package script를 추가하고, 이름이
-바뀌거나 제거된 어댑터의 stale symlink를 기본으로 정리한다.
+바뀌거나 제거된 어댑터의 stale symlink를 기본으로 정리한다. (`.harness-sync`는 이미
+있으면 건드리지 않으므로 정합성 단계를 우회하지 않는다.)
 
 - stale 정리는 기본 동작이라 별도 플래그가 필요 없다.
 - 정리 대상은 이전 attach가 만든 symlink 중 하네스에서 타겟이 사라진 것뿐이다.

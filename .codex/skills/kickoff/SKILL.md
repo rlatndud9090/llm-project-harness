@@ -14,7 +14,9 @@ npm run harness:kickoff -- --title "<한국어 제목>"
 ```
 
 현재 브랜치가 `main`이거나 유효한 work branch가 아니면 `--type`, `--slug`를
-명시한다.
+명시한다. 이 unit이 발전시키는 영역을 알면 `--area "<영역>"`로 시드하면
+`prd.md`/`bugfix.md` frontmatter `area:`에 채워진다(여러 개는 콤마). `$next-feature`
+앵커에 영역이 있으면 kickoff이 자동으로 시드한다.
 
 무엇을 할지 아직 정하지 못했으면 먼저 `$next-feature`로 후보를 추천받는다.
 raw 골격이 생기면 `$prd-helper`로 PRD 작성을 잇는다.

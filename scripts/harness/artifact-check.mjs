@@ -2,7 +2,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  BROAD_FEATURE_CATEGORIES,
+  CURRENT_MARKER,
+  OPERATIONS_CATEGORIES,
   POST_APPROVAL_STAGES,
+  changelogHeadId,
   REPO_ROOT,
   STAGE_VALUES,
   adrBodyLooksAuthored,
@@ -18,10 +22,13 @@ import {
   isHarnessRepository,
   listMarkdownFiles,
   parseApprovalEvents,
+  parseAreaSections,
   parseFrontmatter,
   parseWorkBranch,
   pathExists,
+  primaryArtifactName,
   readText,
+  readUnitAreas,
   repoPath,
   toPosix,
 } from "./lib.mjs";
@@ -29,25 +36,9 @@ import {
 const errors = [];
 const harnessRoot = findHarnessRoot();
 const harnessRepoMode = isHarnessRepository();
-const DISALLOWED_FEATURE_WIKI_CATEGORIES = new Set([
-  "Product & Architecture",
-  "Architecture",
-  "Product",
-  "Products",
-  "Feature",
-  "Features",
-  "General",
-  "Misc",
-  "Miscellaneous",
-  "Other",
-  "기능",
-  "전체 기능",
-  "아키텍처",
-  "공통",
-  "기타",
-  "Project Operations",
-  "프로젝트 운영",
-]);
+// Broad buckets a feature must never live in — the narrow-area rule, shared with
+// wiki-ingest via lib (broad feature names ∪ reserved operations buckets).
+const DISALLOWED_FEATURE_WIKI_CATEGORIES = new Set([...BROAD_FEATURE_CATEGORIES, ...OPERATIONS_CATEGORIES]);
 
 function addError(message) {
   errors.push(message);
@@ -100,6 +91,30 @@ function assertProjectDocsPresent() {
     if (!pathExists(requiredPath)) {
       addError(`missing consuming project artifact: ${toPosix(path.relative(process.cwd(), requiredPath))}`);
     }
+  }
+}
+
+// Consumer reconciliation gate: after updating the `.harness` submodule, the
+// project must reconcile the new CHANGELOG entries (each carries a required
+// consumer action, e.g. rewriting docs/wiki) and record it with harness:sync.
+// Fails until `.harness-sync` matches the harness CHANGELOG head. Skips in the
+// provider repo and when the submodule predates the changelog.
+function assertHarnessSync() {
+  if (harnessRepoMode) return;
+
+  const changelogPath = harnessPath("CHANGELOG.md");
+  if (!pathExists(changelogPath)) return;
+
+  const head = changelogHeadId(readText(changelogPath));
+  if (!head) return;
+
+  const syncPath = repoPath(".harness-sync");
+  const acked = pathExists(syncPath) ? readText(syncPath).trim() : "";
+  if (acked !== head) {
+    addError(
+      `harness updated but not reconciled: .harness-sync "${acked || "(missing)"}" != CHANGELOG head "${head}". ` +
+        `Run "npm run harness:sync" to read the required consumer actions, apply them, then "npm run harness:sync --ack".`,
+    );
   }
 }
 
@@ -178,6 +193,13 @@ function parseWikiCategories(wiki) {
       categories.push(current);
       continue;
     }
+    // Close the section at the next `##` heading so a following (non-area) `## `
+    // section's raw links are not mis-attributed to the preceding area. This keeps
+    // parseWikiCategories consistent with lib's parseAreaSections.
+    if (/^##\s+/.test(line)) {
+      current = null;
+      continue;
+    }
     if (current) current.lines.push(line);
   }
   return categories;
@@ -190,6 +212,172 @@ function findCategoryForLink(categories, relativeLink) {
     }
   }
   return null;
+}
+
+// ─── area 축 기계강제 (consumer 모드 전용) ──────────────────────────────────
+// "구조는 기계강제, 의미는 모델재량": area 존재(활성 작업)·broad 금지·선언↔렌더
+// 일치·날짜 위조·현재 마커 구조 불변식만 본다. 어느 area인지·발전 서사·어느 줄이
+// 현재인지·주석 문구는 모델이 채운다.
+
+// 선언한 feature area가 broad 버킷이면 차단(선언 시에만 발동 = opt-in). 그리고 현재
+// 작업 브랜치의 unit이 review/approved(bugfix는 review/fixed)면 area 선언을 강제한다.
+// assertCurrentBranchRawUnit과 같은 current-branch 스코프라 레거시 unit·main/HEAD
+// 검사에는 무영향.
+function assertAreaField() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  // A declared area (feature or bugfix) must not be a broad bucket.
+  for (const type of ["feature", "bugfix"]) {
+    for (const unitDir of unitDirs(type)) {
+      const rel = toPosix(path.relative(process.cwd(), unitDir));
+      for (const area of readUnitAreas(unitDir, type)) {
+        if (BROAD_FEATURE_CATEGORIES.has(area) || OPERATIONS_CATEGORIES.includes(area)) {
+          addError(`${type} area "${area}" is too broad; declare a narrower functional/structural area: ${rel}`);
+        }
+      }
+    }
+  }
+
+  // Hard-require an area only on the active feature work branch. bugfix area is
+  // optional by design (template + ingest fall back to the operations bucket), so
+  // it is never required. Scoped to the current branch (like
+  // assertCurrentBranchRawUnit) so main/HEAD and legacy units are untouched.
+  const branch = getCurrentBranch();
+  if (branch === "main" || branch === "HEAD") return;
+  const parsed = parseWorkBranch(branch);
+  if (!parsed || parsed.invalid || parsed.type !== "feature") return;
+
+  const unitDir = repoPath("docs", "raw", parsed.type, parsed.slug);
+  const artifactPath = path.join(unitDir, "prd.md");
+  if (!pathExists(artifactPath)) return;
+
+  const status = parseFrontmatter(readText(artifactPath))?.status;
+  if (status !== "review" && status !== "approved") return;
+
+  if (readUnitAreas(unitDir, "feature").length === 0) {
+    const rel = toPosix(path.relative(process.cwd(), unitDir));
+    addError(
+      `active feature unit at status "${status}" must declare an area in prd.md frontmatter (area: "<영역>", 여러 개는 콤마): ${rel}`,
+    );
+  }
+}
+
+// 선언한 area 집합 == 위키에서 링크된 `### 헤딩` 집합(양방향). frontmatter(진실)와
+// wiki(뷰)의 그룹핑 drift·조용한 개명을 차단. 미선언 unit은 skip(opt-in).
+function assertAreaGrouping() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
+
+  const wikiPath = repoPath("docs", "wiki", "index.md");
+  const categories = parseWikiCategories(readText(wikiPath));
+
+  for (const type of ["feature", "bugfix"]) {
+    for (const unitDir of unitDirs(type)) {
+      const declared = readUnitAreas(unitDir, type);
+      if (declared.length === 0) continue;
+
+      const rel = toPosix(path.relative(process.cwd(), unitDir));
+      const linkedHeadings = findLinkedHeadings(categories, wikiPath, unitDir);
+      const declaredSet = new Set(declared);
+
+      for (const area of declaredSet) {
+        if (!linkedHeadings.has(area)) {
+          addError(`${type} unit declares area "${area}" but is not linked under "### ${area}": ${rel}`);
+        }
+      }
+      for (const heading of linkedHeadings) {
+        if (OPERATIONS_CATEGORIES.includes(heading)) continue;
+        if (!declaredSet.has(heading)) {
+          addError(
+            `${type} unit is linked under "### ${heading}" but does not declare area "${heading}" in ${primaryArtifactName(type)}: ${rel}`,
+          );
+        }
+      }
+    }
+  }
+}
+
+// Every `### ` heading under which any of the unit's md links appears. Unlike
+// findCategoryForLink (first match only), this returns all of them, so a
+// multi-area unit linked under several headings is fully accounted for.
+function findLinkedHeadings(categories, wikiPath, unitDir) {
+  const headings = new Set();
+  const relLinks = fs
+    .readdirSync(unitDir)
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => toPosix(path.relative(path.dirname(wikiPath), path.join(unitDir, entry))));
+  for (const category of categories) {
+    if (category.lines.some((line) => relLinks.some((relLink) => line.includes(`](${relLink})`)))) {
+      headings.add(category.name);
+    }
+  }
+  return headings;
+}
+
+// 시간축 구조 게이트(비운영 섹션). date-parity: 렌더된 날짜가 링크된 raw frontmatter
+// date와 일치(위조 타임라인 hard 차단). ordering: 날짜 있는 줄이 오름차순이 아니면
+// nudge(date 교정↔멱등 충돌 흡수). 날짜 없는 레거시 줄은 둘 다 skip.
+function assertAreaTimeline() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
+
+  const wikiPath = repoPath("docs", "wiki", "index.md");
+  for (const section of parseAreaSections(readText(wikiPath))) {
+    if (section.isOperations) continue;
+    const dated = section.lines.filter((entry) => entry.date);
+
+    for (const entry of dated) {
+      // The date source is the unit's dated artifact (prd.md/bugfix.md), found by
+      // suffix so a manual [ADR]-first reorder of the line does not misfire.
+      const dateLink = entry.links.find((link) => link.endsWith("/prd.md") || link.endsWith("/bugfix.md")) ?? entry.primaryLink;
+      if (!dateLink) continue;
+      const target = path.resolve(path.dirname(wikiPath), dateLink);
+      if (!pathExists(target)) continue; // broken link is assertWikiLinks' job
+      const rawDate = parseFrontmatter(readText(target))?.date;
+      if (rawDate && rawDate !== entry.date) {
+        addError(
+          `wiki timeline date ${entry.date} does not match ${dateLink} frontmatter date ${rawDate} (### ${section.name})`,
+        );
+      }
+    }
+
+    for (let index = 1; index < dated.length; index += 1) {
+      if (dated[index].date < dated[index - 1].date) {
+        console.warn(
+          `[harness:check] WARNING: "### ${section.name}" 타임라인이 시간순이 아닙니다 (${dated[index - 1].date} → ${dated[index].date}); 오래된→최신으로 정렬하세요.`,
+        );
+        break;
+      }
+    }
+  }
+}
+
+// 현재 포인터 구조 불변식(비운영 섹션). 섹션당 현재 마커 최대 1개. 현재 마커 줄은
+// superseded 주석을 함께 갖지 못하고, 그 줄의 ADR이 superseded 상태여도 안 된다.
+// "정확히 하나의 현재"는 강제하지 않는다(현재=파생, 최하단이 암묵적 현재).
+function assertAreaCurrency() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
+
+  const wikiPath = repoPath("docs", "wiki", "index.md");
+  for (const section of parseAreaSections(readText(wikiPath))) {
+    if (section.isOperations) continue;
+    const current = section.lines.filter((entry) => entry.hasCurrent);
+    if (current.length > 1) {
+      addError(`"### ${section.name}" marks ${current.length} current decisions (${CURRENT_MARKER}); at most one line may be current.`);
+    }
+    for (const entry of current) {
+      if (entry.hasSuperseded) {
+        addError(`"### ${section.name}" line marked ${CURRENT_MARKER} is also marked superseded; a superseded decision is not current.`);
+      }
+      if (entry.adrLink) {
+        const target = path.resolve(path.dirname(wikiPath), entry.adrLink);
+        const adrStatus = pathExists(target) ? parseFrontmatter(readText(target))?.status : undefined;
+        if (adrStatus === "superseded" || adrStatus === "deprecated") {
+          addError(
+            `"### ${section.name}" line marked ${CURRENT_MARKER} links a ${adrStatus} ADR (${entry.adrLink}); move ${CURRENT_MARKER} to the current decision.`,
+          );
+        }
+      }
+    }
+  }
 }
 
 function assertRawUnits() {
@@ -779,9 +967,14 @@ function assertAdapterParity() {
 assertHarnessShape();
 assertNoHarnessDocsNamespace();
 assertProjectDocsPresent();
+assertHarnessSync();
 assertWikiShape();
 assertWikiLinks();
 assertWikiFeatureTaxonomy();
+assertAreaField();
+assertAreaGrouping();
+assertAreaTimeline();
+assertAreaCurrency();
 assertRawUnits();
 assertRawUnitsLinked();
 assertCurrentBranchRawUnit();

@@ -4,6 +4,8 @@ date: "{YYYY-MM-DD}"
 status: draft # draft | review | approved | rejected
 approval:
 unit_type: feature
+# area(영역): 이 unit이 발전시키는 기능/구조 단위(들). 위키 ### 헤딩과 정확히 일치, 여러 개는 콤마로 나열, broad 바구니 금지. $prd-helper가 채운다.
+area:
 branch: "feature/{slug}"
 raw_path: "docs/raw/feature/{slug}"
 ---
