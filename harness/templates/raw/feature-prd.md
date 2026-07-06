@@ -6,6 +6,8 @@ approval:
 unit_type: feature
 # area(영역): 이 unit이 발전시키는 기능/구조 단위(들). 위키 ### 헤딩과 정확히 일치, 여러 개는 콤마로 나열, broad 바구니 금지. $prd-helper가 채운다.
 area:
+# parent_prd(선택): 이 PRD가 세부화하는 상위/부모 PRD의 상대경로(예: ../<상위-slug>/prd.md). 상위 계약을 잇는 후속 피처면 채운다. 없으면 비움.
+parent_prd:
 branch: "feature/{slug}"
 raw_path: "docs/raw/feature/{slug}"
 ---

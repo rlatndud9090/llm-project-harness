@@ -180,6 +180,14 @@ function sanitizeReason(text) {
   return cleaned || "사용자 명시 승인";
 }
 
+// Finds a real `## <name>` heading by matching at the start of a line, so a
+// backtick mention of the heading inside the state.md rules prose (e.g.
+// "아래 `## 승인 이벤트`에 …") is never mistaken for the heading itself.
+function headingIndex(content, name) {
+  const match = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^\\n]*$`, "m").exec(content);
+  return match ? match.index : -1;
+}
+
 // Replace the "(아직 승인 없음 …)" placeholder with the approval lines, or insert
 // them right under the "## 승인 이벤트" heading when the placeholder is gone.
 function recordApprovalEvents(content, lines) {
@@ -188,10 +196,9 @@ function recordApprovalEvents(content, lines) {
   if (placeholder.test(content)) {
     return content.replace(placeholder, block);
   }
-  const heading = "## 승인 이벤트";
-  const index = content.indexOf(heading);
+  const index = headingIndex(content, "## 승인 이벤트");
   if (index === -1) {
-    return `${content.trimEnd()}\n\n${heading}\n\n${block}\n`;
+    return `${content.trimEnd()}\n\n## 승인 이벤트\n\n${block}\n`;
   }
   const lineEnd = content.indexOf("\n", index);
   const cut = lineEnd === -1 ? content.length : lineEnd;
@@ -201,11 +208,10 @@ function recordApprovalEvents(content, lines) {
 // Append a bullet at the end of the "## 단계 로그" section (before the next
 // heading, or end of file).
 function appendStageLog(content, line) {
-  const heading = "## 단계 로그";
-  const index = content.indexOf(heading);
+  const index = headingIndex(content, "## 단계 로그");
   if (index === -1) return `${content.trimEnd()}\n${line}\n`;
 
-  const nextHeading = content.indexOf("\n## ", index + heading.length);
+  const nextHeading = content.indexOf("\n## ", content.indexOf("\n", index));
   const insertAt = nextHeading === -1 ? content.length : nextHeading;
   const before = content.slice(0, insertAt).trimEnd();
   const after = content.slice(insertAt);

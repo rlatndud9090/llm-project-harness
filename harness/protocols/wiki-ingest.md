@@ -12,6 +12,22 @@ raw unit이 추가되거나 상태가 의미 있게 바뀌면 `docs/wiki/index.m
 npm run harness:ingest -- docs/raw/<type>/<slug> --area "<영역>"
 ```
 
+## 실행 시점 (2-touch, 정본)
+
+ingest는 멱등이라 여러 번 실행해도 안전하며, 라이프사이클에서 **두 번** 자연스럽게 나온다.
+
+1. **첫 touch — `$prd-helper`(PRD를 review로 올릴 때).** 이때 area는 이미 frontmatter에
+   선언돼 있어야 한다(`$prd-helper`가 채운다). ingest가 그 area 아래 dated 링크를 만들어
+   `harness:check`의 "모든 raw unit은 위키에 링크돼야 한다"를 통과시키고 초안을 navigable하게
+   한다. 아직 `_(현재)_`는 붙이지 않는다.
+2. **둘째 touch — `$feature-develop`/통합(커밋 직전).** 구현이 끝나 결정이 확정된 뒤
+   `harness:ingest`를 다시 돌린다(멱등 — 중복 없음). 이 시점에 계보를 **큐레이션**한다:
+   이 결정이 같은 area의 이전 결정을 대체하면 이전 줄에 `_(superseded by …)_`, 이 줄에
+   `_(현재)_`를 단다. 즉 "현재 최신 결정" 표시는 완료 시점에 확정한다.
+
+요약: **area 판단·선언은 `$next-feature`/`$prd-helper`(의미), 첫 링크는 `$prd-helper`,
+계보 큐레이션·최종 확인은 통합/커밋**이다.
+
 ## 영역(area)이란
 
 영역은 앱의 **좁은 기능/구조 단위**다(예: `A화면`, `인증 플로우`, `데이터 동기화

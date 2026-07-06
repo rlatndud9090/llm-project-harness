@@ -137,6 +137,16 @@ describe("isForbiddenStageTransition", () => {
     expect(isForbiddenStageTransition("approved", "implementing")).toBe(false);
     expect(isForbiddenStageTransition("integrated", "implementing")).toBe(false);
   });
+
+  it("allows resuming ADR authoring after a PRD-first approval (approved -> adr phase)", () => {
+    // PRD approved first, then the ADR is authored: entering the ADR phase from
+    // `approved` is not an un-approval (the PRD stays approved on its own axis).
+    expect(isForbiddenStageTransition("approved", "adr-draft")).toBe(false);
+    expect(isForbiddenStageTransition("approved", "adr-review")).toBe(false);
+    // but a true rewind of the PRD-approval process is still blocked
+    expect(isForbiddenStageTransition("approved", "prd-review")).toBe(true);
+    expect(isForbiddenStageTransition("approved", "awaiting-approval")).toBe(true);
+  });
 });
 
 describe("setFrontmatterField", () => {

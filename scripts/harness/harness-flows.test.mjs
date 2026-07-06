@@ -1342,6 +1342,101 @@ function runGuard(payload) {
   });
 }
 
+describe("harness backlog fixes", () => {
+  it("approve places the stage log under the real heading, not the rules prose (backtick literal)", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      runKickoff(projectRoot, "feature", "approve-log", "승인 로그");
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "approve-log");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "승인 로그", status: "review", unit_type: "feature", area: "승인 영역" })}\n${fullPrdBody()}`,
+      );
+
+      const approve = runApprove(projectRoot, "docs/raw/feature/approve-log", ["--quote", "그래 이 PRD랑 ADR 승인할게 진행해", "--adr"]);
+      expect(approve.status).toBe(0);
+
+      const state = read(path.join(unitDir, "state.md"));
+      const logHeadingIdx = state.indexOf("## 단계 로그 (append-only)");
+      const approvedLogIdx = state.indexOf("approved: 사용자 명시 승인");
+      expect(logHeadingIdx).toBeGreaterThan(-1);
+      // The log must land in the real section (after its heading), not spliced into
+      // the rules prose above it that merely mentions `## 단계 로그` in backticks.
+      expect(approvedLogIdx).toBeGreaterThan(logHeadingIdx);
+    });
+  });
+
+  it("assertNoPlaceholders ignores code braces but still catches a real prose token", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const codeDir = path.join(projectRoot, "docs", "raw", "feature", "codeok");
+      writeFile(
+        path.join(codeDir, "prd.md"),
+        `${frontmatter({ title: "codeok", status: "review", unit_type: "feature", area: "코드영역" })}\n${fullPrdBody()}\n\n상태 표기는 \`{ EXPLORE, REWARD }\`로 둔다.\n`,
+      );
+      writeFile(path.join(codeDir, "adr.md"), `${frontmatter({ title: "codeok", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      ingestArea(projectRoot, "docs/raw/feature/codeok");
+
+      const tokenDir = path.join(projectRoot, "docs", "raw", "feature", "realtoken");
+      writeFile(
+        path.join(tokenDir, "prd.md"),
+        `${frontmatter({ title: "realtoken", status: "review", unit_type: "feature", area: "토큰영역" })}\n${fullPrdBody()}\n\n남은 템플릿 토큰 {이름} 이 있다.\n`,
+      );
+      writeFile(path.join(tokenDir, "adr.md"), `${frontmatter({ title: "realtoken", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      ingestArea(projectRoot, "docs/raw/feature/realtoken");
+
+      const out = `${runCheck(projectRoot).stdout}${runCheck(projectRoot).stderr}`;
+      expect(out).toContain("{이름}"); // real leftover token in prose is caught
+      expect(out).not.toContain("EXPLORE"); // inline-code braces are not
+    });
+  });
+
+  it("assertPrdReferences fails a parent_prd that points to a missing file", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "child", { status: "review", area: "자식영역" });
+      const prdPath = path.join(projectRoot, "docs", "raw", "feature", "child", "prd.md");
+      writeFile(prdPath, read(prdPath).replace("unit_type: feature", "unit_type: feature\nparent_prd: ../missing-parent/prd.md"));
+      ingestArea(projectRoot, "docs/raw/feature/child");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("parent_prd points to a missing file");
+    });
+  });
+
+  it("assertPrdReferences passes a parent_prd that resolves", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "parent", { status: "review", area: "부모영역" });
+      seedAreaFeature(projectRoot, "child", { status: "review", area: "자식영역" });
+      const childPrd = path.join(projectRoot, "docs", "raw", "feature", "child", "prd.md");
+      writeFile(childPrd, read(childPrd).replace("unit_type: feature", "unit_type: feature\nparent_prd: ../parent/prd.md"));
+      ingestArea(projectRoot, "docs/raw/feature/parent");
+      ingestArea(projectRoot, "docs/raw/feature/child");
+
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("wiki-ingest warns when creating a new area while other areas exist (typo guard)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "first", { status: "review", area: "A화면" });
+      ingestArea(projectRoot, "docs/raw/feature/first");
+      seedAreaFeature(projectRoot, "second", { status: "review", area: "A 화면" }); // typo: extra space
+
+      const result = spawnSync(
+        process.execPath,
+        [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/second"],
+        { cwd: projectRoot, encoding: "utf8" },
+      );
+      expect(`${result.stdout}${result.stderr}`).toContain("새 영역 생성");
+      expect(`${result.stdout}${result.stderr}`).toContain("A화면"); // shows the existing area to compare against
+    });
+  });
+});
+
 function frontmatter(fields) {
   const lines = Object.entries({ date: "2026-01-01", ...fields }).map(([key, value]) => `${key}: ${value}`);
   return ["---", ...lines, "---"].join("\n");

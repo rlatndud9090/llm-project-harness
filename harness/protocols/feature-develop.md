@@ -162,7 +162,11 @@ npm run harness:ingest -- docs/raw/feature/<slug>
 npm run harness:gate
 ```
 
-성공 후 명시적 파일만 stage하고 Lore commit을 작성한다.
+이 `harness:ingest`는 wiki lineage의 **둘째 touch**다(멱등 — `$prd-helper`의 첫 링크를
+중복 없이 재확인). 구현·결정이 확정된 지금 계보를 **큐레이션**한다: 이 결정이 같은 area의
+이전 결정을 대체하면 이전 줄에 `_(superseded by …)_`, 이 줄에 `_(현재)_`를 단다
+(`wiki-ingest.md` "실행 시점", `adr-helper.md` 참고). 성공 후 명시적 파일만 stage하고
+Lore commit을 작성한다.
 
 ## 실패 모드
 

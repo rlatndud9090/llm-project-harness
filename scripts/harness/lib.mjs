@@ -300,7 +300,16 @@ export const PRE_APPROVAL_STAGES = new Set([
   "awaiting-approval",
 ]);
 
+// Stages that ARE the ADR authoring phase. Re-entering these from `approved` is
+// legitimate when the PRD was approved first and the ADR is still being written
+// (the PRD stays approved on its own axis, so this is not an un-approval).
+const ADR_PHASE_STAGES = new Set(["adr-draft", "adr-review"]);
+
 export function isForbiddenStageTransition(fromStage, toStage) {
+  // Allow resuming ADR authoring after a PRD-first approval. The PRD approval is
+  // still protected on the prd_status axis (approval events + status transitions),
+  // so moving `approved` -> `adr-draft`/`adr-review` does not rewind it.
+  if (fromStage === "approved" && ADR_PHASE_STAGES.has(toStage)) return false;
   return POST_APPROVAL_STAGES.has(fromStage) && PRE_APPROVAL_STAGES.has(toStage);
 }
 

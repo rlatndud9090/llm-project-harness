@@ -543,7 +543,12 @@ function assertNoPlaceholders() {
     const relative = toPosix(path.relative(process.cwd(), filePath));
     const body = bodyAfterFrontmatter(content);
 
-    const tokenMatch = body.match(/\{[^}\n]{1,40}\}/);
+    // Strip code fences and inline code before the `{…}` token scan: an accepted
+    // ADR may legitimately show dict/enum literals (e.g. `Phase { EXPLORE }`) that
+    // are not leftover template tokens. Real leftover tokens ({이름}/{제목}/{slug})
+    // live in prose/headings, not code, so this keeps the token gate meaningful.
+    const prose = body.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
+    const tokenMatch = prose.match(/\{[^}\n]{1,40}\}/);
     if (tokenMatch) {
       addError(`${baseName} (status ${fields.status}) still has an unsubstituted template token ${tokenMatch[0]}: ${relative}`);
     }
@@ -772,6 +777,25 @@ function assertAdrPhaseGate() {
 // ADR frontmatter의 related_prd/supersedes가 실제 파일을 가리키는지 검증한다.
 // assertWikiLinks와 같은 클래스의 link-resolution 게이트다. 값이 비어 있으면
 // 건너뛴다(supersedes는 비어 있는 게 정상이다). 경로는 ADR 디렉토리 기준이다.
+// prd.md frontmatter의 parent_prd가 실제 파일을 가리키는지 검증(assertAdrReferences와
+// 같은 클래스의 link-resolution 게이트). 비어 있으면 skip(대부분 정상). 상위 계약(부모
+// PRD)을 세부화하는 후속 feature가 frontmatter로 계보를 잇게 한다.
+function assertPrdReferences() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
+
+  for (const filePath of listMarkdownFiles(repoPath("docs", "raw"))) {
+    if (path.basename(filePath) !== "prd.md") continue;
+
+    const value = parseFrontmatter(readText(filePath))?.parent_prd;
+    if (!value) continue;
+
+    const relative = toPosix(path.relative(process.cwd(), filePath));
+    if (!pathExists(path.resolve(path.dirname(filePath), value))) {
+      addError(`prd.md parent_prd points to a missing file (${value}): ${relative}`);
+    }
+  }
+}
+
 function assertAdrReferences() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "raw"))) return;
 
@@ -984,6 +1008,7 @@ assertRequiredSections();
 assertStatusTransitions();
 assertStateLedger();
 assertAdrPhaseGate();
+assertPrdReferences();
 assertAdrReferences();
 assertImmutableAdrBody();
 assertPublicSafeDocs();

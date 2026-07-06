@@ -23,6 +23,11 @@
 막는 잠금). `adr-draft`로 올린 뒤에야 `adr.md` 본문을 작성할 수 있다. 초안이 자리를
 잡으면 `stage`를 `adr-review`로 갱신한다.
 
+드물게 PRD를 먼저 단독 승인해 `stage`가 이미 `approved`인 상태에서 뒤늦게 ADR을 붙여야
+하면, `approved` → `adr-draft`/`adr-review` 전이가 허용된다(PRD 승인은 `prd_status` 축에서
+그대로 보존되므로 un-approval이 아니다). ADR을 작성한 뒤 `harness:approve --adr`로 ADR만
+`accepted` 전환한다(이미 approved인 PRD는 그대로 둔다).
+
 ADR을 다듬다 PRD 요구/수용 기준을 함께 고쳐야 하면 `prd.md`도 같이 수정한다(허용된다).
 PRD를 고쳐도 `review`를 유지하며, 승인은 마지막에 PRD·ADR을 한 번에 받는다.
 

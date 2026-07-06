@@ -84,6 +84,11 @@ if (!hasAreaSignal && wiki.includes(`](${primaryLink})`)) {
 
 const areas = resolveAreas();
 
+// Existing area headings (captured before insertion) power a duplicate nudge:
+// creating a NEW feature area while other areas already exist is the moment a
+// typo (`A화면` vs `A 화면`) silently forks a lineage, which no gate catches.
+const existingHeadings = [...wiki.matchAll(/^### (.+)$/gm)].map((match) => match[1].trim());
+
 const linked = [];
 const already = [];
 const reconciled = [];
@@ -96,6 +101,14 @@ for (const area of areas) {
 }
 
 writeText(wikiPath, wiki);
+
+const existingAreas = existingHeadings.filter((heading) => !OPERATIONS_CATEGORIES.includes(heading));
+const newAreas = areas.filter((area) => !existingHeadings.includes(area) && !OPERATIONS_CATEGORIES.includes(area));
+if (newAreas.length && existingAreas.length) {
+  console.warn(`[wiki-ingest] 새 영역 생성: ${newAreas.join(", ")}`);
+  console.warn(`  기존 영역: ${existingAreas.join(", ")}`);
+  console.warn("  이 작업이 기존 영역의 연속이면 오타 없이 그 이름을 그대로 쓰세요(위키 ### 헤딩과 정확히 일치).");
+}
 
 if (linked.length) {
   console.log(`[wiki-ingest] ${relativeUnit} linked`);

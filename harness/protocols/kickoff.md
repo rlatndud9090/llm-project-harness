@@ -109,4 +109,6 @@ raw 골격이 생기면 `$prd-helper`로 **PRD만** 작성한다. `$kickoff`가 
 스켈레톤은 이 시점에 건드리지 않는다 — ADR 작성은 별도 단계(`$adr-helper`)의 몫이고,
 `state.md`의 `stage`가 `adr-draft`로 올라간 뒤에만 허용된다(그 전에는 런타임 가드와
 `harness:check`가 막는다). `$prd-helper`는 ADR 필요 여부만 판단해 PRD `## ADR 필요 여부`에
-남기고, 필요하면 `$adr-helper`로 넘긴다. wiki ingest는 PRD 초안이 자리를 잡은 뒤 실행한다.
+남기고, 필요하면 `$adr-helper`로 넘긴다. wiki ingest는 `$prd-helper`가 PRD를 review로
+올릴 때 처음 실행하고(첫 touch), 통합/커밋 직전에 계보를 큐레이션하며 다시 실행한다
+(둘째 touch). 상세는 `wiki-ingest.md`의 "실행 시점(2-touch)" 참고.
