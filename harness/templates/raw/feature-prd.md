@@ -4,6 +4,8 @@ date: "{YYYY-MM-DD}"
 status: draft # draft | review | approved | rejected
 approval:
 unit_type: feature
+# section(섹션, 선택): area보다 큰 상위 단위(웹앱의 최상위 라우팅/제품 영역 단위). 단일 값. 프로젝트에 섹션이 2개 이상 선언되면 wiki가 섹션별 파일로 자동 분리된다. $prd-helper가 채우거나 $kickoff --section이 시드한다. 안 쓰면 비워 둔다(모든 area가 index.md에 남는다).
+section:
 # area(영역): 이 unit이 발전시키는 기능/구조 단위(들). 위키 ### 헤딩과 정확히 일치, 여러 개는 콤마로 나열, broad 바구니 금지. $prd-helper가 채운다.
 area:
 # parent_prd(선택): 이 PRD가 세부화하는 상위/부모 PRD의 상대경로(예: ../<상위-slug>/prd.md). 상위 계약을 잇는 후속 피처면 채운다. 없으면 비움.

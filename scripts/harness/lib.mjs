@@ -503,6 +503,85 @@ export function readUnitAreas(unitDir, type) {
   return parseAreaList(parseFrontmatter(readText(filePath))?.area);
 }
 
+// ─── section 축 (area 상위 그룹) ─────────────────────────────────────────────
+// section은 area보다 큰 단위(웹앱의 최상위 라우팅/제품 영역 단위)다. area가
+// `### 헤딩`이라면 section은 그 상위 그룹으로, 프로젝트에 section이 2개 이상
+// 선언되면 wiki가 index.md 한 장에서 section별 파일로 분리된다. area와 달리
+// section은 단일 값이다(한 unit은 하나의 section에 속한다).
+
+// The raw unit directories of a given type under docs/raw. Shared by ingest (to
+// count distinct sections) and the checker (to iterate units).
+export function unitDirs(type) {
+  const base = repoPath("docs", "raw", type);
+  if (!pathExists(base)) return [];
+  return fs
+    .readdirSync(base, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(base, entry.name));
+}
+
+// A unit's declared section: the single `section:` frontmatter value on its
+// primary artifact (prd.md/bugfix.md). Returns null for chore units, an
+// undeclared/blank value, a leftover `#` hint, or an unsubstituted `{...}` token.
+export function readUnitSection(unitDir, type) {
+  const artifact = primaryArtifactName(type);
+  if (!artifact) return null;
+  const filePath = path.join(unitDir, artifact);
+  if (!pathExists(filePath)) return null;
+  const raw = parseFrontmatter(readText(filePath))?.section;
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (!value || value.startsWith("#") || value.includes("{")) return null;
+  return value;
+}
+
+// Every distinct section declared across the project's feature/bugfix units.
+// Its size decides the wiki layout: <=1 keeps everything in index.md, >=2 means
+// the wiki is split into per-section files.
+export function collectDeclaredSections() {
+  const sections = new Set();
+  for (const type of ["feature", "bugfix"]) {
+    for (const dir of unitDirs(type)) {
+      const section = readUnitSection(dir, type);
+      if (section) sections.add(section);
+    }
+  }
+  return sections;
+}
+
+// Wiki basenames the harness owns and a section must never collide with.
+export const RESERVED_WIKI_BASENAMES = new Set(["index"]);
+
+// Maps a section name to its wiki filename. Strips path-unsafe/separator
+// characters, turns spaces into `-`, and keeps existing hyphens and non-ASCII
+// (Korean) intact (e.g. "메인 레이아웃" -> "메인-레이아웃.md"). Returns null for an
+// empty result or a reserved basename so the caller can fail loudly. Two
+// different section names that sanitize to the same file are the caller's
+// (checker's) collision to catch.
+export function sectionFileName(section) {
+  if (typeof section !== "string") return null;
+  const base = section
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  if (!base) return null;
+  if (RESERVED_WIKI_BASENAMES.has(base.toLowerCase())) return null;
+  return `${base}.md`;
+}
+
+// All markdown files directly under docs/wiki (index.md plus any per-section
+// files). Section files live flat beside index.md so their `../raw/...` links
+// resolve identically to the index's.
+export function listWikiFiles() {
+  const dir = repoPath("docs", "wiki");
+  if (!pathExists(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => path.join(dir, entry.name));
+}
+
 // A dated wiki bullet begins with a backtick-wrapped ISO date, e.g.
 //   - `2026-01-01` **Title** — [PRD](../raw/feature/x/prd.md)
 export const DATED_BULLET_RE = /^-\s+`(\d{4}-\d{2}-\d{2})`/;

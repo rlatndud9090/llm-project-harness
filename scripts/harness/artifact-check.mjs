@@ -11,6 +11,7 @@ import {
   STAGE_VALUES,
   adrBodyLooksAuthored,
   bodyAfterFrontmatter,
+  collectDeclaredSections,
   fail,
   isPreAdrStage,
   skeletonAdrBody,
@@ -21,6 +22,7 @@ import {
   isForbiddenTransition,
   isHarnessRepository,
   listMarkdownFiles,
+  listWikiFiles,
   parseApprovalEvents,
   parseAreaSections,
   parseFrontmatter,
@@ -29,7 +31,9 @@ import {
   primaryArtifactName,
   readText,
   readUnitAreas,
+  readUnitSection,
   repoPath,
+  sectionFileName,
   toPosix,
 } from "./lib.mjs";
 
@@ -118,27 +122,50 @@ function assertHarnessSync() {
   }
 }
 
+// The wiki is index.md plus (when the project declares >=2 sections) one file per
+// declared section. Any other file is stale/unexpected. A single-index project
+// (<=2 sections... i.e. <2) must not carry section files at all.
 function assertWikiShape() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "wiki"))) return;
 
   const wikiDir = repoPath("docs", "wiki");
   const entries = fs.readdirSync(wikiDir).filter((entry) => !entry.startsWith("."));
-  const unexpected = entries.filter((entry) => entry !== "index.md");
+
+  const declaredSections = collectDeclaredSections();
+  const split = declaredSections.size >= 2;
+  const allowed = new Set(["index.md"]);
+  const fileToSection = new Map();
+  for (const section of declaredSections) {
+    const fileName = sectionFileName(section);
+    if (!fileName) {
+      addError(`section "${section}" cannot map to a wiki filename (empty or reserved); rename it`);
+      continue;
+    }
+    if (fileToSection.has(fileName) && fileToSection.get(fileName) !== section) {
+      addError(`sections "${fileToSection.get(fileName)}" and "${section}" map to the same wiki file "${fileName}"; rename one`);
+    }
+    fileToSection.set(fileName, section);
+    if (split) allowed.add(fileName);
+  }
+
+  const unexpected = entries.filter((entry) => !allowed.has(entry));
   if (unexpected.length > 0) {
-    addError(`docs/wiki must contain only index.md; found ${unexpected.join(", ")}`);
+    const shape = split ? "index.md and declared section files" : "index.md";
+    addError(`docs/wiki must contain only ${shape}; found ${unexpected.join(", ")}`);
   }
 }
 
 function assertWikiLinks() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
 
-  const wikiPath = repoPath("docs", "wiki", "index.md");
-  const wiki = readText(wikiPath);
-  const links = [...wiki.matchAll(/\]\((\.\.\/raw\/[^)]+)\)/g)].map((match) => match[1]);
-  for (const link of links) {
-    const target = path.resolve(path.dirname(wikiPath), link);
-    if (!pathExists(target)) {
-      addError(`broken wiki raw link: ${link}`);
+  for (const wikiPath of listWikiFiles()) {
+    const wiki = readText(wikiPath);
+    const links = [...wiki.matchAll(/\]\((\.\.\/raw\/[^)]+)\)/g)].map((match) => match[1]);
+    for (const link of links) {
+      const target = path.resolve(path.dirname(wikiPath), link);
+      if (!pathExists(target)) {
+        addError(`broken wiki raw link: ${link} (${path.basename(wikiPath)})`);
+      }
     }
   }
 }
@@ -149,26 +176,26 @@ function assertWikiFeatureTaxonomy() {
   const featureDirs = unitDirs("feature");
   if (featureDirs.length === 0) return;
 
-  const wikiPath = repoPath("docs", "wiki", "index.md");
-  const wiki = readText(wikiPath);
-  const categories = parseWikiCategories(wiki);
+  const wikiDir = repoPath("docs", "wiki");
+  for (const wikiPath of listWikiFiles()) {
+    const categories = parseWikiCategories(readText(wikiPath));
+    for (const unitDir of featureDirs) {
+      const markdownFiles = fs
+        .readdirSync(unitDir)
+        .filter((entry) => entry.endsWith(".md"))
+        .map((entry) => path.join(unitDir, entry));
+      const linkedCategories = new Set(
+        markdownFiles
+          .map((filePath) => findCategoryForLink(categories, toPosix(path.relative(wikiDir, filePath))))
+          .filter(Boolean),
+      );
 
-  for (const unitDir of featureDirs) {
-    const markdownFiles = fs
-      .readdirSync(unitDir)
-      .filter((entry) => entry.endsWith(".md"))
-      .map((entry) => path.join(unitDir, entry));
-    const linkedCategories = new Set(
-      markdownFiles
-        .map((filePath) => findCategoryForLink(categories, toPosix(path.relative(path.dirname(wikiPath), filePath))))
-        .filter(Boolean),
-    );
-
-    for (const category of linkedCategories) {
-      if (DISALLOWED_FEATURE_WIKI_CATEGORIES.has(category)) {
-        addError(
-          `feature raw unit must not be linked under broad wiki category "${category}": ${toPosix(path.relative(process.cwd(), unitDir))}`,
-        );
+      for (const category of linkedCategories) {
+        if (DISALLOWED_FEATURE_WIKI_CATEGORIES.has(category)) {
+          addError(
+            `feature raw unit must not be linked under broad wiki category "${category}": ${toPosix(path.relative(process.cwd(), unitDir))}`,
+          );
+        }
       }
     }
   }
@@ -263,12 +290,17 @@ function assertAreaField() {
 }
 
 // 선언한 area 집합 == 위키에서 링크된 `### 헤딩` 집합(양방향). frontmatter(진실)와
-// wiki(뷰)의 그룹핑 drift·조용한 개명을 차단. 미선언 unit은 skip(opt-in).
+// wiki(뷰)의 그룹핑 drift·조용한 개명을 차단. 미선언 unit은 skip(opt-in). wiki가
+// 섹션별로 분리된 경우엔 unit이 자기 섹션 파일에만 링크돼야 한다(라우팅 강제).
 function assertAreaGrouping() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
 
-  const wikiPath = repoPath("docs", "wiki", "index.md");
-  const categories = parseWikiCategories(readText(wikiPath));
+  const wikiDir = repoPath("docs", "wiki");
+  const indexPath = repoPath("docs", "wiki", "index.md");
+  const wikiPaths = listWikiFiles();
+  const categoriesByFile = new Map(wikiPaths.map((wikiPath) => [wikiPath, parseWikiCategories(readText(wikiPath))]));
+
+  const split = collectDeclaredSections().size >= 2;
 
   for (const type of ["feature", "bugfix"]) {
     for (const unitDir of unitDirs(type)) {
@@ -276,15 +308,48 @@ function assertAreaGrouping() {
       if (declared.length === 0) continue;
 
       const rel = toPosix(path.relative(process.cwd(), unitDir));
-      const linkedHeadings = findLinkedHeadings(categories, wikiPath, unitDir);
       const declaredSet = new Set(declared);
 
-      for (const area of declaredSet) {
-        if (!linkedHeadings.has(area)) {
-          addError(`${type} unit declares area "${area}" but is not linked under "### ${area}": ${rel}`);
+      // The wiki file that must hold this unit's areas: its section's file when
+      // the wiki is split, else the single index.
+      let expectedPath = indexPath;
+      if (split) {
+        const section = readUnitSection(unitDir, type);
+        if (!section) {
+          addError(`${type} unit must declare a section (wiki is split into per-section files): ${rel}`);
+          continue;
+        }
+        const fileName = sectionFileName(section);
+        if (!fileName) {
+          addError(`${type} unit section "${section}" cannot map to a wiki filename: ${rel}`);
+          continue;
+        }
+        expectedPath = path.join(wikiDir, fileName);
+      }
+
+      // Headings this unit is linked under, per file. A link in any file other
+      // than the expected one is a routing violation.
+      let expectedHeadings = new Set();
+      for (const wikiPath of wikiPaths) {
+        const headings = findLinkedHeadings(categoriesByFile.get(wikiPath), wikiPath, unitDir);
+        if (headings.size === 0) continue;
+        if (wikiPath === expectedPath) {
+          expectedHeadings = headings;
+        } else {
+          addError(
+            `${type} unit is linked in ${path.basename(wikiPath)} but its section routes it to ${path.basename(expectedPath)}: ${rel}`,
+          );
         }
       }
-      for (const heading of linkedHeadings) {
+
+      for (const area of declaredSet) {
+        if (!expectedHeadings.has(area)) {
+          addError(
+            `${type} unit declares area "${area}" but is not linked under "### ${area}" in ${path.basename(expectedPath)}: ${rel}`,
+          );
+        }
+      }
+      for (const heading of expectedHeadings) {
         if (OPERATIONS_CATEGORIES.includes(heading)) continue;
         if (!declaredSet.has(heading)) {
           addError(
@@ -319,32 +384,33 @@ function findLinkedHeadings(categories, wikiPath, unitDir) {
 function assertAreaTimeline() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
 
-  const wikiPath = repoPath("docs", "wiki", "index.md");
-  for (const section of parseAreaSections(readText(wikiPath))) {
-    if (section.isOperations) continue;
-    const dated = section.lines.filter((entry) => entry.date);
+  for (const wikiPath of listWikiFiles()) {
+    for (const section of parseAreaSections(readText(wikiPath))) {
+      if (section.isOperations) continue;
+      const dated = section.lines.filter((entry) => entry.date);
 
-    for (const entry of dated) {
-      // The date source is the unit's dated artifact (prd.md/bugfix.md), found by
-      // suffix so a manual [ADR]-first reorder of the line does not misfire.
-      const dateLink = entry.links.find((link) => link.endsWith("/prd.md") || link.endsWith("/bugfix.md")) ?? entry.primaryLink;
-      if (!dateLink) continue;
-      const target = path.resolve(path.dirname(wikiPath), dateLink);
-      if (!pathExists(target)) continue; // broken link is assertWikiLinks' job
-      const rawDate = parseFrontmatter(readText(target))?.date;
-      if (rawDate && rawDate !== entry.date) {
-        addError(
-          `wiki timeline date ${entry.date} does not match ${dateLink} frontmatter date ${rawDate} (### ${section.name})`,
-        );
+      for (const entry of dated) {
+        // The date source is the unit's dated artifact (prd.md/bugfix.md), found by
+        // suffix so a manual [ADR]-first reorder of the line does not misfire.
+        const dateLink = entry.links.find((link) => link.endsWith("/prd.md") || link.endsWith("/bugfix.md")) ?? entry.primaryLink;
+        if (!dateLink) continue;
+        const target = path.resolve(path.dirname(wikiPath), dateLink);
+        if (!pathExists(target)) continue; // broken link is assertWikiLinks' job
+        const rawDate = parseFrontmatter(readText(target))?.date;
+        if (rawDate && rawDate !== entry.date) {
+          addError(
+            `wiki timeline date ${entry.date} does not match ${dateLink} frontmatter date ${rawDate} (### ${section.name} in ${path.basename(wikiPath)})`,
+          );
+        }
       }
-    }
 
-    for (let index = 1; index < dated.length; index += 1) {
-      if (dated[index].date < dated[index - 1].date) {
-        console.warn(
-          `[harness:check] WARNING: "### ${section.name}" 타임라인이 시간순이 아닙니다 (${dated[index - 1].date} → ${dated[index].date}); 오래된→최신으로 정렬하세요.`,
-        );
-        break;
+      for (let index = 1; index < dated.length; index += 1) {
+        if (dated[index].date < dated[index - 1].date) {
+          console.warn(
+            `[harness:check] WARNING: "### ${section.name}" (${path.basename(wikiPath)}) 타임라인이 시간순이 아닙니다 (${dated[index - 1].date} → ${dated[index].date}); 오래된→최신으로 정렬하세요.`,
+          );
+          break;
+        }
       }
     }
   }
@@ -356,25 +422,66 @@ function assertAreaTimeline() {
 function assertAreaCurrency() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
 
-  const wikiPath = repoPath("docs", "wiki", "index.md");
-  for (const section of parseAreaSections(readText(wikiPath))) {
-    if (section.isOperations) continue;
-    const current = section.lines.filter((entry) => entry.hasCurrent);
-    if (current.length > 1) {
-      addError(`"### ${section.name}" marks ${current.length} current decisions (${CURRENT_MARKER}); at most one line may be current.`);
-    }
-    for (const entry of current) {
-      if (entry.hasSuperseded) {
-        addError(`"### ${section.name}" line marked ${CURRENT_MARKER} is also marked superseded; a superseded decision is not current.`);
+  for (const wikiPath of listWikiFiles()) {
+    for (const section of parseAreaSections(readText(wikiPath))) {
+      if (section.isOperations) continue;
+      const current = section.lines.filter((entry) => entry.hasCurrent);
+      if (current.length > 1) {
+        addError(
+          `"### ${section.name}" (${path.basename(wikiPath)}) marks ${current.length} current decisions (${CURRENT_MARKER}); at most one line may be current.`,
+        );
       }
-      if (entry.adrLink) {
-        const target = path.resolve(path.dirname(wikiPath), entry.adrLink);
-        const adrStatus = pathExists(target) ? parseFrontmatter(readText(target))?.status : undefined;
-        if (adrStatus === "superseded" || adrStatus === "deprecated") {
-          addError(
-            `"### ${section.name}" line marked ${CURRENT_MARKER} links a ${adrStatus} ADR (${entry.adrLink}); move ${CURRENT_MARKER} to the current decision.`,
-          );
+      for (const entry of current) {
+        if (entry.hasSuperseded) {
+          addError(`"### ${section.name}" line marked ${CURRENT_MARKER} is also marked superseded; a superseded decision is not current.`);
         }
+        if (entry.adrLink) {
+          const target = path.resolve(path.dirname(wikiPath), entry.adrLink);
+          const adrStatus = pathExists(target) ? parseFrontmatter(readText(target))?.status : undefined;
+          if (adrStatus === "superseded" || adrStatus === "deprecated") {
+            addError(
+              `"### ${section.name}" line marked ${CURRENT_MARKER} links a ${adrStatus} ADR (${entry.adrLink}); move ${CURRENT_MARKER} to the current decision.`,
+            );
+          }
+        }
+      }
+    }
+  }
+}
+
+// 섹션 축 레이아웃 불변식: (1) 선언 섹션이 2개 이상이면 index.md가 `## 섹션` 허브여야
+// 하고, 2개 미만이면 허브가 없어야 한다(분리 상태 정합). (2) 허브의 섹션 링크는 실제
+// 파일을 가리켜야 한다. (3) 섹션 이름도 broad 바구니면 안 된다. "어느 섹션인가"는 모델
+// 몫이고, 구조 불변식만 기계강제한다.
+function assertSectionLayout() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
+
+  const declaredSections = collectDeclaredSections();
+  const split = declaredSections.size >= 2;
+  const index = readText(repoPath("docs", "wiki", "index.md"));
+  const hasHub = /^##\s+섹션\s*$/m.test(index);
+
+  if (split && !hasHub) {
+    addError(
+      `${declaredSections.size}개 섹션이 선언됐지만 docs/wiki/index.md가 섹션 허브가 아닙니다("## 섹션" 없음); npm run harness:ingest로 분리하세요.`,
+    );
+  }
+  if (!split && hasHub) {
+    addError(`docs/wiki/index.md에 "## 섹션" 허브가 있지만 선언된 섹션이 2개 미만입니다.`);
+  }
+
+  for (const section of declaredSections) {
+    if (BROAD_FEATURE_CATEGORIES.has(section)) {
+      addError(`section "${section}" is too broad; name the actual product/routing surface.`);
+    }
+  }
+
+  if (hasHub) {
+    // Local `](name.md)` links (raw links contain a slash) are section-file links.
+    const localLinks = [...index.matchAll(/\]\(([^)]+\.md)\)/g)].map((match) => match[1]).filter((link) => !link.includes("/"));
+    for (const link of localLinks) {
+      if (!pathExists(repoPath("docs", "wiki", link))) {
+        addError(`index hub links a missing section file: ${link}`);
       }
     }
   }
@@ -404,7 +511,9 @@ function assertRawUnits() {
 function assertRawUnitsLinked() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
 
-  const wiki = readText(repoPath("docs", "wiki", "index.md"));
+  const wikiDir = repoPath("docs", "wiki");
+  // A unit may be linked from index.md or any section file — join them all.
+  const wiki = listWikiFiles().map(readText).join("\n");
   for (const type of ["feature", "bugfix", "chore"]) {
     for (const unitDir of unitDirs(type)) {
       const markdownFiles = fs
@@ -413,12 +522,12 @@ function assertRawUnitsLinked() {
         .map((entry) => path.join(unitDir, entry));
 
       const hasWikiLink = markdownFiles.some((filePath) => {
-        const relative = toPosix(path.relative(repoPath("docs", "wiki"), filePath));
+        const relative = toPosix(path.relative(wikiDir, filePath));
         return wiki.includes(`](${relative})`);
       });
 
       if (!hasWikiLink) {
-        addError(`raw unit is not linked from docs/wiki/index.md: ${toPosix(path.relative(process.cwd(), unitDir))}`);
+        addError(`raw unit is not linked from docs/wiki: ${toPosix(path.relative(process.cwd(), unitDir))}`);
       }
     }
   }
@@ -995,6 +1104,7 @@ assertHarnessSync();
 assertWikiShape();
 assertWikiLinks();
 assertWikiFeatureTaxonomy();
+assertSectionLayout();
 assertAreaField();
 assertAreaGrouping();
 assertAreaTimeline();

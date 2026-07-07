@@ -4,6 +4,8 @@ date: "YYYY-MM-DD"
 status: draft # draft | review | fixed | rejected
 approval:
 unit_type: bugfix
+# section(섹션, 선택): area보다 큰 상위 단위. 프로젝트가 섹션을 쓰면 이 버그가 속한 섹션을 적어 그 섹션 파일의 타임라인에 합류시킨다. 단일 값. 안 쓰면 비운다.
+section:
 # area(영역, 선택): 이 버그가 속한 기능/구조 단위. 선언하면 그 영역 타임라인에 합류, 비우면 운영 버킷으로 간다. 위키 ### 헤딩과 정확히 일치.
 area:
 ---

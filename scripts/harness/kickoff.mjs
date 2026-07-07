@@ -132,10 +132,12 @@ if (materializeStateLedger()) created.push("state.md");
 // A mismatch means the chosen unit drifted between recommendation and kickoff.
 const anchorPath = repoPath("docs", "raw", ".next-unit");
 let anchorArea = "";
+let anchorSection = "";
 if (pathExists(anchorPath)) {
   const anchorParts = (readText(anchorPath).trim().split("\n")[0] ?? "").split("|").map((part) => part.trim());
   const anchorUnit = anchorParts[0] ?? "";
   anchorArea = anchorParts[2] ?? "";
+  anchorSection = anchorParts[3] ?? "";
   const resolvedUnit = `${type}/${slug}`;
   if (anchorUnit && anchorUnit !== resolvedUnit) {
     console.warn(`[kickoff] WARNING: next-feature anchor (${anchorUnit}) != resolved unit (${resolvedUnit}); confirm this is intended`);
@@ -143,15 +145,28 @@ if (pathExists(anchorPath)) {
   fs.rmSync(anchorPath, { force: true });
 }
 
-// Seed the unit's area from --area (preferred) or the next-feature anchor's 3rd
-// field, so the durable area declaration lands in the primary artifact frontmatter.
+const primaryArtifact = type === "feature" ? "prd.md" : type === "bugfix" ? "bugfix.md" : null;
+
+// Seed the unit's section from --section (preferred) or the next-feature anchor's
+// 4th field, then the area from --area (preferred) or the anchor's 3rd field, so
+// both durable declarations land in the primary artifact frontmatter.
+const section = (typeof args.section === "string" && args.section.trim()) || anchorSection;
 const area = (typeof args.area === "string" && args.area.trim()) || anchorArea;
+let seededSection = "";
 let seededArea = "";
-if (area && (type === "feature" || type === "bugfix")) {
-  const artifactPath = path.join(unitDir, type === "feature" ? "prd.md" : "bugfix.md");
+if (primaryArtifact) {
+  const artifactPath = path.join(unitDir, primaryArtifact);
   if (pathExists(artifactPath)) {
-    writeText(artifactPath, setFrontmatterField(readText(artifactPath), "area", `"${area}"`));
-    seededArea = area;
+    let content = readText(artifactPath);
+    if (section) {
+      content = setFrontmatterField(content, "section", `"${section}"`);
+      seededSection = section;
+    }
+    if (area) {
+      content = setFrontmatterField(content, "area", `"${area}"`);
+      seededArea = area;
+    }
+    if (section || area) writeText(artifactPath, content);
   }
 }
 
@@ -160,4 +175,5 @@ console.log(`- branch: ${branchInfo.branch}`);
 console.log(`- title: ${title}`);
 console.log(`- unit: ${type}/${slug}`);
 console.log(`- created: ${created.length ? created.join(", ") : "none (already existed)"}`);
+if (seededSection) console.log(`- section: ${seededSection}`);
 if (seededArea) console.log(`- area: ${seededArea}`);

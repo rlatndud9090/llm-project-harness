@@ -16,6 +16,7 @@ import {
   parseWorkBranch,
   primaryArtifactName,
   resolveTimezone,
+  sectionFileName,
   setFrontmatterField,
   skeletonAdrBody,
   stripKnownPrefix,
@@ -267,6 +268,30 @@ describe("parseAreaList", () => {
     );
     expect(fields.area).toBe("");
     expect(parseAreaList(fields.area)).toEqual([]);
+  });
+});
+
+describe("sectionFileName", () => {
+  it("keeps Korean names and appends .md", () => {
+    expect(sectionFileName("대시보드")).toBe("대시보드.md");
+  });
+
+  it("turns spaces into hyphens and strips path-unsafe characters", () => {
+    expect(sectionFileName("메인 레이아웃")).toBe("메인-레이아웃.md");
+    expect(sectionFileName("결제/정산")).toBe("결제정산.md");
+    expect(sectionFileName("대시:보드")).toBe("대시보드.md");
+  });
+
+  it("preserves existing hyphens", () => {
+    expect(sectionFileName("a-b-c")).toBe("a-b-c.md");
+  });
+
+  it("returns null for an empty result or a reserved basename", () => {
+    expect(sectionFileName("   ")).toBeNull();
+    expect(sectionFileName("///")).toBeNull();
+    expect(sectionFileName("index")).toBeNull();
+    expect(sectionFileName("INDEX")).toBeNull();
+    expect(sectionFileName(undefined)).toBeNull();
   });
 });
 

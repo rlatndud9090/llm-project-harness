@@ -85,6 +85,12 @@ PRD는 한국어로 작성한다. branch name, file path, command, TypeScript id
   갈라진다). 없으면 구체적인 새 영역을 만든다. broad 바구니는 금지. 소규모의 다른 영역
   작업이 섞였으면 콤마로 여러 영역을 적는다. 이건 의미 판단이므로 `$prd-helper`가 정하며,
   wiki 그룹핑·타임라인은 이 값에서 파생된다.
+- **섹션(section, 선택)**: 프로젝트가 area 상위의 **섹션**(웹앱 최상위 라우팅/제품 영역
+  단위)을 쓰면, 이 작업이 어느 섹션인지 판단해 `prd.md` frontmatter `section:`에 **단일
+  값**으로 적는다. 이미 분리된(섹션 2개 이상) 프로젝트라면 필수다 — 미선언이면 ingest가
+  실패한다. 기존 섹션은 `docs/wiki/index.md`의 `## 섹션` 허브(또는 각 섹션 파일)에서 확인해
+  연속이면 오타 없이 재사용한다. 섹션이 2개째로 늘면 `harness:ingest`가 wiki를 섹션별 파일로
+  자동 분리한다. 섹션을 안 쓰는 프로젝트면 비워 둔다.
 - **상위 PRD 계보(선택)**: 이 PRD가 상위/부모 PRD(큰 계약)를 세부화하는 후속 작업이면
   `prd.md` frontmatter `parent_prd`에 그 상대경로(예: `../<상위-slug>/prd.md`)를 적는다.
   `harness:check`가 링크 유효성을 검증한다. 계보가 없으면 비워 둔다.

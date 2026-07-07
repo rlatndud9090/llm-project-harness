@@ -215,6 +215,192 @@ describe("wiki-ingest area lineage", () => {
   });
 });
 
+describe("wiki-ingest sections", () => {
+  const wiki = (projectRoot, name) => path.join(projectRoot, "docs", "wiki", name);
+
+  it("keeps a single declared section in index.md with no section files", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
+      seedAreaFeature(projectRoot, "grid", { section: "대시보드", area: "그리드", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/grid");
+
+      const files = fs.readdirSync(path.join(projectRoot, "docs", "wiki"));
+      expect(files).toEqual(["index.md"]);
+      const index = read(wiki(projectRoot, "index.md"));
+      expect(index).toContain("### 위젯");
+      expect(index).toContain("### 그리드");
+      // No real section hub heading (the intro prose mentions "## 섹션" only inside
+      // inline code, so match the anchored heading line, not a bare substring).
+      expect(index).not.toMatch(/^## 섹션\s*$/m);
+    });
+  });
+
+  it("splits into per-section files when a 2nd section appears, migrating the first section", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯", date: "2026-01-10" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-15" });
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+
+      const index = read(wiki(projectRoot, "index.md"));
+      expect(index).toContain("## 섹션");
+      expect(index).toContain("[대시보드](대시보드.md)");
+      expect(index).toContain("[설정](설정.md)");
+      // The migrated first-section lineage left index.md.
+      expect(index).not.toContain("../raw/feature/widget/prd.md");
+
+      const dashboard = read(wiki(projectRoot, "대시보드.md"));
+      expect(dashboard).toContain("### 위젯");
+      expect(dashboard).toContain("[PRD](../raw/feature/widget/prd.md)");
+
+      const settings = read(wiki(projectRoot, "설정.md"));
+      expect(settings).toContain("### 프로필");
+      expect(settings).toContain("[PRD](../raw/feature/profile/prd.md)");
+    });
+  });
+
+  it("preserves navigation labels (현재/superseded) through the split migration", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯", date: "2026-01-10" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      // Hand-add a current marker before the split.
+      const indexPath = wiki(projectRoot, "index.md");
+      writeFile(indexPath, read(indexPath).replace("../raw/feature/widget/prd.md)", "../raw/feature/widget/prd.md) _(현재)_"));
+
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-15" });
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+
+      expect(read(wiki(projectRoot, "대시보드.md"))).toContain("_(현재)_");
+    });
+  });
+
+  it("stays idempotent after a split (no duplicate links)", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+
+      const dashboard = read(wiki(projectRoot, "대시보드.md"));
+      expect(dashboard.split("](../raw/feature/widget/prd.md)").length - 1).toBe(1);
+    });
+  });
+
+  it("adds a 3rd section file and hub link", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+      seedAreaFeature(projectRoot, "billing", { section: "결제", area: "청구서", date: "2026-03-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/billing");
+
+      expect(fs.existsSync(wiki(projectRoot, "결제.md"))).toBe(true);
+      expect(read(wiki(projectRoot, "index.md"))).toContain("[결제](결제.md)");
+    });
+  });
+
+  it("passes harness:check on a split project", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("refuses to ingest a section-less feature in a split project", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+
+      seedAreaFeature(projectRoot, "orphan", { area: "고아", date: "2026-03-01" });
+      const result = ingestUnit(projectRoot, "docs/raw/feature/orphan");
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("섹션");
+    });
+  });
+
+  it("routes a section-less operations bugfix to index.md even when split", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+
+      // A dependency-bump bugfix with no area/section falls back to the operations bucket.
+      const bugDir = path.join(projectRoot, "docs", "raw", "bugfix", "dep-bump");
+      writeFile(path.join(bugDir, "bugfix.md"), `${frontmatter({ title: "dep-bump", status: "review", unit_type: "bugfix" })}\n# Bugfix\n\n## 증상\n\nx\n\n## 원인\n\ny\n\n## 수정\n\nz\n\n## 회귀 방지\n\n- [ ] t\n`);
+      const result = ingestUnit(projectRoot, "docs/raw/bugfix/dep-bump");
+      expect(result.status).toBe(0);
+
+      const index = read(wiki(projectRoot, "index.md"));
+      expect(index).toContain("../raw/bugfix/dep-bump/bugfix.md");
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("check flags a unit linked in the wrong section file", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+      const settings = wiki(projectRoot, "설정.md");
+      writeFile(settings, `${read(settings)}\n### 위젯\n\n- \`2026-01-01\` **오배치** — [PRD](../raw/feature/widget/prd.md)\n`);
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(1);
+      expect(result.stdout + result.stderr).toContain("routes it to");
+    });
+  });
+
+  it("check flags a stray wiki file", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+      writeFile(wiki(projectRoot, "stray.md"), "# stray\n");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(1);
+      expect(result.stdout + result.stderr).toContain("stray.md");
+    });
+  });
+
+  it("check flags a broad section name", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "widget", { section: "기능", area: "위젯" });
+      seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
+      ingestUnit(projectRoot, "docs/raw/feature/widget");
+      ingestUnit(projectRoot, "docs/raw/feature/profile");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(1);
+      expect(result.stdout + result.stderr).toContain("too broad");
+    });
+  });
+});
+
 describe("artifact-check area gates", () => {
   it("fails when a declared area does not match the linked heading", () => {
     withProject((projectRoot) => {
@@ -1492,13 +1678,24 @@ function ingestArea(projectRoot, unitPath, area) {
 
 // Writes a review-ready feature unit (prd.md + adr.md skeleton). Passing `area`
 // declares it in the prd frontmatter; `date` overrides the timeline date.
-function seedAreaFeature(projectRoot, slug, { status = "review", area, date } = {}) {
+function seedAreaFeature(projectRoot, slug, { status = "review", area, section, date } = {}) {
   const unitDir = path.join(projectRoot, "docs", "raw", "feature", slug);
   const prdFields = { title: slug, status, unit_type: "feature" };
+  if (section) prdFields.section = section;
   if (area) prdFields.area = area;
   if (date) prdFields.date = date;
   writeFile(path.join(unitDir, "prd.md"), `${frontmatter(prdFields)}\n${fullPrdBody()}`);
   writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: slug, status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+}
+
+// Runs wiki-ingest reading the unit's frontmatter (section + area), returning the
+// spawn result so tests can assert success or a routing/section failure.
+function ingestUnit(projectRoot, unitPath) {
+  return spawnSync(
+    process.execPath,
+    [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath],
+    { cwd: projectRoot, encoding: "utf8" },
+  );
 }
 
 // Rewrites an existing feature unit's prd.md to declare an area, leaving the wiki

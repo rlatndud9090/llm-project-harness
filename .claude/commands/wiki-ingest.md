@@ -10,7 +10,12 @@ npm run harness:ingest -- $ARGUMENTS --area "<영역>"
 
 규칙:
 
-- 수정 대상은 `docs/wiki/index.md` 하나다.
+- 수정 대상은 `docs/wiki/index.md`(그리고 분리 후 각 `docs/wiki/<섹션>.md`)이며, 손으로
+  섹션 파일을 만들지 않는다 — 섹션 분리·이동은 ingest가 한다.
+- area 상위의 **섹션**은 `prd.md`/`bugfix.md` frontmatter `section:`(단일 값) 또는
+  `--section`으로 준다. 선언 섹션이 2개 이상이면 ingest가 `docs/wiki/<섹션>.md`로 자동
+  분리하고 `index.md`를 섹션 링크 허브로 재작성한다. 분리된 프로젝트에서 섹션 미선언
+  feature/bugfix는 실패한다.
 - 같은 raw unit을 같은 영역에 여러 번 실행해도 중복 링크를 만들지 않는다.
 - wiki에는 요약문을 쓰지 않고 raw link만 둔다.
 - 영역(area)은 앱의 좁은 기능/구조 단위다. 정규 경로는 `prd.md`/`bugfix.md` frontmatter
