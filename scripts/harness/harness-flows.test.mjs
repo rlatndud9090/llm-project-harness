@@ -401,6 +401,62 @@ describe("wiki-ingest sections", () => {
   });
 });
 
+describe("kickoff-window link gates (settled-gating)", () => {
+  it("is green right after kickoff of a feature with a seeded area+section", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "battle-selection", "--title", "배틀 선출", "--area", "배틀 진행 · 선출 UX", "--section", "배틀"]);
+      expect(k.status).toBe(0);
+      // area is durably seeded into the draft prd.md ...
+      const prd = read(path.join(projectRoot, "docs", "raw", "feature", "battle-selection", "prd.md"));
+      expect(prd).toContain('area: "배틀 진행 · 선출 UX"');
+      // ... yet the pre-review skeleton is not required to be linked, so check is green.
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("still fails a review PRD that was not ingested (link requirement is intact)", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "foo", { status: "review", area: "포영역" });
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(1);
+      expect(result.stdout + result.stderr).toContain("not linked");
+    });
+  });
+
+  it("is green once the review PRD has its first ingest", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "foo", { status: "review", area: "포영역" });
+      ingestUnit(projectRoot, "docs/raw/feature/foo");
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("auto-links a chore at kickoff and stays green", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "chore", "--slug", "dep-bump", "--title", "Dep bump"]);
+      expect(k.status).toBe(0);
+      const index = read(path.join(projectRoot, "docs", "wiki", "index.md"));
+      expect(index).toContain("../raw/chore/dep-bump/notes.md");
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("does not phantom-split on two draft features declaring different sections", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      kickoff(projectRoot, ["--type", "feature", "--slug", "a-feat", "--title", "A", "--area", "A영역", "--section", "대시보드"]);
+      kickoff(projectRoot, ["--type", "feature", "--slug", "b-feat", "--title", "B", "--area", "B영역", "--section", "설정"]);
+      expect(runCheck(projectRoot).status).toBe(0);
+      // Drafts declare 2 sections but neither is settled, so no split / section files.
+      expect(fs.readdirSync(path.join(projectRoot, "docs", "wiki"))).toEqual(["index.md"]);
+    });
+  });
+});
+
 describe("artifact-check area gates", () => {
   it("fails when a declared area does not match the linked heading", () => {
     withProject((projectRoot) => {
@@ -1694,6 +1750,14 @@ function ingestUnit(projectRoot, unitPath) {
   return spawnSync(
     process.execPath,
     [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath],
+    { cwd: projectRoot, encoding: "utf8" },
+  );
+}
+
+function kickoff(projectRoot, args) {
+  return spawnSync(
+    process.execPath,
+    [path.join(projectRoot, ".harness", "scripts", "harness", "kickoff.mjs"), ...args],
     { cwd: projectRoot, encoding: "utf8" },
   );
 }

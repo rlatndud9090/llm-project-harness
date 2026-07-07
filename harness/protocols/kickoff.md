@@ -107,7 +107,11 @@ npm run harness:kickoff -- --title "위젯 그리드" --section "대시보드" -
 npm run harness:check
 ```
 
-`harness:check`는 현재 브랜치와 raw path가 맞는지 확인한다.
+`harness:check`는 현재 브랜치와 raw path가 맞는지 확인하며, **kickoff 직후에도 green이어야
+한다.** feature/bugfix 골격은 아직 review 전이라 wiki에 링크되지 않는데(첫 ingest는
+`$prd-helper`가 PRD를 review로 올릴 때 — 2-touch), 링크/영역 게이트가 **review 전 unit을
+면제**하므로 미링크가 에러가 아니다. chore는 area·section이 없어 `$kickoff`가 생성 직후
+운영 버킷에 바로 링크한다. 즉 kickoff이 끝나면 어떤 유형이든 check가 통과한다.
 
 ## 다음 단계
 

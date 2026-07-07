@@ -14,6 +14,31 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-08 kickoff-window-settled-gating
+
+**변경**
+
+- **kickoff 직후 `harness:check` green 보장.** feature/bugfix 골격은 첫 ingest(2-touch의
+  `$prd-helper` PRD→review 시점) 전까지 wiki에 링크되지 않는데, `assertRawUnitsLinked`와
+  `assertAreaGrouping`이 그 전부터 링크를 요구해 kickoff↔prd-helper 창에서 빨간불이었다
+  (kickoff.md 완료조건 check-green과 상충). 두 게이트가 이제 `unitIsSettled`(feature=prd
+  review/approved, bugfix=bugfix review/fixed)가 아닌 unit을 **면제**한다. 링크 요구 자체는
+  review+에서 그대로 유지된다.
+- **chore는 kickoff이 즉시 링크.** chore는 review 라이프사이클이 없고 area/section이 필요
+  없어(운영 버킷) `kickoff.mjs`가 골격 생성 직후 wiki-ingest를 best-effort로 실행한다. 따라서
+  chore도 kickoff 직후 green이고 링크 게이트는 엄격하게 유지된다.
+- **`collectDeclaredSections`가 settled 유닛의 섹션만 카운트.** 아직 review 전인 draft가
+  시드된 `section:`만으로 유령 split(2섹션 판정→허브 없음→`assertSectionLayout`/`assertWikiShape`
+  빨간불)을 만들던 문제를 함께 제거. 두 섹션이 실제 review+ingest될 때 분리가 일어난다. ingest는
+  현재 처리 중인 unit의 섹션을 명시적으로 카운트에 더하므로 status 순서와 무관하게 안전하다.
+
+**소비자 조치**
+
+- **없음.** 이 변경은 오탐(false red)을 줄이는 방향의 순수 개선이라 하위호환이다. 서브모듈
+  업데이트 후 kickoff 직후 `harness:check`가 green이 되고, `kickoff --type chore`가 chore를
+  자동으로 위키 운영 버킷에 링크한다(수동 `harness:ingest` 불필요). review 이상 unit의 링크
+  요구는 그대로다.
+
 ## 2026-07-07 wiki-section-axis-and-auto-split
 
 **변경**

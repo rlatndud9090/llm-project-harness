@@ -534,13 +534,41 @@ export function readUnitSection(unitDir, type) {
   return value;
 }
 
-// Every distinct section declared across the project's feature/bugfix units.
-// Its size decides the wiki layout: <=1 keeps everything in index.md, >=2 means
-// the wiki is split into per-section files.
+// True once a unit has settled enough to be required in the wiki (its first
+// ingest is due). This is the same "content settled" line the placeholder /
+// required-section / area gates use: feature at prd.md review|approved, bugfix at
+// bugfix.md review|fixed. A chore is notes-only with no review status, so kickoff
+// links it immediately — it is always considered settled. A pre-review skeleton
+// (kickoff / prd-draft) is NOT settled, so the wiki-link gates skip it (honoring
+// the documented "harness:check is green right after kickoff" contract).
+export function unitIsSettled(unitDir, type) {
+  if (type === "feature") {
+    const status = readArtifactStatus(unitDir, "prd.md");
+    return status === "review" || status === "approved";
+  }
+  if (type === "bugfix") {
+    const status = readArtifactStatus(unitDir, "bugfix.md");
+    return status === "review" || status === "fixed";
+  }
+  return true; // chore: linked at kickoff, always required thereafter
+}
+
+function readArtifactStatus(unitDir, fileName) {
+  const filePath = path.join(unitDir, fileName);
+  if (!pathExists(filePath)) return null;
+  return parseFrontmatter(readText(filePath))?.status ?? null;
+}
+
+// Every distinct section declared across the project's SETTLED feature/bugfix
+// units. Its size decides the wiki layout: <=1 keeps everything in index.md, >=2
+// means the wiki is split into per-section files. Counting only settled units
+// keeps a not-yet-reviewed draft's seeded section from forcing a phantom split
+// while it is still a kickoff skeleton (the wiki has nothing linked for it yet).
 export function collectDeclaredSections() {
   const sections = new Set();
   for (const type of ["feature", "bugfix"]) {
     for (const dir of unitDirs(type)) {
+      if (!unitIsSettled(dir, type)) continue;
       const section = readUnitSection(dir, type);
       if (section) sections.add(section);
     }

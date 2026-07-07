@@ -35,6 +35,7 @@ import {
   repoPath,
   sectionFileName,
   toPosix,
+  unitIsSettled,
 } from "./lib.mjs";
 
 const errors = [];
@@ -306,6 +307,9 @@ function assertAreaGrouping() {
     for (const unitDir of unitDirs(type)) {
       const declared = readUnitAreas(unitDir, type);
       if (declared.length === 0) continue;
+      // A pre-review skeleton with a seeded area is not linked yet (its first
+      // ingest is due at review); don't require the area↔heading match until then.
+      if (!unitIsSettled(unitDir, type)) continue;
 
       const rel = toPosix(path.relative(process.cwd(), unitDir));
       const declaredSet = new Set(declared);
@@ -516,6 +520,11 @@ function assertRawUnitsLinked() {
   const wiki = listWikiFiles().map(readText).join("\n");
   for (const type of ["feature", "bugfix", "chore"]) {
     for (const unitDir of unitDirs(type)) {
+      // A pre-review skeleton is not linked until its first ingest (feature/bugfix
+      // at review; chore is linked at kickoff). Requiring a link before then would
+      // make harness:check red right after kickoff, contradicting kickoff's contract.
+      if (!unitIsSettled(unitDir, type)) continue;
+
       const markdownFiles = fs
         .readdirSync(unitDir)
         .filter((entry) => entry.endsWith(".md"))

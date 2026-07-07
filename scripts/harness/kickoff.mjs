@@ -1,6 +1,8 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   fail,
   harnessPath,
@@ -177,3 +179,17 @@ console.log(`- unit: ${type}/${slug}`);
 console.log(`- created: ${created.length ? created.join(", ") : "none (already existed)"}`);
 if (seededSection) console.log(`- section: ${seededSection}`);
 if (seededArea) console.log(`- area: ${seededArea}`);
+
+// A chore has no review lifecycle and needs no area/section — it lands in the wiki
+// operations bucket. Link it right now (best-effort) so a just-kickoff'd chore is
+// already navigable and harness:check is green immediately. feature/bugfix defer
+// their first ingest to review (2-touch), and the wiki-link gates exempt them until
+// then, so only chore needs this eager link.
+if (type === "chore" && pathExists(repoPath("docs", "wiki", "index.md"))) {
+  const ingestScript = fileURLToPath(new URL("wiki-ingest.mjs", import.meta.url));
+  try {
+    execFileSync(process.execPath, [ingestScript, rawPath], { cwd: process.cwd(), stdio: "inherit" });
+  } catch {
+    console.warn(`[kickoff] chore 자동 ingest 실패 — 수동으로 "npm run harness:ingest -- ${rawPath}"를 실행하세요.`);
+  }
+}
