@@ -14,6 +14,30 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-08 adr-helper-design-decision-lane
+
+**변경**
+
+- **`designer` 역할 신설**(`harness/roles/designer.md` + `.codex`/`.claude` 어댑터). UI-significant
+  유닛에서 화면 배치·구성·상호작용 어포던스·시각 위계의 **대안을 제안**하고 채택 결정을
+  근거와 함께 남긴다. 빌드는 하지 않는다(구현은 `ui-engineer`).
+- **`$adr-helper`에 디자인 결정 레인(Phase 3.5)** 추가. `$prd-helper`가 "다투는 화면 배치"를
+  ADR 필요 사유로 넘기면, `designer`가 배치 대안을 **최소 2개 ASCII 와이어프레임**으로 비교하고,
+  채택안·기각 사유·시각 위계 근거를 **ADR `## 선택지`/`## 결정`/`## 선택 근거`에** 남긴다(별도
+  아티팩트·게이트 없음). 배치 선택은 구조화 질문(ClaudeCode `AskUserQuestion` preview 등)으로
+  받아 PRD·ADR 통합 승인으로 흡수한다.
+- **게이팅**: `$prd-helper`의 "ADR 필요 여부" 판단에 "디자인 결정 필요 여부"를 포함. 배치가
+  실제 다투는 결정인 UI 유닛에만 발동하고, 단순 화면은 build-first 유지.
+- 기본 경로는 tool-free ASCII(Codex/ClaudeCode 양쪽 동작). `frontend-design` 스킬·브라우저 도구
+  (Playwright MCP: 목업 hi-fi 스크린샷 비교)·컴포넌트 라이브러리 MCP는 **있으면 쓰는 optional
+  가속기**로만 참조하며 없어도 동작한다.
+
+**소비자 조치**
+
+- **없음(옵트인).** 새 `designer` 역할과 디자인 결정 레인은 UI-significant 유닛에서만 발동하는
+  선택 경로다. 단순 화면은 종전대로 build-first다. 서브모듈 업데이트 후 `.harness`의 `designer`
+  어댑터가 노출되며, hi-fi 목업 비교를 쓰려면 Playwright MCP를 연결하면 된다(없으면 ASCII).
+
 ## 2026-07-08 kickoff-window-settled-gating
 
 **변경**

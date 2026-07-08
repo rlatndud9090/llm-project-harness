@@ -61,6 +61,8 @@ raw_path: "docs/raw/feature/{slug}"
 
 ADR 필요 여부와 그 이유를 여기에 기록한다(이 판단은 `$prd-helper`에서 하고, ADR 본문은
 `$adr-helper`에서 별도로 작성한다). `adr.md`가 아니라 이 섹션이 결정의 근거를 남기는 곳이다.
+durable decision에는 구조/데이터/엔진/의존성뿐 아니라 **다투는 화면 배치 결정**도 포함된다
+(UI-significant 유닛이면 `$adr-helper`의 디자인 결정 레인에서 배치 대안을 비교·결정한다).
 
 - **필요:** <이유> → `$adr-helper`로 넘어가 ADR을 작성하고, PRD·ADR을 한 번에 승인받는다.
 - **불필요:** <이유> → `adr.md`는 스켈레톤으로 두고 PRD 단독 승인으로 진행한다.

@@ -101,6 +101,7 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 - [Researcher](roles/researcher.md)
 - [Reviewer](roles/reviewer.md)
 - [Architect](roles/architect.md)
+- [Designer](roles/designer.md)
 - [Domain engineer](roles/domain-engineer.md)
 - [UI engineer](roles/ui-engineer.md)
 - [Test engineer](roles/test-engineer.md)
