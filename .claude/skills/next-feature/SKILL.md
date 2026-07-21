@@ -47,16 +47,22 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
 - agents 화면 제목은 `~/.claude/jobs/<job>/state.json`의 `name` 필드다. 아래 스크립트로
   현재 세션(`$CLAUDE_CODE_SESSION_ID`)에 해당하는 job의 `name`을 `<약어> next-feature`로
   설정하고 `nameSource`를 `user`로 지정한다(`user`여야 Claude Code 자동 영문 이름이 덮어쓰지 않는다).
+- 스크립트 맨 앞의 가드가 **먼저** agents 세션인지(=job `state.json` 존재) 확인하므로,
+  agents 모드가 아닌 대화형 세션에서 그대로 실행해도 실패 exit code 없이 조용히 넘어간다.
+  즉 세션 종류를 신경 쓰지 말고 항상 실행하면 된다.
 
 ```bash
-proj="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
-abbr="$(printf '%s' "$proj" | tr '_ ' '--' | awk -F'-' '{s="";for(i=1;i<=NF;i++)if($i!="")s=s toupper(substr($i,1,1));print s}')"
-[ "${#abbr}" -lt 2 ] && abbr="$(printf '%s' "$proj" | tr '[:lower:]' '[:upper:]' | cut -c1-3)"
-python3 - "$CLAUDE_CODE_SESSION_ID" "<$abbr> next-feature" <<'PY'
+# 가드: agents(FleetView) 세션에서만 제목을 바꾼다. job state.json이 하나도 없으면
+# (= agents 모드가 아님) 여기서 조용히 건너뛴다 — 실패 exit code 없이 정상 종료한다.
+if [ -z "$CLAUDE_CODE_SESSION_ID" ] || ! ls ~/.claude/jobs/*/state.json >/dev/null 2>&1; then
+  echo "agents 세션 아님(job state.json 없음) — 제목 설정 건너뜀"
+else
+  proj="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+  abbr="$(printf '%s' "$proj" | tr '_ ' '--' | awk -F'-' '{s="";for(i=1;i<=NF;i++)if($i!="")s=s toupper(substr($i,1,1));print s}')"
+  [ "${#abbr}" -lt 2 ] && abbr="$(printf '%s' "$proj" | tr '[:lower:]' '[:upper:]' | cut -c1-3)"
+  python3 - "$CLAUDE_CODE_SESSION_ID" "<$abbr> next-feature" <<'PY'
 import json, sys, glob, os
 sid, title = sys.argv[1], sys.argv[2]
-if not sid:
-    sys.exit("CLAUDE_CODE_SESSION_ID 미설정 — 제목 설정 건너뜀")
 target = None
 for p in glob.glob(os.path.expanduser("~/.claude/jobs/*/state.json")):
     try:
@@ -67,13 +73,15 @@ for p in glob.glob(os.path.expanduser("~/.claude/jobs/*/state.json")):
         target = (p, d)
         break
 if not target:
-    sys.exit(f"job state.json 없음(sessionId={sid}) — 제목 설정 건너뜀")
+    print(f"이 세션에 해당하는 job 없음(sessionId={sid}) — 제목 설정 건너뜀")
+    raise SystemExit(0)
 p, d = target
 d["name"] = title
 d["nameSource"] = "user"
 json.dump(d, open(p, "w"), ensure_ascii=False, indent=2)
 print("agents 화면 제목 설정:", title)
 PY
+fi
 ```
 
 > 작업 단위를 확정해 `$kickoff`로 넘어가면, kickoff이 제목의 `next-feature` 부분을

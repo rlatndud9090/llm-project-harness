@@ -14,6 +14,23 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-21 fleetview-title-agents-guard
+
+**변경**
+
+- `$kickoff`·`$next-feature`의 agents 화면(FleetView) 제목 설정 스크립트에 **선-체크 가드**를
+  추가했다. 스크립트 맨 앞에서 agents 세션인지(`~/.claude/jobs/*/state.json` 존재)를 먼저
+  확인하고, job state.json이 하나도 없으면(= agents 모드가 아닌 대화형 세션) python을 아예
+  호출하지 않고 조용히 정상 종료한다(exit 0). job은 있으나 현재 세션과 매칭되는 항목이 없는
+  경우도 `sys.exit(<문자열>)`(exit 1) 대신 `SystemExit(0)`으로 no-op 처리한다.
+- 이전에는 매칭되는 state.json이 없을 때마다 exit code 1로 빠져서, 그 실패를 "제목 설정
+  건너뜀"으로 해석해 넘어가야 했다. 이제 비-agents 세션에서도 실패 신호 없이 깔끔히 no-op이 된다.
+
+**소비자 조치**
+
+- 없음. Claude Code 어댑터 전용 동작 개선으로 공용 `harness/` 표면·소비자 아티팩트에 영향이
+  없다. FleetView 제목 갱신은 agents 세션에서 종전과 동일하게 동작한다.
+
 ## 2026-07-08 adr-helper-design-decision-lane
 
 **변경**
