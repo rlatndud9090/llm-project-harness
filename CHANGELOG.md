@@ -14,6 +14,40 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-21 kickoff-branch-situational
+
+**변경**
+
+- `$kickoff`이 raw 골격을 만들기 **전에** 작업 브랜치를 상황에 따라 정리한다. `main`/`master`에서
+  작업 트리가 깨끗하면 `<type>/<slug>` 브랜치를 **자동 생성·전환**(`git checkout -b`)하고, 이미 그
+  작업 브랜치 위면 그대로 둔다(branch-first). 다른 브랜치·커밋 안 된 변경·detached HEAD·비-git,
+  또는 목표 브랜치가 이미 존재하면 브랜치를 건드리지 않고 힌트만 남긴다.
+- 새 플래그 `--checkout`(현재 위치에서 강제 생성·전환)과 `--no-branch`(브랜치 로직 완전 끔, 둘이
+  겹치면 `--no-branch` 우선)를 추가했다.
+- 지금까지 kickoff은 브랜치를 전혀 만들지 않았는데 프로토콜 문서·state 원장은 "브랜치 생성"을
+  약속해 문서↔동작이 어긋나 있었다. 실제 동작에 맞춰 `session-start.md`·`next-feature.md`·
+  `kickoff.md`와 state 원장 로그줄(feature 템플릿 + bugfix/chore 인라인)을 정정했다.
+
+**소비자 조치**
+
+- 없음(동작만 확장). 기존 branch-first 습관은 그대로 동작한다. `main`/`master` + clean 상태에서
+  kickoff하면 이제 작업 브랜치가 자동으로 생기니, 그게 싫으면 `--no-branch`를 쓴다. 다른 브랜치나
+  dirty 상태에서는 kickoff이 자동 전환하지 않고 워크트리 격리 vs 현재 위치 checkout을 선택하도록 안내한다.
+
+## 2026-07-21 extracth1-frontmatter-title
+
+**변경**
+
+- `wiki-ingest`가 위키 제목을 뽑을 때 쓰는 `extractH1`이 선두 frontmatter 블록을 건너뛴 뒤 본문 H1을
+  찾도록 고쳤다. 이전에는 frontmatter 안의 `# section(섹션, 선택): …` 같은 안내 주석 줄을 H1로 오인해,
+  최신 kickoff 템플릿을 쓴 unit의 위키 줄에 실제 제목 대신 주석 텍스트가 박혔다.
+
+**소비자 조치**
+
+- 이번 수정은 **앞으로의 ingest만** 바로잡는다. `harness:ingest`는 이미 링크된 unit의 제목을 다시
+  만들지 않으므로(멱등 skip), 기존 위키에 `# section(…)`류 가짜 제목이 박힌 줄이 있으면
+  `docs/wiki/*.md`에서 **손으로 실제 제목으로 교정**한다. 이후 신규 ingest는 정상 렌더된다.
+
 ## 2026-07-21 fleetview-title-agents-guard
 
 **변경**

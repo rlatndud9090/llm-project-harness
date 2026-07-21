@@ -31,7 +31,7 @@ adr_status: proposed
 
 ## 단계 로그 (append-only)
 
-- {YYYY-MM-DD} kickoff: 브랜치와 raw 골격 생성
+- {YYYY-MM-DD} kickoff: raw 골격 생성
 
 ## 승인 이벤트
 

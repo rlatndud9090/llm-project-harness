@@ -38,7 +38,7 @@
 | --- | --- |
 | "이제 뭐하지?", "다음 뭐 할까?" | `next-feature.md` |
 | "이 아이디어를 작업 단위로 쪼개줘" | `next-feature.md` |
-| 작업 단위 초기세팅(브랜치/raw 생성) | `kickoff.md` |
+| 작업 단위 초기세팅(raw 생성 + 브랜치 정리) | `kickoff.md` |
 | PRD 작성/보강 | `prd-helper.md` |
 | ADR 작성/보강 (필요 시) | `adr-helper.md` |
 | 하네스 submodule 장착/업데이트 | `submodule-attach.md` |

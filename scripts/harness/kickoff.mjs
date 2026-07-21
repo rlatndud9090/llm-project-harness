@@ -4,9 +4,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  BASE_BRANCHES,
+  createAndCheckoutBranch,
   fail,
+  getCurrentBranch,
   harnessPath,
   inferRawUnitFromBranch,
+  isGitRepo,
+  isWorkingTreeClean,
+  localBranchExists,
   parseArgs,
   pathExists,
   rawUnitPath,
@@ -41,6 +47,63 @@ const date = args.date || today();
 const unitDir = rawUnitPath(type, slug);
 const branchName = `${type}/${slug}`;
 const rawPath = `docs/raw/${type}/${slug}`;
+
+// ─── 브랜치 처리 (상황감지) ──────────────────────────────────────────────────
+// raw 골격을 만들기 전에 작업 브랜치를 정리한다. 전역 git 상태를 바꾸는 자동
+// 전환은 "main/master + clean"이라는 안전한 경우로만 제한한다. 그 외(다른 작업
+// 브랜치·dirty·detached·비-git)는 브랜치를 건드리지 않고 힌트만 남겨, 워크트리
+// 격리 vs 현재 위치 checkout 선택을 호출자(에이전트/사용자)에게 맡긴다. --checkout은
+// 현재 위치에서 강제 생성, --no-branch는 브랜치 로직을 완전히 끈다(충돌 시 우선).
+const branchNote = resolveBranch();
+
+function resolveBranch() {
+  if (args["no-branch"]) return "브랜치 로직 건너뜀 (--no-branch)";
+  if (!isGitRepo()) {
+    return args.checkout ? "git 저장소가 아니라 --checkout 무시" : null;
+  }
+
+  const current = getCurrentBranch();
+
+  // 이미 이 유닛의 작업 브랜치 위 → branch-first, 그대로 둔다.
+  if (current === branchName) return `이미 ${branchName} 위 (그대로 둠)`;
+
+  // 목표 브랜치가 이미 있으면 `checkout -b`는 실패한다. 자동 전환 대신 힌트만.
+  if (localBranchExists(branchName)) {
+    console.warn(`[kickoff] 브랜치 ${branchName}이(가) 이미 있습니다. 그 브랜치로 옮기려면 "git checkout ${branchName}"를 직접 실행하세요.`);
+    return `${branchName} 이미 존재 (전환 안 함)`;
+  }
+
+  // --checkout: 현재 위치에서 강제로 새 브랜치 생성.
+  if (args.checkout) {
+    try {
+      createAndCheckoutBranch(branchName);
+      return `${branchName} 생성·전환 (--checkout)`;
+    } catch {
+      fail(`--checkout으로 ${branchName}을(를) 만들 수 없습니다(트리 상태를 확인하세요).`);
+    }
+  }
+
+  // 자동: main/master + clean 일 때만. 그 외는 건드리지 않고 상황을 알린다.
+  const onBase = BASE_BRANCHES.has(current);
+  if (onBase && isWorkingTreeClean()) {
+    try {
+      createAndCheckoutBranch(branchName);
+      return `${branchName} 자동 생성·전환 (main+clean)`;
+    } catch {
+      console.warn(`[kickoff] ${branchName} 자동 생성에 실패했습니다. 수동으로 "git checkout -b ${branchName}"를 실행하세요.`);
+      return `${branchName} 자동 생성 실패`;
+    }
+  }
+
+  if (current === "HEAD") {
+    console.warn("[kickoff] detached HEAD 상태라 브랜치를 만들지 않습니다. 작업 브랜치를 정한 뒤 다시 실행하거나 --checkout을 쓰세요.");
+  } else if (onBase) {
+    console.warn(`[kickoff] 작업 트리에 커밋 안 된 변경이 있어 자동 브랜치 생성을 건너뜁니다. 정리 후 다시 실행하거나 --checkout(현재 위치 생성)/워크트리 격리를 선택하세요.`);
+  } else {
+    console.warn(`[kickoff] 다른 브랜치(${current})에서 실행 중입니다. 자동 전환하지 않습니다. 워크트리로 격리할지, --checkout으로 ${branchName}을(를) 만들지 선택하세요.`);
+  }
+  return `브랜치 미변경 (현재 ${current})`;
+}
 
 const replacements = [
   [/\{제목\}/g, title],
@@ -109,7 +172,7 @@ stage: kickoff
 
 ## 단계 로그 (append-only)
 
-- ${date} kickoff: 브랜치와 raw 골격 생성
+- ${date} kickoff: raw 골격 생성
 `,
   );
   return true;
@@ -173,7 +236,7 @@ if (primaryArtifact) {
 }
 
 console.log(`[kickoff] ${path.relative(process.cwd(), unitDir)}`);
-console.log(`- branch: ${branchInfo.branch}`);
+console.log(`- branch: ${branchNote ?? branchInfo.branch}`);
 console.log(`- title: ${title}`);
 console.log(`- unit: ${type}/${slug}`);
 console.log(`- created: ${created.length ? created.join(", ") : "none (already existed)"}`);

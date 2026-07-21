@@ -1677,6 +1677,77 @@ describe("harness backlog fixes", () => {
       expect(`${result.stdout}${result.stderr}`).toContain("A화면"); // shows the existing area to compare against
     });
   });
+
+  it("ingest renders the real H1 title, not a frontmatter `#` comment line (extractH1 fix)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      // The REAL kickoff template keeps `# section(…)`/`# area(…)` hint lines in the
+      // prd.md frontmatter — the exact shape that used to be mistaken for the H1.
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "title-render", "--title", "제목 렌더", "--area", "렌더 영역"]);
+      expect(k.status).toBe(0);
+      const prdPath = path.join(projectRoot, "docs", "raw", "feature", "title-render", "prd.md");
+      writeFile(prdPath, read(prdPath).replace("status: draft", "status: review")); // settle so it ingests
+      const ing = ingestUnit(projectRoot, "docs/raw/feature/title-render");
+      expect(ing.status).toBe(0);
+
+      const index = read(path.join(projectRoot, "docs", "wiki", "index.md"));
+      expect(index).toContain("**제목 렌더**"); // the real title
+      expect(index).not.toContain("section(섹션"); // never the frontmatter hint comment
+    });
+  });
+});
+
+describe("kickoff branch handling", () => {
+  it("auto-creates and checks out the work branch on main + clean tree", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      commitAll(projectRoot); // main is now clean
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "auto-branch", "--title", "자동 브랜치"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("feature/auto-branch");
+    });
+  });
+
+  it("stays put when --no-branch is passed, even on a clean main", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      commitAll(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "stay", "--title", "머무름", "--no-branch"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("main");
+    });
+  });
+
+  it("does not auto-switch on a dirty tree; prints a skip hint", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot); // untracked files -> dirty
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "dirty-skip", "--title", "더티"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("main");
+      expect(`${k.stdout}${k.stderr}`).toContain("자동 브랜치 생성을 건너뜁니다");
+    });
+  });
+
+  it("hints instead of failing when the target branch already exists", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      commitAll(projectRoot);
+      git(projectRoot, ["branch", "feature/dup"]); // pre-create the target
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "dup", "--title", "중복"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("main"); // did not switch
+      expect(`${k.stdout}${k.stderr}`).toContain("이미 있습니다");
+    });
+  });
+
+  it("is a no-op in a non-git project (kickoff still succeeds)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "nogit", "--title", "노깃"]);
+      expect(k.status).toBe(0);
+      expect(fs.existsSync(path.join(projectRoot, "docs", "raw", "feature", "nogit", "prd.md"))).toBe(true);
+    });
+  });
 });
 
 function frontmatter(fields) {
@@ -1798,6 +1869,12 @@ function commitAll(projectRoot) {
 
 function git(projectRoot, args) {
   execFileSync("git", args, { cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function currentBranch(projectRoot) {
+  // symbolic-ref resolves the branch name even on an unborn branch (fresh repo with
+  // no commits), where `rev-parse --abbrev-ref HEAD` errors.
+  return execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { cwd: projectRoot, encoding: "utf8" }).trim();
 }
 
 function writeFile(filePath, content) {

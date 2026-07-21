@@ -5,6 +5,7 @@ import {
   changelogEntriesAfter,
   changelogHeadId,
   datedBulletDate,
+  extractH1,
   formatApprovalEvent,
   isForbiddenStageTransition,
   isForbiddenTransition,
@@ -55,6 +56,36 @@ describe("parseFrontmatter", () => {
 
   it("returns null without a frontmatter block", () => {
     expect(parseFrontmatter("# no frontmatter here")).toBeNull();
+  });
+});
+
+describe("extractH1", () => {
+  it("returns the body H1, skipping a `#` comment line inside frontmatter", () => {
+    // Mirrors the real kickoff template shape: frontmatter carries `# section(…)`
+    // hint lines before the body's real H1.
+    const content = [
+      "---",
+      'title: "데이터 계약"',
+      "status: draft # draft | review | approved",
+      "# section(섹션, 선택): area보다 큰 상위 단위. …",
+      "section:",
+      "# area(영역): 이 unit이 발전시키는 기능/구조 단위. …",
+      "area:",
+      "---",
+      "",
+      "# PRD: 데이터 계약",
+      "",
+      "## 배경",
+    ].join("\n");
+    expect(extractH1(content)).toBe("PRD: 데이터 계약");
+  });
+
+  it("still finds the H1 when there is no frontmatter", () => {
+    expect(extractH1("# Notes: 작업 단위 제목\n\nDate: 2026-01-01\n")).toBe("Notes: 작업 단위 제목");
+  });
+
+  it("returns null when there is no body H1", () => {
+    expect(extractH1('---\ntitle: "x"\n# hint: not a title\n---\n\n본문만 있고 헤딩은 없다.\n')).toBeNull();
   });
 });
 

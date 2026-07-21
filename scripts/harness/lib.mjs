@@ -77,6 +77,70 @@ export function getCurrentBranch() {
   }
 }
 
+// Base branches kickoff may auto-branch off of. A checkout that moves global git
+// state is only safe from one of these (a fresh feature branch off a clean base);
+// on any other branch kickoff defers the choice (worktree vs in-place) to the caller.
+export const BASE_BRANCHES = new Set(["main", "master"]);
+
+// True when REPO_ROOT is inside a git work tree. kickoff runs in non-git contexts
+// (tests, freshly scaffolded consumers) too, so every branch operation guards on
+// this first and treats a non-repo as "do nothing".
+export function isGitRepo() {
+  try {
+    return (
+      execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim() === "true"
+    );
+  } catch {
+    return false;
+  }
+}
+
+// True when the work tree has no staged/unstaged/untracked changes (porcelain
+// output is empty). Auto-branching only happens on a clean tree so a checkout can
+// never carry or strand a work-in-progress. Errors read as "not clean" (fail safe).
+export function isWorkingTreeClean() {
+  try {
+    return (
+      execFileSync("git", ["status", "--porcelain"], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim() === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
+// True when a local branch of this name already exists. Used so kickoff never runs
+// `checkout -b` on an existing branch (which would fail); it hints instead.
+export function localBranchExists(branch) {
+  try {
+    execFileSync("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Creates and switches to a new branch. Throws on failure (e.g. dirty tree,
+// invalid name); callers decide whether to warn or abort.
+export function createAndCheckoutBranch(branch) {
+  execFileSync("git", ["checkout", "-b", branch], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
 export function parseArgs(argv) {
   const args = { _: [] };
   for (let index = 0; index < argv.length; index += 1) {
@@ -197,8 +261,13 @@ export function bodyAfterFrontmatter(content) {
   return content.slice(end + 4);
 }
 
+// The first body H1. Skips the leading frontmatter block first so a `# ...`
+// comment line inside frontmatter (e.g. the `# section(섹션, 선택): …` hints the
+// kickoff templates carry) is never mistaken for the title. bodyAfterFrontmatter
+// returns the whole content unchanged when there is no frontmatter, so this stays
+// correct for frontmatter-less artifacts (notes.md) too.
 export function extractH1(content) {
-  const match = /^#\s+(.+)$/m.exec(content);
+  const match = /^#\s+(.+)$/m.exec(bodyAfterFrontmatter(content));
   return match?.[1]?.trim() ?? null;
 }
 

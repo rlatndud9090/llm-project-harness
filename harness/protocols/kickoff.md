@@ -54,6 +54,26 @@ npm run harness:kickoff -- --title "데이터 계약"
 npm run harness:kickoff -- --type feature --slug data-contract --title "데이터 계약"
 ```
 
+### 브랜치 처리 (상황감지)
+
+`$kickoff`은 raw 골격을 만들기 **전에** 작업 브랜치를 정리한다. 전역 git 상태를
+바꾸는 자동 전환은 안전한 경우로만 제한한다.
+
+| 상황 | 동작 |
+| --- | --- |
+| `main`/`master` + 작업 트리 clean | 작업 브랜치를 **자동 생성·전환**(`git checkout -b <type>/<slug>`) |
+| 이미 이 유닛의 작업 브랜치 위 | 그대로 둔다 (branch-first) |
+| 목표 브랜치가 이미 존재 | 전환하지 않고 힌트만 (`git checkout <branch>`를 직접) |
+| 다른 브랜치 / 커밋 안 된 변경 / detached HEAD / 비-git | 브랜치를 건드리지 않고 힌트만 |
+
+즉 개발자가 `main`에서 깨끗한 상태로 kickoff하면 브랜치가 알아서 생기고, 이미
+작업 브랜치를 파 둔 branch-first 습관도 그대로 동작한다. 그 밖의 상황에서는 kickoff이
+자동 전환을 **하지 않고**, 진입한 에이전트가 사용자에게 **워크트리로 격리할지
+(EnterWorktree) 현재 위치에서 브랜치를 팔지(`--checkout`)** 물어본 뒤 진행한다.
+
+- `--checkout`: 현재 위치에서 `<type>/<slug>` 브랜치를 강제로 생성·전환한다.
+- `--no-branch`: 브랜치 로직을 완전히 끈다(둘이 겹치면 `--no-branch`가 우선).
+
 ### `--area` / `--section` (선택): 영역·섹션 시드
 
 이 unit이 발전시키는 기능/구조 영역을 이미 알면 `--area "<영역>"`로 시드한다(여러
