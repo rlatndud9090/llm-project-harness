@@ -103,17 +103,46 @@ export function isGitRepo() {
 // output is empty). Auto-branching only happens on a clean tree so a checkout can
 // never carry or strand a work-in-progress. Errors read as "not clean" (fail safe).
 export function isWorkingTreeClean() {
+  const changed = workingTreeChangedPaths();
+  return Array.isArray(changed) && changed.length === 0;
+}
+
+// Returns the working-tree paths git reports as changed (staged, unstaged, or
+// untracked), each repo-root-relative and POSIX. `-uall` expands untracked
+// directories to individual files so a caller can reason about exact paths — git
+// otherwise collapses a wholly-untracked dir to an ancestor entry (e.g. the whole
+// `docs/raw/`), which would defeat a per-subtree ignore. Returns null on error so
+// callers can fail safe (treat "unknown" as not clean). Lets a caller decide a
+// tree is "clean enough" by disregarding paths it owns.
+export function workingTreeChangedPaths() {
+  let out;
   try {
-    return (
-      execFileSync("git", ["status", "--porcelain"], {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim() === ""
-    );
+    // `-c core.quotepath=false` stops git from octal-escaping non-ASCII paths, so
+    // callers get the real UTF-8 path instead of a config-dependent quoted form.
+    // (Space-containing names are still double-quoted, but the harness's own paths
+    // are all ASCII/space-free, and any unmatched path safely reads as "changed".)
+    out = execFileSync("git", ["-c", "core.quotepath=false", "status", "--porcelain", "-uall"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
   } catch {
-    return false;
+    return null;
   }
+  const trimmed = out.replace(/\n+$/, "");
+  if (trimmed === "") return [];
+  return trimmed
+    .split("\n")
+    .map((line) => {
+      // Porcelain v1: two status columns + a space, then the path. Renames/copies
+      // render as "old -> new"; take the destination. Paths with special or
+      // non-ASCII characters are git-quoted and left verbatim here — they will not
+      // match an ASCII ignore set, so they correctly read as real changes.
+      const body = line.slice(3);
+      const arrow = body.indexOf(" -> ");
+      return arrow >= 0 ? body.slice(arrow + 4) : body;
+    })
+    .filter((entry) => entry.length > 0);
 }
 
 // True when a local branch of this name already exists. Used so kickoff never runs

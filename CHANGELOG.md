@@ -14,6 +14,27 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-23 kickoff-own-artifacts-not-dirty
+
+**변경**
+
+- **`$kickoff`의 main+clean auto-checkout 판정이 kickoff 자신의 산출물을 dirty로 세지 않도록
+  고쳤다.** 지금까지 clean 판정은 `git status --porcelain`(untracked 포함)이 비어야 했는데,
+  `$next-feature`가 방금 남긴 `docs/raw/.next-unit` 앵커가 untracked라 tree를 dirty로 만들어,
+  `main`에 있어도 auto-checkout이 막히고 프로토콜상 에이전트가 "워크트리 vs checkout"을 물으며
+  **raw 골격 생성·`.next-unit` 소비까지 블록**되던 자기충돌이 있었다. 이제 clean 판정은 kickoff이
+  소비할 `.next-unit` 앵커와 대상 unit의 raw 디렉터리(`docs/raw/<type>/<slug>/`, 재실행 잔재
+  포함)만 남은 트리를 clean으로 본다. 무관한 WIP가 하나라도 섞이면 여전히 dirty로 남아 워크트리
+  vs checkout 선택 경로를 탄다.
+- `lib.mjs`에 `workingTreeChangedPaths()`(porcelain 경로 목록, 오류 시 null)를 추가하고
+  `isWorkingTreeClean()`을 그 위에 재정의했다(동작 동일). `kickoff.mjs`는 이 목록에서 자기
+  산출물을 제외해 판정한다. 프로토콜 문서(`kickoff.md`·`next-feature.md`)도 정합화했다.
+
+**소비자 조치**
+
+- 없음(동작만 확장·수정). `$next-feature → $kickoff` 정상 플로우가 더는 앵커 때문에 막히지
+  않는다. `main`에서 kickoff 산출물 외에 깨끗하면 이전처럼 작업 브랜치가 자동 생성된다.
+
 ## 2026-07-22 wiki-strip-authoring-and-harness-freshness
 
 **변경**

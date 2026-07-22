@@ -11,7 +11,6 @@ import {
   harnessPath,
   inferRawUnitFromBranch,
   isGitRepo,
-  isWorkingTreeClean,
   localBranchExists,
   parseArgs,
   pathExists,
@@ -22,6 +21,7 @@ import {
   titleFromSlug,
   today,
   validateTypeAndSlug,
+  workingTreeChangedPaths,
   writeText,
 } from "./lib.mjs";
 
@@ -50,11 +50,28 @@ const rawPath = `docs/raw/${type}/${slug}`;
 
 // ─── 브랜치 처리 (상황감지) ──────────────────────────────────────────────────
 // raw 골격을 만들기 전에 작업 브랜치를 정리한다. 전역 git 상태를 바꾸는 자동
-// 전환은 "main/master + clean"이라는 안전한 경우로만 제한한다. 그 외(다른 작업
-// 브랜치·dirty·detached·비-git)는 브랜치를 건드리지 않고 힌트만 남겨, 워크트리
-// 격리 vs 현재 위치 checkout 선택을 호출자(에이전트/사용자)에게 맡긴다. --checkout은
-// 현재 위치에서 강제 생성, --no-branch는 브랜치 로직을 완전히 끈다(충돌 시 우선).
+// 전환은 "main/master + clean"이라는 안전한 경우로만 제한한다. 단, "clean" 판정은
+// kickoff 자신의 산출물 — $next-feature가 남긴 `docs/raw/.next-unit` 앵커(이번에
+// 소비한다)와 대상 unit의 raw 디렉터리(이번에 만든다/재실행 잔재) — 은 dirty로 세지
+// 않는다. 이 자기 산출물을 dirty로 오인하면 next-feature→kickoff 정상 플로우에서
+// 앵커 하나 때문에 auto-checkout이 막히고 골격 생성까지 블록되기 때문이다. 그 외
+// (무관한 WIP·다른 작업 브랜치·detached·비-git)는 브랜치를 건드리지 않고 힌트만
+// 남겨, 워크트리 격리 vs 현재 위치 checkout 선택을 호출자(에이전트/사용자)에게 맡긴다.
+// --checkout은 현재 위치에서 강제 생성, --no-branch는 브랜치 로직을 완전히 끈다(충돌 시 우선).
 const branchNote = resolveBranch();
+
+// main/master 자동 전환용 clean 판정. kickoff 자신의 산출물만 남은 트리는 "clean"으로
+// 본다: 소비할 `.next-unit` 앵커와, (재실행 시) 대상 unit의 raw 디렉터리. 무관한 변경이
+// 하나라도 섞여 있으면 dirty로 남아 호출자에게 워크트리 vs checkout 선택을 넘긴다.
+// git 오류(null)는 안전하게 dirty로 읽는다.
+function treeCleanForKickoff() {
+  const changed = workingTreeChangedPaths();
+  if (changed === null) return false;
+  return changed.every((entry) => {
+    const p = entry.replace(/\/$/, "");
+    return p === "docs/raw/.next-unit" || p === rawPath || p.startsWith(`${rawPath}/`);
+  });
+}
 
 function resolveBranch() {
   if (args["no-branch"]) return "브랜치 로직 건너뜀 (--no-branch)";
@@ -85,7 +102,7 @@ function resolveBranch() {
 
   // 자동: main/master + clean 일 때만. 그 외는 건드리지 않고 상황을 알린다.
   const onBase = BASE_BRANCHES.has(current);
-  if (onBase && isWorkingTreeClean()) {
+  if (onBase && treeCleanForKickoff()) {
     try {
       createAndCheckoutBranch(branchName);
       return `${branchName} 자동 생성·전환 (main+clean)`;

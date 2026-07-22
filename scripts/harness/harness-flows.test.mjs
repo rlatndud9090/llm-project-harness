@@ -1781,6 +1781,63 @@ describe("kickoff branch handling", () => {
     });
   });
 
+  it("auto-branches when the only change is the next-feature anchor it will consume", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      commitAll(projectRoot); // main is clean...
+      // ...except the $next-feature anchor kickoff is about to consume. An untracked
+      // .next-unit must NOT read as WIP that blocks the main+clean auto-checkout.
+      writeFile(path.join(projectRoot, "docs", "raw", ".next-unit"), "feature/anchored | prd.md | 앵커영역 | \n");
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "anchored", "--title", "앵커"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("feature/anchored");
+      // The anchor is still consumed (deleted) even though the branch moved onto it.
+      expect(fs.existsSync(path.join(projectRoot, "docs", "raw", ".next-unit"))).toBe(false);
+    });
+  });
+
+  it("auto-branches on a re-run when only the target unit's raw dir is untracked", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      commitAll(projectRoot);
+      // Leftover skeleton from an aborted prior kickoff of the SAME unit: untracked
+      // files under the target raw dir are kickoff's own footprint, not unrelated WIP.
+      writeFile(path.join(projectRoot, "docs", "raw", "feature", "rerun", "notes.md"), "# 잔재\n");
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "rerun", "--title", "재실행"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("feature/rerun");
+    });
+  });
+
+  it("defers (stays on main) when unrelated WIP sits alongside the anchor", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      commitAll(projectRoot);
+      writeFile(path.join(projectRoot, "docs", "raw", ".next-unit"), "feature/mixed | prd.md | 혼합영역 | \n");
+      writeFile(path.join(projectRoot, "unrelated.txt"), "WIP\n"); // genuine unrelated change
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "mixed", "--title", "혼합"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("main");
+      expect(`${k.stdout}${k.stderr}`).toContain("자동 브랜치 생성을 건너뜁니다");
+    });
+  });
+
+  it("defers when a prefix-sibling unit dir is untracked (pins the rawPath+'/' guard)", () => {
+    withGitProject((projectRoot) => {
+      attach(projectRoot);
+      commitAll(projectRoot);
+      // Kicking off feature/foo while feature/foobar has untracked WIP. `foobar`
+      // shares the `foo` prefix but is a DIFFERENT unit — it must read as dirty so
+      // kickoff defers. This pins the trailing slash in startsWith(rawPath + "/"):
+      // dropping it would match foobar as owned and wrongly auto-branch over its WIP.
+      writeFile(path.join(projectRoot, "docs", "raw", "feature", "foobar", "notes.md"), "# 남의 WIP\n");
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "foo", "--title", "푸"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("main");
+      expect(`${k.stdout}${k.stderr}`).toContain("자동 브랜치 생성을 건너뜁니다");
+    });
+  });
+
   it("stays put when --no-branch is passed, even on a clean main", () => {
     withGitProject((projectRoot) => {
       attach(projectRoot);
