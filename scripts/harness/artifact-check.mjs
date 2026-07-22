@@ -1,9 +1,12 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   BROAD_FEATURE_CATEGORIES,
   CURRENT_MARKER,
+  FRESHNESS_THROTTLE_MS,
   OPERATIONS_CATEGORIES,
   POST_APPROVAL_STAGES,
   changelogHeadId,
@@ -13,6 +16,8 @@ import {
   bodyAfterFrontmatter,
   collectDeclaredSections,
   fail,
+  findWikiAuthoringSentinel,
+  shouldProbeFreshness,
   isPreAdrStage,
   skeletonAdrBody,
   findHarnessRoot,
@@ -123,6 +128,67 @@ function assertHarnessSync() {
   }
 }
 
+// Submodule freshness nudge (consumer mode, warning-only). Compares the pinned
+// `.harness` commit against the remote default branch head; if the submodule is
+// behind, warns so a project can update mid-work. Best-effort: bounded timeouts,
+// throttled to one network probe per window (so it never slows down every commit),
+// and any failure (offline, no remote, detached) is swallowed — it must never fail
+// the check. Skipped in CI / test / when opted out.
+function assertHarnessFresh() {
+  if (harnessRepoMode) return;
+  if (process.env.HARNESS_SKIP_REMOTE_CHECK || process.env.CI || process.env.VITEST) return;
+
+  // Throttle the network probe by an OS-temp marker's mtime (kept out of the repo so
+  // it never shows in git status). Touch it before probing so an offline/slow probe
+  // also counts against the window and never repeats its timeout on the next check.
+  const marker = path.join(os.tmpdir(), `harness-freshness-${REPO_ROOT.replace(/[^a-zA-Z0-9]+/g, "-")}`);
+  let lastProbeMs = 0;
+  try {
+    lastProbeMs = fs.statSync(marker).mtimeMs;
+  } catch {
+    // no marker yet → probe now
+  }
+  if (!shouldProbeFreshness(lastProbeMs, Date.now(), FRESHNESS_THROTTLE_MS)) return;
+  try {
+    fs.writeFileSync(marker, "");
+  } catch {
+    // temp not writable → proceed without throttling; the probe is still bounded
+  }
+
+  try {
+    const local = git(["-C", harnessRoot, "rev-parse", "HEAD"], 2000);
+    const remoteLine = git(["-C", harnessRoot, "ls-remote", "origin", "HEAD"], 5000);
+    const remote = remoteLine.split(/\s+/)[0] ?? "";
+    if (local && remote && local !== remote) {
+      console.warn(
+        `[harness:check] WARNING: .harness 서브모듈이 원격보다 뒤처져 있습니다 (로컬 ${local.slice(0, 9)} → 원격 ${remote.slice(0, 9)}). ` +
+          `편한 시점에 "git submodule update --remote .harness" 후 "npm run harness:sync"로 최신화하세요. ` +
+          `이 하네스 정비 커밋은 전용 브랜치 없이 지금 작업 중인 브랜치에 chore 하나로 태워도 됩니다 ` +
+          `(.harness/harness/protocols/commit-protocol.md "하네스 정비 ride-along" 참고).`,
+      );
+    }
+  } catch {
+    // best-effort: offline / no origin / detached / git absent → skip silently.
+  }
+}
+
+function git(args, timeout) {
+  return execFileSync("git", args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout,
+    killSignal: "SIGKILL",
+    // Never let a network op stall on an interactive prompt (credentials, host-key,
+    // passphrase). BatchMode + bounded ConnectTimeout make ls-remote fail fast when
+    // unreachable, so the freshness probe can never hang the check.
+    env: {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: "0",
+      GIT_SSH_COMMAND: `${process.env.GIT_SSH_COMMAND ?? "ssh"} -o BatchMode=yes -o ConnectTimeout=5`,
+    },
+  }).trim();
+}
+
 // The wiki is index.md plus (when the project declares >=2 sections) one file per
 // declared section. Any other file is stale/unexpected. A single-index project
 // (<=2 sections... i.e. <2) must not carry section files at all.
@@ -153,6 +219,28 @@ function assertWikiShape() {
   if (unexpected.length > 0) {
     const shape = split ? "index.md and declared section files" : "index.md";
     addError(`docs/wiki must contain only ${shape}; found ${unexpected.join(", ")}`);
+  }
+}
+
+// A consuming project's wiki must hold only project content (direction + area/
+// section lineage links), never the "how to write the wiki" guidance. Older
+// attach/kickoff seeds copied the whole template — rules and all — into the wiki;
+// this gate flags any wiki file that still carries that boilerplate so the reform
+// (moving guidance to wiki-ingest.md) is machine-forced on submodule update. One
+// error per file; the sentinels live in lib (shared, testable).
+function assertWikiNoAuthoringGuidance() {
+  if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;
+
+  for (const wikiPath of listWikiFiles()) {
+    const sentinel = findWikiAuthoringSentinel(readText(wikiPath));
+    if (sentinel) {
+      addError(
+        `docs/wiki/${path.basename(wikiPath)}에 위키 '작성 규칙' 안내문("${sentinel}")이 남아 있습니다. ` +
+          `소비 프로젝트 위키에는 프로젝트 방향성과 raw unit 계보 링크만 둡니다. 작성 규칙은 ` +
+          `.harness/harness/protocols/wiki-ingest.md로 이관됐으니 상단 안내 blockquote, "Raw Units" 설명 문단, ` +
+          `하단 "Maintenance" 섹션 같은 규칙 문구를 삭제하세요(방향성·계보 링크는 유지).`,
+      );
+    }
   }
 }
 
@@ -1110,7 +1198,9 @@ assertHarnessShape();
 assertNoHarnessDocsNamespace();
 assertProjectDocsPresent();
 assertHarnessSync();
+assertHarnessFresh();
 assertWikiShape();
+assertWikiNoAuthoringGuidance();
 assertWikiLinks();
 assertWikiFeatureTaxonomy();
 assertSectionLayout();

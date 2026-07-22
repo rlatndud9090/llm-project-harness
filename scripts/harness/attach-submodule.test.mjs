@@ -209,6 +209,9 @@ function runHarnessCheck(projectRoot) {
   execFileSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "artifact-check.mjs")], {
     cwd: projectRoot,
     encoding: "utf8",
+    // `.harness` points at the provider repo (real origin); skip the network
+    // freshness probe so the check stays fast and deterministic in tests.
+    env: { ...process.env, HARNESS_SKIP_REMOTE_CHECK: "1" },
   });
 }
 

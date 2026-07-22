@@ -4,9 +4,13 @@ import {
   adrBodyLooksAuthored,
   changelogEntriesAfter,
   changelogHeadId,
+  FRESHNESS_THROTTLE_MS,
+  WIKI_AUTHORING_SENTINELS,
   datedBulletDate,
   extractH1,
+  findWikiAuthoringSentinel,
   formatApprovalEvent,
+  shouldProbeFreshness,
   isForbiddenStageTransition,
   isForbiddenTransition,
   isPreAdrStage,
@@ -380,6 +384,76 @@ describe("parseAreaSections", () => {
   it("stops a section at the next `##` heading (Maintenance is not a bullet)", () => {
     const sections = parseAreaSections(wiki);
     expect(sections).toHaveLength(2);
+  });
+});
+
+describe("findWikiAuthoringSentinel", () => {
+  it("detects each leaked authoring-guidance boilerplate phrase", () => {
+    for (const sentinel of WIKI_AUTHORING_SENTINELS) {
+      expect(findWikiAuthoringSentinel(`앞부분\n${sentinel} 뒷부분`)).toBe(sentinel);
+    }
+  });
+
+  it("detects the real boilerplate blocks seen in consumer wikis", () => {
+    const maintenance = "## Maintenance\n\n- 새 raw work unit은 `docs/raw/...` 아래에 둔다.\n";
+    const rawUnitsIntro = "각 `### <영역>`은 앱의 **좁은 기능/구조 단위**다.";
+    const topBlockquote = "> 이 한 장은 에이전트가 작업 시작 시 로드하는 얇은 인덱스다.";
+    expect(findWikiAuthoringSentinel(maintenance)).toBe("새 raw work unit은");
+    expect(findWikiAuthoringSentinel(rawUnitsIntro)).toBe("각 `### <영역>`은 앱의");
+    expect(findWikiAuthoringSentinel(topBlockquote)).toBe("이 한 장은 에이전트가");
+  });
+
+  it("returns null for a clean project wiki (direction + lineage only)", () => {
+    const clean = [
+      "---",
+      "kind: wiki-index",
+      "summary: 프로젝트 방향성과 raw unit 네비게이션.",
+      "authoring_rules: .harness/harness/protocols/wiki-ingest.md 참고.",
+      "---",
+      "",
+      "# 프로젝트 Wiki",
+      "",
+      "## 큰 방향성",
+      "",
+      "- **무엇**: 배틀 기록 웹앱",
+      "- **지식 경계**: raw PRD/ADR/notes가 진실 원천이고, 이 index는 navigation만 맡는다.",
+      "",
+      "## Raw Units (영역별 계보)",
+      "",
+      "### 배틀 세션",
+      "",
+      "- `2026-01-01` **세션 상태 계약** — [PRD](../raw/feature/battle-session/prd.md)",
+      "",
+    ].join("\n");
+    expect(findWikiAuthoringSentinel(clean)).toBeNull();
+  });
+
+  it("does not flag the thin template's frontmatter pointer", () => {
+    // The new template's authoring_rules pointer mentions the rules doc without
+    // copying any rule prose — it must not read as a sentinel.
+    const pointer = "authoring_rules: 위키 구조·영역(area)/섹션(section) 작성 규칙은 .harness/harness/protocols/wiki-ingest.md 참고.";
+    expect(findWikiAuthoringSentinel(pointer)).toBeNull();
+  });
+});
+
+describe("shouldProbeFreshness", () => {
+  it("probes when there is no prior marker (lastProbeMs 0 vs a real now)", () => {
+    // In real use nowMs is Date.now() (~1.7e12), far past the throttle from epoch,
+    // so a missing marker (0) always probes. Use a now >= the window to prove it.
+    expect(shouldProbeFreshness(0, FRESHNESS_THROTTLE_MS)).toBe(true);
+    expect(shouldProbeFreshness(0, 2 * FRESHNESS_THROTTLE_MS)).toBe(true);
+  });
+
+  it("skips within the throttle window and probes once it elapses", () => {
+    const now = 10 * FRESHNESS_THROTTLE_MS;
+    expect(shouldProbeFreshness(now - 1, now)).toBe(false); // just probed
+    expect(shouldProbeFreshness(now - (FRESHNESS_THROTTLE_MS - 1), now)).toBe(false); // still inside
+    expect(shouldProbeFreshness(now - FRESHNESS_THROTTLE_MS, now)).toBe(true); // window elapsed
+  });
+
+  it("honors a custom throttle window", () => {
+    expect(shouldProbeFreshness(1000, 1500, 1000)).toBe(false);
+    expect(shouldProbeFreshness(1000, 2000, 1000)).toBe(true);
   });
 });
 

@@ -587,10 +587,9 @@ describe("artifact-check area gates", () => {
       seedAreaFeature(projectRoot, "paid", { status: "review", area: "결제" });
 
       const wikiPath = path.join(projectRoot, "docs", "wiki", "index.md");
-      writeFile(
-        wikiPath,
-        read(wikiPath).replace("## Maintenance", "## 참고\n\n- 관련: [PRD](../raw/feature/paid/prd.md)\n\n## Maintenance"),
-      );
+      // Append a `## 참고` section after the 배송 lineage (the thin template has no
+      // `## Maintenance` to anchor on). The paid link then lives under `## 참고`.
+      writeFile(wikiPath, `${read(wikiPath).trimEnd()}\n\n## 참고\n\n- 관련: [PRD](../raw/feature/paid/prd.md)\n`);
 
       const result = runCheck(projectRoot);
       // The paid link lives under `## 참고`, not `### 배송`, so it must not be
@@ -986,6 +985,80 @@ describe("artifact-check wiki taxonomy", () => {
       const result = runCheck(projectRoot);
       expect(result.status).not.toBe(0);
       expect(`${result.stdout}${result.stderr}`).toContain('broad wiki category "Product & Architecture"');
+    });
+  });
+});
+
+describe("artifact-check wiki authoring-guidance leak", () => {
+  it("passes the thin attached template (only direction + Raw Units heading)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      // The freshly attached wiki is the thin template — no authoring guidance.
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("fails when the wiki still carries the old Maintenance rules block", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "wiki", "index.md"),
+        [
+          "# Wiki",
+          "",
+          "## 큰 방향성",
+          "",
+          "- **무엇**: 테스트 프로젝트",
+          "",
+          "## Raw Units (영역별 계보)",
+          "",
+          "## Maintenance",
+          "",
+          "- 새 raw work unit은 `docs/raw/{feature,bugfix,chore}/branch-slug/` 아래에 둔다.",
+          "",
+        ].join("\n"),
+      );
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("위키 '작성 규칙' 안내문");
+    });
+  });
+
+  it("fails when the wiki still carries the top authoring blockquote", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      writeFile(
+        path.join(projectRoot, "docs", "wiki", "index.md"),
+        [
+          "# Wiki",
+          "",
+          "> 이 한 장은 에이전트가 작업 시작 시 로드하는 얇은 네비게이션 인덱스다.",
+          "",
+          "## 큰 방향성",
+          "",
+          "- **무엇**: 테스트",
+          "",
+          "## Raw Units (영역별 계보)",
+          "",
+        ].join("\n"),
+      );
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("wiki-ingest.md");
+    });
+  });
+
+  it("passes a clean project wiki that keeps direction and lineage only", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      seedAreaFeature(projectRoot, "clean", { status: "review", area: "깨끗한영역" });
+      ingestArea(projectRoot, "docs/raw/feature/clean");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).toBe(0);
+      expect(`${result.stdout}${result.stderr}`).not.toContain("위키 '작성 규칙' 안내문");
     });
   });
 });
@@ -1852,6 +1925,11 @@ function runCheck(projectRoot) {
   return spawnSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "artifact-check.mjs")], {
     cwd: projectRoot,
     encoding: "utf8",
+    // Disable the best-effort submodule freshness probe in tests: `.harness` here
+    // points at the provider repo (which has a real origin), so the network
+    // ls-remote would add latency and flakiness. The probe is covered by its own
+    // pure unit test (shouldProbeFreshness).
+    env: { ...process.env, HARNESS_SKIP_REMOTE_CHECK: "1" },
   });
 }
 

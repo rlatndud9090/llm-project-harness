@@ -544,6 +544,48 @@ export const BROAD_FEATURE_CATEGORIES = new Set([
 // its count/placement is machine-checked; which line earns it stays model-judged.
 export const CURRENT_MARKER = "_(현재)_";
 
+// ─── Wiki authoring-guidance leak detection ─────────────────────────────────
+// A consuming project's docs/wiki carries ONLY project content: direction and the
+// dated area/section lineage links. The "how to write the wiki" guidance (what an
+// area is, how to read the timeline, how to run ingest, the Maintenance rules)
+// belongs in harness/protocols/wiki-ingest.md, NOT baked into each project's wiki.
+// Older attach/kickoff seeds copied the whole template — rules and all — into the
+// wiki, freezing the guidance there. These sentinels are high-precision phrases
+// that appear ONLY in that leaked boilerplate (never in real project content or the
+// current thin template), so artifact-check can flag a wiki that still carries it.
+export const WIKI_AUTHORING_SENTINELS = [
+  "이 한 장은 에이전트가", // 상단 안내 blockquote (신형)
+  "이 문서는 항상 로딩되는", // 상단 안내 blockquote (구형)
+  "상세 종합본은 두지 않으며", // "합성 문서로 키우지 않는다" 안내
+  "종합 요약 문서로 키우지 않는다", // 구형 안내 변형
+  "각 `### <영역>`은 앱의", // "Raw Units" 설명 문단 도입부
+  "영역 설계 원칙", // "Raw Units" 설명 문단의 규칙 목록
+  "읽는 법 —", // "읽는 법 — 한 영역 아래 줄들은…" 타임라인 읽기 안내
+  "새 raw work unit은", // 하단 "Maintenance" 규칙 블록
+];
+
+// The first authoring-guidance sentinel present in wiki text, or null when the wiki
+// is clean. Pure/testable; the checker turns a hit into a hard error that points to
+// wiki-ingest.md as the guidance's new home.
+export function findWikiAuthoringSentinel(text) {
+  return WIKI_AUTHORING_SENTINELS.find((sentinel) => text.includes(sentinel)) ?? null;
+}
+
+// ─── Submodule freshness probe throttle ─────────────────────────────────────
+// The freshness nudge does a live `git ls-remote` (network). Running it on every
+// harness:check would add latency to every commit (pre-commit runs the check). The
+// user asked for an occasional ("한번씩") nudge, so we throttle the network probe to
+// at most once per window per repo, tracked by an OS-temp marker's mtime (kept out
+// of the repo so it never shows in git status). Skipping the probe is not a skip of
+// the check — only the network freshness lookup is rate-limited.
+export const FRESHNESS_THROTTLE_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+// True when enough time has passed since the last freshness probe (or there was
+// none). Pure/testable; `lastProbeMs = 0` (no marker) always probes.
+export function shouldProbeFreshness(lastProbeMs, nowMs, throttleMs = FRESHNESS_THROTTLE_MS) {
+  return nowMs - lastProbeMs >= throttleMs;
+}
+
 // A unit's `area` frontmatter is a comma-separated list (one work unit may evolve
 // more than one area). Split, trim, and drop entries that are not real
 // declarations: an empty value, a leftover `#` hint value, or an unsubstituted

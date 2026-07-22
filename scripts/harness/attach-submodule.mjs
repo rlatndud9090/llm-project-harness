@@ -211,11 +211,13 @@ function ensureProjectDocs() {
     path.join(projectRoot, "docs", "wiki", "index.md"),
     readHarnessTemplate("wiki", "index.md"),
     "LLM-HARNESS:WIKI",
-    `## Harness Maintenance
-
-- 새 raw work unit은 \`docs/raw/{feature,bugfix,chore}/branch-slug/\` 아래에 둔다.
-- raw unit을 추가하면 \`npm run harness:ingest -- docs/raw/<type>/<slug> --area "<영역>"\`를 실행한다(레거시 별칭: \`--category\`).
-- 기존 문서는 강제로 이동하지 않는다. 새 작업부터 raw/wiki 규칙을 적용한다.
+    // Retrofit injects only a pointer, never authoring rules: the wiki holds project
+    // content (direction + lineage links); the "how to write the wiki" guidance lives
+    // in wiki-ingest.md. Keep this block sentinel-free so harness:check does not flag
+    // it as leaked guidance (see WIKI_AUTHORING_SENTINELS / assertWikiNoAuthoringGuidance).
+    `이 위키에는 프로젝트 방향성과 raw unit 계보 링크만 둡니다. 위키 구조·영역(area)/섹션(section)
+작성 규칙은 \`.harness/harness/protocols/wiki-ingest.md\`를 참고하세요(이 안내는 규칙 본문을
+위키에 복사하지 않습니다).
 `,
   );
 

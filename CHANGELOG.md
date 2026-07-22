@@ -14,6 +14,39 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-22 wiki-strip-authoring-and-harness-freshness
+
+**변경**
+
+- **위키 템플릿을 얇은 골격으로 재설계.** `harness/templates/wiki/index.md`에서 '위키 작성 규칙'
+  설명(상단 안내 blockquote, `## Raw Units` 아래 "영역이란/영역 설계 원칙/읽는 법" 설명 문단,
+  하단 `## Maintenance` 섹션)을 전부 제거했다. 이제 템플릿에는 frontmatter 포인터(`summary`·
+  `authoring_rules`), `## 큰 방향성`, `## Raw Units (영역별 계보)` 헤딩만 남는다. 작성 규칙은
+  정본인 `harness/protocols/wiki-ingest.md`로 이관했다(위키 파일 내용 계약 섹션 신설).
+- **`assertWikiNoAuthoringGuidance` 게이트 신설(하드 에러, 소비자 전용).** `docs/wiki/*.md`에
+  옛 작성-규칙 boilerplate가 남아 있으면 `harness:check`가 sentinel로 감지해 실패시킨다. sentinel은
+  그 boilerplate에만 나타나는 고정밀 문구다(lib `WIKI_AUTHORING_SENTINELS`).
+- **`attach --retrofit`의 위키 주입 정리.** 기존엔 `## Harness Maintenance` 규칙 블록을 소비자
+  위키에 주입했는데, 규칙 대신 `wiki-ingest.md`를 가리키는 sentinel-free 포인터만 주입하도록 바꿨다.
+- **서브모듈 최신 여부 warning.** `harness:check`가 소비 프로젝트에서 `.harness`가 원격보다
+  뒤처졌으면 경고만 남긴다(best-effort·타임아웃, 오프라인/CI/`HARNESS_SKIP_REMOTE_CHECK`는 skip).
+- **하네스 정비 ride-along 예외 명문화.** `.harness` 최신화와 그 정합화는 전용 브랜치 없이 현재
+  브랜치에 chore 커밋 하나로 태워도 된다(`kickoff --type chore --no-branch`). `commit-protocol.md`·
+  `submodule-attach.md`에 규칙을 추가했다. 기계 게이트는 이 ride-along을 막지 않는다.
+
+**소비자 조치 (필수)**
+
+1. **`docs/wiki/index.md`(및 분리된 섹션 파일)에서 '위키 작성 규칙' 문구를 삭제한다.** 구체적으로
+   상단 안내 blockquote(`이 한 장은 에이전트가…` / `이 문서는 항상 로딩되는…`), `## Raw Units`
+   아래의 설명 문단(`각 ### <영역>은 앱의…`, `영역 설계 원칙`, `읽는 법 —` 및 예시 코드블록),
+   하단 `## Maintenance` 섹션을 제거한다. **`## 큰 방향성`과 `### <영역>`별 계보 링크는 그대로
+   유지**한다. 삭제 후 `harness:check`가 green이면 완료다(남은 잔재는 sentinel 에러로 알려준다).
+2. (선택) 위키 최상단에 `summary`·`authoring_rules` frontmatter 포인터를 새 템플릿처럼 추가하면
+   "이 파일이 무엇이고 규칙은 어디에 있는지"가 명확해진다.
+3. `npm run harness:sync -- --ack`로 이 항목 반영을 확인한다(`.harness-sync` 갱신).
+
+서브모듈 최신 여부 warning과 ride-along 예외는 추가 동작이라 별도 소비자 조치가 없다.
+
 ## 2026-07-21 kickoff-branch-situational
 
 **변경**

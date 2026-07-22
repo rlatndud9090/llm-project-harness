@@ -181,6 +181,24 @@ EOF
 - 하네스 정책 변경과 제품 기능 구현은 가능하면 분리한다.
 - 같은 커밋에 섞어야 한다면 raw notes에 이유를 남긴다.
 
+## 하네스 정비 ride-along (브랜치 규율 예외)
+
+작업 단위는 원칙적으로 자기 브랜치에서 커밋한다(branch-per-unit). **딱 하나의 예외**로,
+**`.harness` 서브모듈 최신화와 그에 부수되는 정합화**(`harness:sync --ack`, 위키 규칙-잔재
+제거, frontmatter 마이그레이션 등)는 **전용 브랜치나 워크트리를 새로 파지 않고 지금 작업 중인
+아무 브랜치에 chore 커밋 하나로 태워** 반영해도 된다.
+
+- 정비용 raw unit은 `npm run harness:kickoff -- --type chore --slug harness-update --no-branch`로
+  만든다. `--no-branch`는 브랜치 로직을 끄므로 현재 브랜치를 그대로 둔다(main이든 진행 중인
+  feature 브랜치든 무관). kickoff이 이 chore를 위키 운영 버킷에 **자동 링크**하므로 `harness:check`가
+  바로 green이다(수동 ingest 불필요). raw unit을 kickoff 없이 손으로 만들면 링크가 없어
+  `harness:check`가 막으니, kickoff 경로를 쓴다.
+- 커밋 본문은 notes-only 형식으로 `[Notes](docs/raw/chore/harness-update/notes.md)`를 링크한다.
+- 이 예외는 오직 하네스 정비에만 적용한다. 제품/도메인 변경은 종전대로 자기 작업 단위·브랜치를
+  따른다. 한 커밋에 하네스 정비와 제품 변경을 섞지 않는다.
+- 기계 게이트(브랜치↔raw unit 정합성 등)는 이 ride-along을 막지 않는다. 그래서 별도 우회
+  플래그 없이 그대로 커밋하면 된다.
+
 ## 훅 실패 처리
 
 훅 실패는 우회하지 않는다.
