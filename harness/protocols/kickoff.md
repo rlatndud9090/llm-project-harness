@@ -54,6 +54,43 @@ npm run harness:kickoff -- --title "데이터 계약"
 npm run harness:kickoff -- --type feature --slug data-contract --title "데이터 계약"
 ```
 
+### GitHub 이슈로 시작 (이슈 번호 인자)
+
+무엇을 할지 이미 GitHub 이슈로 적어 뒀다면, `$kickoff`에 **이슈 번호만** 붙여서 시작할
+수 있다. 사용자가 다른 말 없이 번호(또는 이슈 URL)만 인자로 주면 그건 "이 이슈로
+kickoff" 라는 뜻이다. 예: `/kickoff 42`, `/kickoff #42`, `/kickoff https://github.com/o/r/issues/42`.
+
+이때 **이슈를 읽고 유형을 판정하는 일은 스킬(에이전트)의 몫**이고, 스크립트는 골격
+생성과 provenance 기록만 한다(구조는 기계가, 의미는 모델이). 에이전트는 이렇게 진행한다:
+
+1. **저장소 파악** — `git remote get-url origin`에서 `owner/repo`를 얻는다.
+2. **이슈 조회** — 런타임의 GitHub 통합(GitHub MCP 도구: `issue_read`/`get_issue` 등)으로
+   제목·본문·라벨을 읽는다. `gh` CLI로 셸아웃하지 않는다(소비 프로젝트가 명시 허용한
+   경우에만 예외).
+3. **유형 판정(feature/bugfix/chore)** — "브랜치 이름"이 아니라 "결정의 성질"로 정한다
+   (아래 "bugfix / chore 아티팩트 정책"과 같은 기준). 라벨을 힌트로 쓴다: `bug`→bugfix,
+   `enhancement`/`feature`→feature, `chore`/`dependencies`/`documentation`→chore. 라벨이
+   모호하면 본문으로 판단하고, **제품 판단(무엇을 만들지·트레이드오프)이 필요하면
+   feature로 승격**한다.
+4. **slug·제목·영역 도출** — 이슈 제목에서 kebab-case 영어 slug와 한국어 제목을 만든다
+   (vague slug 금지). 영역/섹션이 분명하면 `--area`/`--section`으로 함께 시드한다.
+5. **kickoff 실행** — 도출한 값으로 부른다. 원본 이슈는 `--issue`로 남긴다:
+
+   ```sh
+   npm run harness:kickoff -- --type bugfix --slug session-restore \
+     --title "세션 복원 실패" --issue 42
+   ```
+
+`--issue <번호|#번호|URL>`는 이 작업 단위가 어느 이슈에서 나왔는지를 **durable
+provenance**로 기록한다: feature/bugfix는 `prd.md`/`bugfix.md` frontmatter의 `issue:`에,
+모든 유형은 `state.md` 단계 로그의 kickoff 줄에 남는다(chore는 primary artifact가 없어
+state 원장에만 남는다). URL을 주면 URL을, 번호를 주면 `#<번호>`를 정규화해 기록한다.
+값이 이슈 참조로 해석되지 않으면 kickoff이 실패한다.
+
+이슈 번호를 스크립트에 **직접** 넘기면(`harness:kickoff -- 42`) 스크립트가 실패하며
+"먼저 이슈를 조회·분류하라"는 힌트를 낸다 — 유형 판정을 건너뛴 채 골격이 생기는 것을
+막기 위해서다.
+
 ### 브랜치 처리 (상황감지)
 
 `$kickoff`은 raw 골격을 만들기 **전에** 작업 브랜치를 정리한다. 전역 git 상태를

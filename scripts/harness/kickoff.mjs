@@ -12,6 +12,7 @@ import {
   inferRawUnitFromBranch,
   isGitRepo,
   localBranchExists,
+  normalizeIssueRef,
   parseArgs,
   pathExists,
   rawUnitPath,
@@ -27,6 +28,32 @@ import {
 
 const args = parseArgs(process.argv.slice(2));
 const branchInfo = inferRawUnitFromBranch();
+
+// A bare issue number/URL is the skill's job to resolve, not the script's: the
+// agent fetches the issue, classifies its type (feature/bugfix/chore), and derives
+// a slug/title before calling kickoff. The script can't reach GitHub, so a stray
+// issue-like positional (a passthrough of `/kickoff 123`) fails loudly here instead
+// of silently no-op'ing. See harness/protocols/kickoff.md "GitHub 이슈로 시작".
+const strayIssuePositional = args._.find((entry) => normalizeIssueRef(entry) !== null);
+if (strayIssuePositional) {
+  fail(
+    `이슈 번호(${strayIssuePositional})를 kickoff에 직접 넘길 수 없습니다. ` +
+      `먼저 이슈를 조회·분류해 --type/--slug/--title로 실행하세요(원본 이슈는 --issue로 기록). ` +
+      `상세: harness/protocols/kickoff.md "GitHub 이슈로 시작".`,
+  );
+}
+
+// --issue <number|#number|url>: record the source GitHub issue as durable
+// provenance on the created unit (primary-artifact frontmatter + state ledger).
+// Optional — the skill passes it after resolving an issue-driven kickoff. A
+// present-but-unparseable value fails rather than recording garbage provenance.
+let issueRef = "";
+if (args.issue !== undefined) {
+  if (args.issue === true) fail("--issue 에는 값이 필요합니다(예: --issue 123 또는 --issue <이슈 URL>).");
+  const normalized = normalizeIssueRef(args.issue);
+  if (!normalized) fail(`--issue 값을 이슈 참조로 해석할 수 없습니다: ${args.issue}`);
+  issueRef = normalized.ref;
+}
 
 let type = args.type;
 let slug = args.slug;
@@ -122,7 +149,13 @@ function resolveBranch() {
   return `브랜치 미변경 (현재 ${current})`;
 }
 
+// Appended to the state ledger's kickoff log line when an issue drove this unit,
+// so the source issue is visible in the append-only stage log too (the frontmatter
+// `issue:` field carries the machine-readable copy). Empty when no --issue.
+const kickoffLogNote = issueRef ? ` (이슈 ${issueRef})` : "";
+
 const replacements = [
+  [/kickoff: raw 골격 생성/g, `kickoff: raw 골격 생성${kickoffLogNote}`],
   [/\{제목\}/g, title],
   [/\{YYYY-MM-DD\}/g, date],
   [/\{slug\}/g, slug],
@@ -189,7 +222,7 @@ stage: kickoff
 
 ## 단계 로그 (append-only)
 
-- ${date} kickoff: raw 골격 생성
+- ${date} kickoff: raw 골격 생성${kickoffLogNote}
 `,
   );
   return true;
@@ -248,7 +281,11 @@ if (primaryArtifact) {
       content = setFrontmatterField(content, "area", `"${area}"`);
       seededArea = area;
     }
-    if (section || area) writeText(artifactPath, content);
+    // The source issue is durable provenance, so it lands in the primary artifact
+    // frontmatter (prd.md/bugfix.md) as a machine-readable field. chore has no
+    // primary artifact — its issue link survives only in the state ledger line.
+    if (issueRef) content = setFrontmatterField(content, "issue", `"${issueRef}"`);
+    if (section || area || issueRef) writeText(artifactPath, content);
   }
 }
 
@@ -259,6 +296,7 @@ console.log(`- unit: ${type}/${slug}`);
 console.log(`- created: ${created.length ? created.join(", ") : "none (already existed)"}`);
 if (seededSection) console.log(`- section: ${seededSection}`);
 if (seededArea) console.log(`- area: ${seededArea}`);
+if (issueRef) console.log(`- issue: ${issueRef}`);
 
 // A chore has no review lifecycle and needs no area/section — it lands in the wiki
 // operations bucket. Link it right now (best-effort) so a just-kickoff'd chore is

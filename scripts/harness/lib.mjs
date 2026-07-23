@@ -265,6 +265,37 @@ export function titleFromSlug(slug) {
     .join(" ");
 }
 
+// ─── GitHub issue reference (kickoff --issue provenance) ─────────────────────
+// Normalizes the reference passed to `kickoff --issue`, the durable link from a
+// work unit back to the GitHub issue that motivated it. Accepts a bare number
+// ("123"), a hash form ("#123"), or a full issue URL in the canonical
+// `<scheme>://<host>/<owner>/<repo>/issues/<n>` shape (host-agnostic so GitHub
+// Enterprise / self-hosted remotes work, but the `owner/repo/issues/<n>` tail is
+// required — a bare `/issues/<n>`, a `/blob/.../issues/<n>` path, or a `/pull/<n>`
+// URL do NOT match). Returns { number, ref } where `ref` is the canonical string
+// to record as provenance: the base issue URL when a URL was given (clickable,
+// with any trailing `/`, `?query`, or `#fragment` stripped), otherwise "#<n>" with
+// leading zeros dropped. Returns null for anything unrecognizable — or a
+// non-positive issue number — so the caller (kickoff) fails loudly instead of
+// recording garbage provenance. This same recognizer flags a bare issue-number
+// positional the skill forgot to resolve.
+export function normalizeIssueRef(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const urlMatch = /^(https?:\/\/[^\s/]+\/[^\s/]+\/[^\s/]+\/issues\/(\d+))(?:[/?#]|$)/.exec(trimmed);
+  if (urlMatch) {
+    const number = Number(urlMatch[2]);
+    return number >= 1 ? { number, ref: urlMatch[1] } : null;
+  }
+  const numMatch = /^#?(\d+)$/.exec(trimmed);
+  if (numMatch) {
+    const number = Number(numMatch[1]);
+    return number >= 1 ? { number, ref: `#${number}` } : null;
+  }
+  return null;
+}
+
 export function parseFrontmatter(content) {
   if (!content.startsWith("---\n")) return null;
   const end = content.indexOf("\n---", 4);

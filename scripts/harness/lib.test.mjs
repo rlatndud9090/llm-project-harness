@@ -14,6 +14,7 @@ import {
   isForbiddenStageTransition,
   isForbiddenTransition,
   isPreAdrStage,
+  normalizeIssueRef,
   parseApprovalEvents,
   parseAreaList,
   parseAreaSections,
@@ -467,5 +468,60 @@ describe("approval events", () => {
 
   it("ignores lines that are not approval events", () => {
     expect(parseApprovalEvents("- 그냥 로그\n- APPROVAL foo 2026 x :: y")).toEqual([]);
+  });
+});
+
+describe("normalizeIssueRef", () => {
+  it("normalizes a bare number to #<n>", () => {
+    expect(normalizeIssueRef("42")).toEqual({ number: 42, ref: "#42" });
+  });
+
+  it("accepts the #<n> hash form and drops leading zeros", () => {
+    expect(normalizeIssueRef("#42")).toEqual({ number: 42, ref: "#42" });
+    expect(normalizeIssueRef("007")).toEqual({ number: 7, ref: "#7" });
+  });
+
+  it("keeps a full GitHub issue URL as the clickable ref", () => {
+    expect(normalizeIssueRef("https://github.com/o/r/issues/42")).toEqual({
+      number: 42,
+      ref: "https://github.com/o/r/issues/42",
+    });
+  });
+
+  it("strips a trailing comment fragment, query string, or slash from the base URL", () => {
+    const base = { number: 42, ref: "https://github.com/o/r/issues/42" };
+    expect(normalizeIssueRef("https://github.com/o/r/issues/42#issuecomment-99")).toEqual(base);
+    expect(normalizeIssueRef("https://github.com/o/r/issues/42?foo=1")).toEqual(base);
+    expect(normalizeIssueRef("https://github.com/o/r/issues/42/")).toEqual(base);
+  });
+
+  it("accepts a host-agnostic canonical issue URL (GitHub Enterprise / self-hosted)", () => {
+    expect(normalizeIssueRef("https://github.example.com/o/r/issues/8")).toEqual({
+      number: 8,
+      ref: "https://github.example.com/o/r/issues/8",
+    });
+  });
+
+  it("rejects issue look-alikes: PR URL, blob path, and bare /issues/<n>", () => {
+    expect(normalizeIssueRef("https://github.com/o/r/pull/42")).toBeNull();
+    expect(normalizeIssueRef("https://github.com/o/my-issues/blob/main/issues/7")).toBeNull();
+    expect(normalizeIssueRef("https://evil.com/issues/5")).toBeNull();
+    expect(normalizeIssueRef("https://github.com/o/r/issues/42abc")).toBeNull();
+  });
+
+  it("trims surrounding whitespace before matching", () => {
+    expect(normalizeIssueRef("  #5  ")).toEqual({ number: 5, ref: "#5" });
+  });
+
+  it("rejects non-positive, empty, non-string, and non-issue values", () => {
+    expect(normalizeIssueRef("0")).toBeNull();
+    expect(normalizeIssueRef("#0")).toBeNull();
+    expect(normalizeIssueRef("")).toBeNull();
+    expect(normalizeIssueRef("   ")).toBeNull();
+    expect(normalizeIssueRef("feature/x")).toBeNull();
+    expect(normalizeIssueRef("not-an-issue")).toBeNull();
+    expect(normalizeIssueRef("12abc")).toBeNull();
+    expect(normalizeIssueRef(undefined)).toBeNull();
+    expect(normalizeIssueRef(42)).toBeNull();
   });
 });

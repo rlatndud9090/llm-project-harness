@@ -14,6 +14,31 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-23 kickoff-github-issue-arg
+
+**변경**
+
+- **`$kickoff`에 GitHub 이슈 번호 진입점을 추가했다.** 사용자가 다른 말 없이 이슈 번호(또는
+  이슈 URL) 하나만 인자로 주면(`/kickoff 42`) "이 이슈로 kickoff"로 해석한다. 이슈를 읽고
+  유형(feature/bugfix/chore)을 판정해 slug·제목을 도출하는 **의미 판단은 스킬(에이전트)의
+  몫**이고, 스크립트는 골격 생성과 provenance 기록만 한다(구조는 기계, 의미는 모델). 판정
+  절차·라벨 힌트를 `harness/protocols/kickoff.md`의 새 "GitHub 이슈로 시작" 섹션과 3개 어댑터
+  (`.claude/commands/kickoff.md`, `.claude/skills/kickoff`, `.codex/skills/kickoff`)에 명문화했다.
+- **`kickoff.mjs`에 `--issue <번호|#번호|URL>` 옵션을 추가했다.** 이 작업 단위가 나온 이슈를
+  durable provenance로 남긴다: feature/bugfix는 `prd.md`/`bugfix.md` frontmatter의 `issue:`에,
+  모든 유형은 `state.md` 단계 로그의 kickoff 줄에 기록한다(chore는 primary artifact가 없어
+  state 원장에만). URL은 URL로, 번호는 `#<번호>`로 정규화한다(`lib.normalizeIssueRef`, 순수·
+  테스트 가능). 해석 불가한 값은 골격을 만들기 전에 실패한다.
+- **이슈 번호를 스크립트에 직접 넘기면 실패한다.** `harness:kickoff -- 42`처럼 이슈-형태
+  positional이 오면 유형 판정을 건너뛴 골격 생성을 막기 위해 실패하고 "먼저 이슈를 조회·
+  분류하라"는 힌트를 낸다.
+
+**소비자 조치**
+
+- 없음(기능 추가). 이슈 번호로 kickoff하려면 런타임에 GitHub MCP 도구가 설정되어 있어야
+  한다(없으면 기존처럼 `--type/--slug/--title`로 직접 kickoff하면 된다). `--issue` frontmatter
+  필드는 선택이라 기존 게이트에 영향을 주지 않는다.
+
 ## 2026-07-23 kickoff-own-artifacts-not-dirty
 
 **변경**

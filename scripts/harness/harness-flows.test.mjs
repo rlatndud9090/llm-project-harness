@@ -1880,6 +1880,97 @@ describe("kickoff branch handling", () => {
   });
 });
 
+describe("kickoff --issue provenance", () => {
+  it("records a bare issue number on a feature (prd frontmatter + state log)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "issue-feat", "--title", "이슈 기능", "--issue", "42"]);
+      expect(k.status).toBe(0);
+      expect(k.stdout).toContain("- issue: #42");
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "issue-feat");
+      expect(read(path.join(unitDir, "prd.md"))).toContain('issue: "#42"');
+      expect(read(path.join(unitDir, "state.md"))).toContain("kickoff: raw 골격 생성 (이슈 #42)");
+    });
+  });
+
+  it("keeps a full issue URL as the recorded ref", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const url = "https://github.com/o/r/issues/42";
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "issue-url", "--title", "이슈 URL", "--issue", url]);
+      expect(k.status).toBe(0);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "issue-url");
+      expect(read(path.join(unitDir, "prd.md"))).toContain(`issue: "${url}"`);
+      // The state-ledger note is a separate code path from the frontmatter field;
+      // pin the URL rendering there too, not just the #<n> form.
+      expect(read(path.join(unitDir, "state.md"))).toContain(`kickoff: raw 골격 생성 (이슈 ${url})`);
+    });
+  });
+
+  it("records the issue on a bugfix's bugfix.md frontmatter and state ledger", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "bugfix", "--slug", "issue-bug", "--title", "이슈 버그", "--issue", "#7"]);
+      expect(k.status).toBe(0);
+      const unitDir = path.join(projectRoot, "docs", "raw", "bugfix", "issue-bug");
+      expect(read(path.join(unitDir, "bugfix.md"))).toContain('issue: "#7"');
+      expect(read(path.join(unitDir, "state.md"))).toContain("kickoff: raw 골격 생성 (이슈 #7)");
+    });
+  });
+
+  it("records a chore's issue only in the state ledger (no primary artifact)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "chore", "--slug", "issue-chore", "--title", "이슈 정리", "--issue", "9"]);
+      expect(k.status).toBe(0);
+      const unitDir = path.join(projectRoot, "docs", "raw", "chore", "issue-chore");
+      expect(read(path.join(unitDir, "state.md"))).toContain("kickoff: raw 골격 생성 (이슈 #9)");
+      expect(fs.existsSync(path.join(unitDir, "prd.md"))).toBe(false);
+      expect(fs.existsSync(path.join(unitDir, "bugfix.md"))).toBe(false);
+    });
+  });
+
+  it("omits the issue line and note when no --issue is passed", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "no-issue", "--title", "이슈 없음"]);
+      expect(k.status).toBe(0);
+      expect(k.stdout).not.toContain("- issue:");
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "no-issue");
+      expect(read(path.join(unitDir, "prd.md"))).not.toContain("issue:");
+      expect(read(path.join(unitDir, "state.md"))).toContain("kickoff: raw 골격 생성\n");
+    });
+  });
+
+  it("rejects a bare issue-number positional (must resolve the issue first)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["42"]);
+      expect(k.status).not.toBe(0);
+      expect(`${k.stdout}${k.stderr}`).toContain("직접 넘길 수 없습니다");
+      expect(fs.existsSync(path.join(projectRoot, "docs", "raw", "feature"))).toBe(false);
+    });
+  });
+
+  it("rejects a value that is not an issue reference", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "chore", "--slug", "bad-issue", "--title", "나쁨", "--issue", "not-an-issue"]);
+      expect(k.status).not.toBe(0);
+      expect(`${k.stdout}${k.stderr}`).toContain("이슈 참조로 해석할 수 없습니다");
+    });
+  });
+
+  it("rejects --issue with no value", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const k = kickoff(projectRoot, ["--type", "chore", "--slug", "no-val", "--title", "값없음", "--issue"]);
+      expect(k.status).not.toBe(0);
+      expect(`${k.stdout}${k.stderr}`).toContain("값이 필요합니다");
+    });
+  });
+});
+
 function frontmatter(fields) {
   const lines = Object.entries({ date: "2026-01-01", ...fields }).map(([key, value]) => `${key}: ${value}`);
   return ["---", ...lines, "---"].join("\n");
