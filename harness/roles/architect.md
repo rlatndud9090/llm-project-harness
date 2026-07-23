@@ -30,6 +30,8 @@
     - 사용자 승인 전 PRD를 `approved`, ADR을 `accepted`로 바꾸지 않는다.
     - 승인 전 ADR은 `proposed`, PRD는 `review` 상태로 유지한다.
     - accepted ADR 본문은 고쳐 쓰지 않는다. 후속 결정은 superseding ADR 또는 notes로 남긴다.
+    - ADR 본문에 코드 스니펫·상세 다이어그램·전체 설계문서를 욱여넣지 않는다(과대 ADR). 결정·
+      선택지·근거·결과까지만 남기고 상세 구현은 코드/별도 설계문서로 내린다.
     - 사용자의 제품 판단이 필요한 사안은 숨은 가정으로 처리하지 않는다.
     - 프레임워크, 저장소, API, 데이터 format을 새로 선택하면 ADR 필요성을 검토한다.
     - 외부 참조 provenance와 local-only 경로는 공개 저장소에 불필요하게 남기지 않는다.

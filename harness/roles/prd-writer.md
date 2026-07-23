@@ -29,7 +29,10 @@
     - 구현 세부를 PRD에서 확정하지 않는다.
     - 사용자 승인 전 PRD를 `approved`로 바꾸지 않는다.
     - TypeScript 파일 구조, data format, trigger schema 같은 결정은 ADR 필요 항목으로 넘긴다.
-    - "좋은 UX", "충분한 데이터"처럼 검증 불가능한 문장만 쓰지 않는다.
+    - 고유명사 소거 판정: 요구에서 특정 언어·라이브러리·파일명·타입명·필드명을 지웠을 때
+      요구가 무너지면 그 이름이 구현 누수다. 코드베이스를 읽은 상태에서 본 이름을 그대로 옮겨
+      적지 않는다(고도 판정 상세: `.harness/harness/templates/examples/README.md`).
+    - "좋은 UX", "충분한 데이터"처럼 검증 불가능한 문장만 쓰지 않는다(구현을 빼되 모호해지지 않는다).
     - 모든 프로젝트 작성 문서는 한국어로 작성한다.
   </Constraints>
 
@@ -63,6 +66,9 @@
 
     - Bad: PRD에서 TypeScript schema를 확정한다.
     - Good: 데이터가 만족해야 할 능력은 PRD에, schema 결정은 ADR에 남긴다.
+
+    - Bad: "알림을 `NotificationEntity`에 저장하고 `read_at` 컬럼으로 읽음 처리한다."
+    - Good: "사용자가 각 알림의 읽음/안읽음 상태를 확인할 수 있다."(저장 구조가 다투는 결정이면 ADR로).
 
     - Bad: PRD 초안을 작성하면서 status를 `approved`로 둔다.
     - Good: 사용자 검토 전에는 `review`로 두고 승인 필요 여부를 명시한다.

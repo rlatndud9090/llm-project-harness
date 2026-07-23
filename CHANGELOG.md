@@ -14,6 +14,34 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-23 prd-adr-altitude-examples
+
+**변경**
+
+- **`harness/templates/examples/`를 신설했다.** 채워진 PRD/ADR **짝 예시**(`notification-prd.md`,
+  `notification-adr.md`)와 "무엇이 어디에 사는가" **고도 가이드**(`README.md`)를 담았다. 가이드는
+  3층 고도표(PRD/ADR/구현), 누수 **self-check 3문항**(실제 요구 판정·구현 결합 판정·고유명사 소거
+  판정), 누수 **부검 대조표**, 과대 ADR 경계를 이 하네스의 **단일 출처**로 정의한다. "구조는
+  기계강제·의미는 모델재량" 철학에 따라, 코드레벨 디테일이 PRD에 새는 문제(의미 품질)는 리터럴
+  게이트가 아니라 이 서술 루브릭 + self-review로 다룬다.
+- **`prd-helper.md` Phase 4**의 느슨한 "구현 세부를 과하게 박지 않았는가?" 1줄을 **3문항 이진
+  self-check + 모호(과소명세) 방지 + 루프 종료 조건**으로 강화하고, 상세는 examples/README를
+  단일 출처로 참조하게 했다(복제 금지).
+- **`adr-helper.md`·`architect.md`**에 **과대 ADR**(코드 스니펫·전체 설계문서를 본문에 욱여넣기)
+  경계선을 추가했다(코드 누수의 ADR 쪽 대칭).
+- **`prd-writer.md`**에 **고유명사 소거 판정**(에이전트가 코드베이스를 읽은 뒤 타입·필드명을 그대로
+  요구에 옮기는 누수를 겨냥)과 good/bad 대조를 추가했다.
+- **`feature-prd.md`/`feature-adr.md` 템플릿**에 작성 고도 힌트를 추가하고, `feature-prd.md` 비기능
+  예시의 "저장소 구조" 문구를 "저장소가 만족해야 할 조건"으로 교정했다(템플릿 문구 자체의 누수
+  유인 제거).
+
+**소비자 조치**
+
+- 없음(추가·강화만; 게이트·frontmatter·구조 불변). `templates/examples/`는 `harness:check`가
+  스캔하지 않는 교육 자료이며 **존재를 기계강제하지 않는다**(교육 자료의 존재를 소비 프로젝트
+  게이트로 강제하는 층위 혼동을 피함). 새 고도 가이드는 공유 프로토콜/역할을 통해 자동 적용되므로,
+  원하면 팀에 `.harness/harness/templates/examples/README.md`를 공유하면 된다.
+
 ## 2026-07-23 kickoff-github-issue-arg
 
 **변경**

@@ -12,6 +12,10 @@ supersedes:
 
 # ADR: {제목}
 
+> 작성 고도: ADR은 "어떤 구조를 왜 골랐나"의 근거 저널이다. 코드 스니펫·전체 설계문서를 본문에
+> 넣지 않는다(과대 ADR) — 상세 구현은 코드·별도 설계문서로 내린다. 참고:
+> `.harness/harness/templates/examples/README.md`.
+
 ## 컨텍스트
 
 어떤 상황에서 이 결정이 필요했는가?
