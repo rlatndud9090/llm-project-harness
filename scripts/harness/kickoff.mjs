@@ -20,6 +20,7 @@ import {
   repoPath,
   setFrontmatterField,
   titleFromSlug,
+  toPosix,
   today,
   validateTypeAndSlug,
   workingTreeChangedPaths,
@@ -289,7 +290,11 @@ if (primaryArtifact) {
   }
 }
 
-console.log(`[kickoff] ${path.relative(process.cwd(), unitDir)}`);
+// 이 첫 줄은 사람과 에이전트가 그대로 복사해 가는 unit 경로다 — 커밋 메시지의
+// `관련 문서:` 링크, `harness:ingest -- <path>` 인자, frontmatter 참조로 흘러간다.
+// Windows에서 path.relative는 백슬래시를 주므로, 그대로 두면 비정규 경로가 커밋되는
+// 아티팩트에 심긴다. 하네스가 문서에 쓰는 경로는 항상 POSIX다.
+console.log(`[kickoff] ${toPosix(path.relative(process.cwd(), unitDir))}`);
 console.log(`- branch: ${branchNote ?? branchInfo.branch}`);
 console.log(`- title: ${title}`);
 console.log(`- unit: ${type}/${slug}`);

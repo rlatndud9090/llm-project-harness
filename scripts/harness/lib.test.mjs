@@ -14,6 +14,8 @@ import {
   isForbiddenStageTransition,
   isForbiddenTransition,
   isPreAdrStage,
+  bodyAfterFrontmatter,
+  normalizeEol,
   normalizeIssueRef,
   parseApprovalEvents,
   parseAreaList,
@@ -203,6 +205,55 @@ describe("setFrontmatterField", () => {
     expect(fields.approval).toBe("user:2026-01-01:ok");
     expect(fields.title).toBe("X");
     expect(fields.status).toBe("approved");
+  });
+});
+
+// Git for Windows는 core.autocrlf=true를 시스템 기본값으로 배포하므로 Windows 소비
+// 프로젝트의 워킹트리는 CRLF다. 구분자를 "---\n" 리터럴로 찾으면 frontmatter가 있는데도
+// "없음"으로 판정되고, 쓰기 경로에서는 기존 블록 위에 새 블록이 얹혀 파일이 손상된다.
+// 리눅스 CI는 인덱스(LF)만 보므로 재현되지 않아, 이 케이스들이 유일한 방어선이다.
+describe("CRLF/BOM tolerance (Windows checkout)", () => {
+  const CRLF = ["---", "status: draft", 'title: "T"', "---", "", "# 본문", ""].join("\r\n");
+  const LF = CRLF.replace(/\r\n/g, "\n");
+
+  it("normalizeEol strips a BOM and collapses CRLF", () => {
+    expect(normalizeEol("\uFEFF---\r\na: b\r\n")).toBe("---\na: b\n");
+    expect(normalizeEol(LF)).toBe(LF);
+  });
+
+  it("parses frontmatter out of a CRLF file", () => {
+    expect(parseFrontmatter(CRLF)).toEqual({ status: "draft", title: "T" });
+    expect(parseFrontmatter(`\uFEFF${CRLF}`)).toEqual({ status: "draft", title: "T" });
+  });
+
+  it("strips the frontmatter block from a CRLF file so body checks do not see keys", () => {
+    expect(bodyAfterFrontmatter(CRLF)).not.toContain("status: draft");
+    expect(bodyAfterFrontmatter(CRLF).trim()).toBe("# 본문");
+    expect(extractH1(CRLF)).toBe("본문");
+  });
+
+  it("updates a CRLF file in place instead of stacking a second frontmatter block", () => {
+    const out = setFrontmatterField(CRLF, "status", "approved");
+
+    // 손상 회귀의 핵심 신호: 블록 구분자가 정확히 2개(여는 것과 닫는 것)여야 한다.
+    expect(out.split(/\r?\n/).filter((line) => line === "---")).toHaveLength(2);
+    expect(parseFrontmatter(out)).toEqual({ status: "approved", title: "T" });
+    expect(out).not.toContain("status: draft");
+    // 수술적 편집: EOL을 LF로 바꿔 파일 전체를 뒤집지 않는다.
+    expect(out).toContain("\r\n");
+    expect(out.replace(/\r\n/g, "\n")).toBe(setFrontmatterField(LF, "status", "approved"));
+  });
+
+  it("appends a new key to a CRLF frontmatter block using the file's own line ending", () => {
+    const out = setFrontmatterField(CRLF, "stage", "adr-draft");
+    expect(parseFrontmatter(out)).toEqual({ status: "draft", title: "T", stage: "adr-draft" });
+    expect(out).toContain("stage: adr-draft\r\n");
+  });
+
+  it("keeps prepending a block when there really is no frontmatter", () => {
+    const out = setFrontmatterField("# 본문\r\n", "status", "draft");
+    expect(parseFrontmatter(out)).toEqual({ status: "draft" });
+    expect(out.endsWith("# 본문\r\n")).toBe(true);
   });
 });
 

@@ -30,7 +30,7 @@
 // so a hook bug never wedges normal editing — harness:check remains the backstop.
 import fs from "node:fs";
 import path from "node:path";
-import { isPreAdrStage, parseFrontmatter } from "./lib.mjs";
+import { isPreAdrStage, normalizeEol, parseFrontmatter } from "./lib.mjs";
 
 const STATUS_FLIP_RE = /^\s*status:\s*["']?(approved|accepted)\b/m;
 const APPROVAL_LINE_RE = /^\s*-\s*APPROVAL\s+(prd|adr)\b/m;
@@ -106,9 +106,14 @@ function preAdrStageFor(cwd, filePath) {
   }
 }
 
+// 이 가드는 절대 파일을 쓰지 않고 판정만 한다. 그래서 읽는 즉시 EOL을 정규화한다.
+// CRLF 워킹트리(Windows 기본값)에서 도구가 넘기는 old_string은 LF인 경우가 많은데,
+// 그러면 아래 literal split이 한 군데도 못 찾아 "편집 전 = 편집 후"로 재구성되고,
+// 승인 플립이 감지되지 않은 채 통과한다(fail-open이라 조용히 뚫린다). 양쪽을 같은
+// 정규형으로 맞춰야 그 우회가 닫힌다.
 function readCurrent(cwd, filePath) {
   try {
-    return fs.readFileSync(path.resolve(cwd, filePath), "utf8");
+    return normalizeEol(fs.readFileSync(path.resolve(cwd, filePath), "utf8"));
   } catch {
     return null; // new file (Write) or unreadable; reconstruct falls back below
   }
@@ -118,23 +123,28 @@ function readCurrent(cwd, filePath) {
 // replacement, and applies to all occurrences so detection over-approximates
 // rather than misses. Falls back to the raw fragments when the current file is
 // unavailable, so a value-only Edit is still caught whenever the file exists.
+// 도구가 준 조각도 readCurrent와 같은 정규형으로 맞춘다(위 주석 참고).
 function reconstruct(payload, toolInput, currentContent) {
+  const fragment = (value) => (typeof value === "string" ? normalizeEol(value) : null);
+
   if (payload.tool_name === "Write") {
-    return typeof toolInput.content === "string" ? toolInput.content : currentContent ?? "";
+    return fragment(toolInput.content) ?? currentContent ?? "";
   }
   if (payload.tool_name === "MultiEdit" && Array.isArray(toolInput.edits)) {
     let text = currentContent;
-    if (text === null) return toolInput.edits.map((edit) => String(edit?.new_string ?? "")).join("\n");
+    if (text === null) return toolInput.edits.map((edit) => fragment(edit?.new_string) ?? "").join("\n");
     for (const edit of toolInput.edits) {
-      if (edit && typeof edit.old_string === "string" && typeof edit.new_string === "string") {
-        text = text.split(edit.old_string).join(edit.new_string);
+      const oldFragment = fragment(edit?.old_string);
+      const newFragment = fragment(edit?.new_string);
+      if (oldFragment !== null && newFragment !== null) {
+        text = text.split(oldFragment).join(newFragment);
       }
     }
     return text;
   }
   // Edit
-  const oldStr = typeof toolInput.old_string === "string" ? toolInput.old_string : "";
-  const newStr = typeof toolInput.new_string === "string" ? toolInput.new_string : "";
+  const oldStr = fragment(toolInput.old_string) ?? "";
+  const newStr = fragment(toolInput.new_string) ?? "";
   if (currentContent === null) return newStr; // fragment fallback
   return oldStr ? currentContent.split(oldStr).join(newStr) : `${currentContent}\n${newStr}`;
 }

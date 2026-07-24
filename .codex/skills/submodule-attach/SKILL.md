@@ -7,6 +7,28 @@ description: "공용 LLM Project Harness를 소비 프로젝트에 git submodule
 
 공용 기준은 `.harness/harness/protocols/submodule-attach.md`다.
 
+## Windows 사전조건 (필수)
+
+어댑터는 symlink다. Git for Windows의 시스템 기본값(`core.symlinks=false`,
+`core.autocrlf=true`)으로 clone하면 장착이 **조용히** 무너진다 — 링크 대신 경로가
+적힌 텍스트 파일이 체크아웃되고 `git status`는 깨끗하다. 장착 전에 확인한다.
+
+```sh
+git config --global core.symlinks true
+git config --global core.autocrlf false
+git config --unset core.symlinks    # 이미 clone된 저장소는 local 제거가 필수
+git config --unset core.autocrlf
+git config core.symlinks            # true로 나오는지 확인
+```
+
+`--global`만으로는 안 된다: clone 시점에 그 값이 `.git/config`에 복사되고 local이
+global을 이긴다. Windows 개발자 모드도 켜야 symlink를 만들 수 있다.
+
+`attach-submodule.mjs`는 첫 링크 전에 이를 진단하고 문제가 있으면 아무것도 바꾸지
+않고 중단한다. 텍스트 파일로 이미 깨진 어댑터는 attach 재실행으로 복구된다.
+`harness:check`도 그 상태를 어댑터 무결성 오류로 보고한다. 복구 전체 절차와
+`.harness` 미초기화 구분법은 `.harness/harness/protocols/submodule-attach.md`를 본다.
+
 ## 신규 장착
 
 소비 프로젝트 루트에서:

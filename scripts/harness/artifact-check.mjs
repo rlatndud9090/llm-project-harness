@@ -192,11 +192,21 @@ function git(args, timeout) {
 // The wiki is index.md plus (when the project declares >=2 sections) one file per
 // declared section. Any other file is stale/unexpected. A single-index project
 // (<=2 sections... i.e. <2) must not carry section files at all.
+// 탐색기/Finder가 폴더를 열어 보기만 해도 만드는 OS 부산물. 사용자에게는 보이지도
+// 않고 .gitignore로도 못 막는다(여기는 인덱스가 아니라 파일시스템을 읽는다).
+// 이것 때문에 "docs/wiki must contain only …"가 빨개지면 원인을 찾을 길이 없다.
+// 점으로 시작하는 것들(.DS_Store)은 이미 걸러지므로 Windows 쪽만 추가한다.
+const FILESYSTEM_ARTIFACTS = new Set(["desktop.ini", "thumbs.db", "ehthumbs.db"]);
+
+function isFilesystemArtifact(entry) {
+  return FILESYSTEM_ARTIFACTS.has(entry.toLowerCase());
+}
+
 function assertWikiShape() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "wiki"))) return;
 
   const wikiDir = repoPath("docs", "wiki");
-  const entries = fs.readdirSync(wikiDir).filter((entry) => !entry.startsWith("."));
+  const entries = fs.readdirSync(wikiDir).filter((entry) => !entry.startsWith(".") && !isFilesystemArtifact(entry));
 
   const declaredSections = collectDeclaredSections();
   const split = declaredSections.size >= 2;
@@ -1141,6 +1151,79 @@ function assertHarnessAdapters() {
   }
 }
 
+// 어댑터는 소비 프로젝트에서 `.harness` 안을 가리키는 symlink다. git이 symlink를
+// 만들지 못하는 환경(`core.symlinks=false` — Git for Windows의 시스템 기본값)에서
+// clone하면, git은 링크 대신 **타겟 경로가 적힌 한 줄짜리 텍스트 파일**을 체크아웃
+// 한다. 내용이 인덱스와 일치하므로 `git status`는 깨끗하고 어디에서도 경고가 뜨지
+// 않는다. 스킬/에이전트는 전부 죽어 있는데 신호가 하나도 없는 상태다.
+//
+// 존재 검사(assertHarnessAdapters)는 이걸 못 잡는다. 파일은 "있기" 때문이다.
+// 스킬 디렉터리가 통째로 파일이 된 경우만 간접적으로 드러난다. 그래서 어댑터
+// 표면을 직접 훑어 "링크여야 할 자리에 링크 stand-in 텍스트 파일이 있는지"를 본다.
+//
+// 하네스 제공 저장소 자신의 `.claude/**`·`.codex/**`는 symlink가 아니라 실제
+// 파일이므로(원본이다) 소비 프로젝트 모드에서만 검사한다.
+function assertAdapterLinkIntegrity() {
+  if (harnessRepoMode) return;
+
+  const standIns = [];
+  for (const [toolDir, childDir] of [
+    [".codex", "agents"],
+    [".codex", "skills"],
+    [".claude", "agents"],
+    [".claude", "commands"],
+    [".claude", "skills"],
+  ]) {
+    const adapterDir = rootAdapterPath(toolDir, childDir);
+    if (!pathExists(adapterDir)) continue;
+
+    for (const entry of fs.readdirSync(adapterDir)) {
+      if (entry.startsWith(".")) continue;
+      const entryPath = path.join(adapterDir, entry);
+      if (looksLikeSymlinkStandIn(entryPath)) standIns.push(`${toolDir}/${childDir}/${entry}`);
+    }
+  }
+
+  if (standIns.length === 0) return;
+
+  const sample = standIns.slice(0, 3).join(", ");
+  const rest = standIns.length > 3 ? ` 외 ${standIns.length - 3}개` : "";
+  addError(
+    `하네스 어댑터 ${standIns.length}개가 symlink가 아니라 링크 경로만 적힌 텍스트 파일입니다(${sample}${rest}). ` +
+      `git이 symlink를 만들지 못한 채 clone된 상태입니다(core.symlinks=false). ` +
+      `복구: git config --global core.symlinks true → (저장소 .git/config에 값이 박혀 있으면 local이 이기므로) git config --unset core.symlinks → ` +
+      `git submodule update --init --recursive → git ls-files -s | awk '$1 == 120000 { print $4 }' | xargs -r rm -f && git checkout -- .`,
+  );
+}
+
+// stand-in 판별은 보수적으로 한다. 정상 어댑터 파일(예: .claude/commands/kickoff.md)은
+// frontmatter와 여러 줄을 가진 마크다운이므로, "개행 없는 한 줄"이면서 그 한 줄을
+// 자기 위치 기준으로 풀었을 때 하네스 루트 안을 가리키는 경우만 stand-in으로 본다.
+// 프로젝트가 직접 둔 로컬 어댑터는 하네스 밖을 가리키므로 걸리지 않는다.
+function looksLikeSymlinkStandIn(entryPath) {
+  let stats;
+  try {
+    stats = fs.lstatSync(entryPath);
+  } catch {
+    return false;
+  }
+  if (!stats.isFile() || stats.size === 0 || stats.size > 512) return false;
+
+  let content;
+  try {
+    content = fs.readFileSync(entryPath, "utf8");
+  } catch {
+    return false;
+  }
+
+  const target = content.trim();
+  if (!target || /[\r\n]/.test(target)) return false;
+
+  const resolved = path.resolve(path.dirname(entryPath), target);
+  const harnessAbsolute = path.resolve(harnessRoot);
+  return resolved === harnessAbsolute || resolved.startsWith(`${harnessAbsolute}${path.sep}`);
+}
+
 function tomlDeveloperInstructions(content) {
   const match = /developer_instructions\s*=\s*"""\r?\n?([\s\S]*?)"""/.exec(content);
   return match ? match[1] : null;
@@ -1222,6 +1305,7 @@ assertAdrReferences();
 assertImmutableAdrBody();
 assertPublicSafeDocs();
 assertHarnessAdapters();
+assertAdapterLinkIntegrity();
 assertAdapterParity();
 
 if (errors.length > 0) {

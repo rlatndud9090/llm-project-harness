@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -184,6 +184,85 @@ describe("attach-submodule", () => {
   });
 });
 
+// Windows에서 어댑터가 조용히 무너지는 경로(#3): git이 symlink를 만들지 못하면
+// 링크 대신 타겟 경로가 적힌 텍스트 파일이 체크아웃되는데 git status는 깨끗하다.
+// 아래 케이스들은 전부 플랫폼 독립이다(실제 Windows 없이도 리눅스 CI에서 돈다).
+describe("attach-submodule Windows environment", () => {
+  it("seeds .gitattributes so a Windows checkout cannot introduce CRLF", () => {
+    withProject((projectRoot) => {
+      runAttach(projectRoot);
+
+      const attributes = fs.readFileSync(path.join(projectRoot, ".gitattributes"), "utf8");
+      expect(attributes).toContain("* text=auto eol=lf");
+      expect(attributes).toContain("*.png binary");
+
+      runHarnessCheck(projectRoot);
+    });
+  });
+
+  it("keeps a project's own .gitattributes but warns when it does not pin eol", () => {
+    withProject((projectRoot) => {
+      writeFile(path.join(projectRoot, ".gitattributes"), "*.png binary\n");
+
+      const output = runAttach(projectRoot);
+
+      expect(fs.readFileSync(path.join(projectRoot, ".gitattributes"), "utf8")).toBe("*.png binary\n");
+      expect(output).toContain("kept .gitattributes");
+      expect(output).toContain("eol=lf");
+    });
+  });
+
+  it("refuses to attach when git cannot record symlinks, and names the local-config trap", () => {
+    withProject((projectRoot) => {
+      git(projectRoot, ["init", "-q"]);
+      // clone 시점에 git이 시스템 기본값을 저장소로 복사해 두는 상황을 그대로 재현한다.
+      git(projectRoot, ["config", "core.symlinks", "false"]);
+
+      const result = runAttachRaw(projectRoot, [], { HARNESS_SKIP_ENV_CHECK: "" });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("core.symlinks=false");
+      // 전역 설정만 바꿔서는 안 고쳐진다는 사실이 처방의 핵심이다.
+      expect(result.stderr).toContain("git config --unset core.symlinks");
+      // 절반만 장착된 상태를 남기지 않는다.
+      expect(pathExists(path.join(projectRoot, ".claude"))).toBe(false);
+      expect(pathExists(path.join(projectRoot, "docs"))).toBe(false);
+    });
+  });
+
+  it("repairs adapters that were checked out as one-line text files, leaving real overrides alone", () => {
+    withProject((projectRoot) => {
+      // core.symlinks=false로 clone된 저장소의 실제 모습: 링크가 아니라 경로 한 줄.
+      const brokenLink = path.join(projectRoot, ".claude", "skills", "next-feature");
+      writeFile(brokenLink, "../../.harness/.claude/skills/next-feature");
+      const localOverride = path.join(projectRoot, ".claude", "commands", "kickoff.md");
+      writeFile(localOverride, "# 프로젝트 전용 kickoff\n\n이 파일은 프로젝트가 직접 작성했다.\n");
+
+      const output = runAttach(projectRoot);
+
+      expect(output).toContain("repair .claude/skills/next-feature");
+      expect(isSymlink(brokenLink)).toBe(true);
+      expect(pathExists(path.join(brokenLink, "SKILL.md"))).toBe(true);
+
+      // 하네스 밖을 가리키지 않는 진짜 로컬 파일은 절대 지우지 않는다.
+      expect(output).toContain("kept local override .claude/commands/kickoff.md");
+      expect(fs.readFileSync(localOverride, "utf8")).toContain("프로젝트가 직접 작성했다");
+    });
+  });
+});
+
+function runAttachRaw(projectRoot, args = [], env = {}) {
+  return spawnSync(
+    process.execPath,
+    [path.join(projectRoot, ".harness", "scripts", "harness", "attach-submodule.mjs"), "--harness-dir", ".harness", ...args],
+    { cwd: projectRoot, encoding: "utf8", env: { ...process.env, ...env } },
+  );
+}
+
+function git(projectRoot, args) {
+  execFileSync("git", args, { cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
 function withProject(callback) {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "llm-harness-attach-"));
   try {
@@ -194,13 +273,18 @@ function withProject(callback) {
   }
 }
 
-function runAttach(projectRoot, args = []) {
+// 픽스처는 임시 디렉터리에서 돌아 호스트의 git 전역/시스템 설정을 그대로 상속한다.
+// Git for Windows 러너는 core.symlinks=false가 시스템 기본값이라, 진단을 끄지 않으면
+// 테스트 통과 여부가 실행 머신의 설정에 따라 갈린다. 진단 자체는 그것을 명시적으로
+// 켜는 전용 테스트에서 검증한다.
+function runAttach(projectRoot, args = [], env = {}) {
   return execFileSync(
     process.execPath,
     [path.join(projectRoot, ".harness", "scripts", "harness", "attach-submodule.mjs"), "--harness-dir", ".harness", ...args],
     {
       cwd: projectRoot,
       encoding: "utf8",
+      env: { ...process.env, HARNESS_SKIP_ENV_CHECK: "1", ...env },
     },
   );
 }

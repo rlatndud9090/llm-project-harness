@@ -1971,6 +1971,144 @@ describe("kickoff --issue provenance", () => {
   });
 });
 
+// Windows에서만 터지고 저장소에는 흔적이 남지 않는 세 실패(#1 gate ENOENT,
+// #2 CRLF frontmatter 손상, #3 symlink가 텍스트 파일로 체크아웃)를 실제 플랫폼 없이
+// 재현한다. 리눅스 CI는 인덱스(LF)와 정상 symlink만 보므로 이 픽스처들이 유일한
+// 상시 방어선이다 — Windows CI를 붙여도 `.gitattributes` 때문에 CRLF는 재현되지 않는다.
+describe("Windows failure modes", () => {
+  it("harness:gate runs every step when npm did not launch it (no npm_execpath to inherit)", () => {
+    withProject((projectRoot) => {
+      seedGateScripts(projectRoot);
+
+      // 이 조건이 곧 이슈 #1이다. 예전에는 spawnSync("npm", …)이 Windows에서 ENOENT로
+      // 죽으면서 status가 null로 와, 첫 스텝에서 메시지 한 줄 없이 exit 1 했다.
+      const result = runGate(projectRoot, { npm_execpath: undefined, npm_config_user_agent: undefined });
+
+      expect(`${result.stdout}${result.stderr}`).toContain("[harness:gate] ok");
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("harness:gate propagates a failing step's exit status instead of swallowing it", () => {
+    withProject((projectRoot) => {
+      seedGateScripts(projectRoot, { lint: "node -e \"process.exit(3)\"" });
+
+      const result = runGate(projectRoot, { npm_execpath: undefined });
+
+      expect(result.status).toBe(3);
+      expect(`${result.stdout}${result.stderr}`).not.toContain("[harness:gate] ok");
+    });
+  });
+
+  it("harness:approve updates a CRLF worktree in place instead of stacking frontmatter blocks", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "crlf-unit");
+      runKickoff(projectRoot, "feature", "crlf-unit", "CRLF 단위");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "CRLF", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      ingest(projectRoot, "docs/raw/feature/crlf-unit", "공유 기능");
+
+      // core.autocrlf=true로 체크아웃된 상태를 그대로 만든다.
+      convertToCrlf(unitDir);
+
+      const approve = runApprove(projectRoot, "docs/raw/feature/crlf-unit", ["--quote", "이대로 승인, 구현 들어가"]);
+      expect(approve.status).toBe(0);
+
+      // 손상 회귀의 핵심 신호. 예전에는 실행 한 번에 state.md 구분자가 6줄(블록 3개),
+      // prd.md가 4줄(블록 2개)로 불어나고 status는 draft인 채 남았다.
+      for (const fileName of ["prd.md", "state.md"]) {
+        const lines = read(path.join(unitDir, fileName)).split(/\r?\n/);
+        expect(lines.filter((line) => line === "---")).toHaveLength(2);
+      }
+      expect(read(path.join(unitDir, "prd.md"))).toContain("status: approved");
+      expect(read(path.join(unitDir, "state.md"))).toContain("prd_status: approved");
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("harness:check passes on a CRLF worktree (frontmatter is present, not missing)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "crlf-check");
+      runKickoff(projectRoot, "feature", "crlf-check", "CRLF 검사");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "CRLF Check", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      ingest(projectRoot, "docs/raw/feature/crlf-check", "공유 기능");
+      convertToCrlf(unitDir);
+      convertToCrlf(path.join(projectRoot, "docs", "wiki"));
+
+      const result = runCheck(projectRoot);
+      expect(`${result.stdout}${result.stderr}`).not.toContain("missing frontmatter");
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("harness:check reports adapters that were checked out as text files instead of symlinks", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const adapter = path.join(projectRoot, ".claude", "skills", "next-feature");
+      fs.rmSync(adapter, { recursive: true, force: true });
+      writeFile(adapter, "../../.harness/.claude/skills/next-feature");
+
+      // 프로젝트가 직접 둔 로컬 어댑터는 오탐 대상이 아니다.
+      writeFile(path.join(projectRoot, ".claude", "commands", "project-note.md"), "# 프로젝트 전용\n\n본문\n");
+
+      const result = runCheck(projectRoot);
+      const output = `${result.stdout}${result.stderr}`;
+      expect(result.status).not.toBe(0);
+      expect(output).toContain("텍스트 파일");
+      expect(output).toContain("core.symlinks=false");
+      expect(output).toContain(".claude/skills/next-feature");
+      expect(output).not.toContain("project-note.md");
+    });
+  });
+});
+
+// gate 픽스처: 실제 하네스 스텝 대신 즉시 끝나는 스크립트를 둔다. 검증 대상은
+// 스텝의 내용이 아니라 "패키지 매니저를 띄울 수 있는가"이기 때문이다.
+function seedGateScripts(projectRoot, overrides = {}) {
+  const scripts = {
+    "harness:check": 'node -e "console.log(0)"',
+    lint: 'node -e "console.log(0)"',
+    build: 'node -e "console.log(0)"',
+    "test:run": 'node -e "console.log(0)"',
+    ...overrides,
+  };
+  writeFile(path.join(projectRoot, "package.json"), `${JSON.stringify({ name: "gate-fixture", private: true, scripts }, null, 2)}\n`);
+}
+
+function runGate(projectRoot, envOverrides = {}) {
+  const env = { ...process.env };
+  for (const [key, value] of Object.entries(envOverrides)) {
+    if (value === undefined) delete env[key];
+    else env[key] = value;
+  }
+  return spawnSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "gate.mjs")], {
+    cwd: projectRoot,
+    encoding: "utf8",
+    env,
+  });
+}
+
+// 디렉터리의 모든 텍스트 파일을 CRLF로 바꿔, Git for Windows 체크아웃을 재현한다.
+function convertToCrlf(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      convertToCrlf(entryPath);
+      continue;
+    }
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    const content = fs.readFileSync(entryPath, "utf8");
+    fs.writeFileSync(entryPath, content.replace(/\r?\n/g, "\r\n"), "utf8");
+  }
+}
+
 function frontmatter(fields) {
   const lines = Object.entries({ date: "2026-01-01", ...fields }).map(([key, value]) => `${key}: ${value}`);
   return ["---", ...lines, "---"].join("\n");
@@ -1998,7 +2136,14 @@ function attach(projectRoot) {
   execFileSync(
     process.execPath,
     [path.join(projectRoot, ".harness", "scripts", "harness", "attach-submodule.mjs"), "--harness-dir", ".harness"],
-    { cwd: projectRoot, encoding: "utf8" },
+    {
+      cwd: projectRoot,
+      encoding: "utf8",
+      // 픽스처는 호스트의 git 전역/시스템 설정을 상속한다. Git for Windows는
+      // core.symlinks=false가 시스템 기본값이라, 진단을 끄지 않으면 이 파일의 모든
+      // 플로우 테스트가 실행 머신 설정에 좌우된다(진단 자체는 attach-submodule.test.mjs에서 검증).
+      env: { ...process.env, HARNESS_SKIP_ENV_CHECK: "1" },
+    },
   );
 }
 

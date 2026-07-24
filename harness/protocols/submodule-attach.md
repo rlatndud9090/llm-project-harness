@@ -14,6 +14,74 @@
 - 같은 경로에 로컬 adapter가 이미 있으면 프로젝트 override로 보고 덮어쓰지 않는다.
 - `docs/harness`, `docs/raw/_templates`, `scripts/harness` symlink를 만들지 않는다.
 
+## Windows 사전조건 (필수)
+
+하네스 어댑터는 `.harness` 안을 가리키는 **symlink**다(프로젝트당 수십 개). Git for
+Windows는 시스템 gitconfig에 아래 두 값을 심어서 배포되므로, 이 상태로 clone하면
+장착이 **조용히** 무너진다. 아무 경고도 뜨지 않고 `git status`도 깨끗하다.
+
+```sh
+git config --show-origin --get core.symlinks   # file:C:/Program Files/Git/etc/gitconfig  false
+git config --show-origin --get core.autocrlf   # file:C:/Program Files/Git/etc/gitconfig  true
+```
+
+- `core.symlinks=false`: git이 symlink 대신 **타겟 경로가 적힌 한 줄짜리 텍스트
+  파일**을 체크아웃한다. 인덱스와 내용이 일치하니 `git status`는 깨끗하고, 스킬
+  설명 자리에 링크 경로가 그대로 찍히는 것 말고는 신호가 없다.
+- `core.autocrlf=true`: 워킹트리가 CRLF로 체크아웃된다. 하네스의 frontmatter
+  검사가 전부 "frontmatter 없음"으로 오판하고, `harness:approve`는 기존 블록 위에
+  새 블록을 얹어 PRD/ADR/state를 실제로 손상시킨다. 리눅스 CI는 인덱스(LF)만 보므로
+  재현되지 않는다.
+
+`attach-submodule.mjs`는 첫 링크를 만들기 전에 이 조건을 진단하고, 문제가 있으면
+**아무것도 바꾸지 않고 중단한다**(절반만 장착된 상태를 남기지 않는다). 진단은 설정
+값과 그 **출처**를 함께 보고, 실제로 임시 symlink를 만들어 본다(프로젝트 루트에
+`.harness-symlink-probe-*`를 잠깐 만들고 지운다). `--no-env-check` 또는
+`HARNESS_SKIP_ENV_CHECK=1`로 끌 수 있지만 권장하지 않는다.
+
+```sh
+# 0) Windows 개발자 모드 ON — 설정 > 개인 정보 및 보안 > 개발자용 > 개발자 모드
+#    (관리자 권한 없이 symlink를 만들려면 필수)
+
+# 1) 전역 기본값을 덮는다. 이후 clone에 적용된다
+git config --global core.symlinks true
+git config --global core.autocrlf false
+
+# 2) 이미 clone된 저장소는 local 설정 제거가 필수다
+git config --unset core.symlinks
+git config --unset core.autocrlf
+git config core.symlinks    # true로 나오는지 반드시 확인
+```
+
+> **⚠ 전역 설정만으로는 이미 clone된 저장소가 고쳐지지 않는다.** clone 시점에 git이
+> 그 값을 저장소의 `.git/config`에 **복사해 둔다.** local이 global을 이기므로
+> `--global`을 넣어도 실효값은 여전히 `false`다. 2단계를 빠뜨리면 symlink 재생성이
+> 전부 실패한다.
+
+이미 깨진 저장소를 복구할 때는 위 1·2단계 뒤에 아래를 순서대로 실행한다. 4·5단계는
+작업 트리가 깨끗할 때만 안전하다.
+
+```sh
+git submodule update --init --recursive                                   # 3) 서브모듈 확보
+git ls-files -s | awk '$1 == 120000 { print $4 }' | xargs -r rm -f        # 4) 깨진 링크 제거
+git checkout -- .                                                        #    인덱스에서 재생성
+git rm --cached -rq . && git reset --hard                                 # 5) CRLF 제거(.gitattributes 작성 후)
+npm run harness:hooks                                                    # 6) 훅 설치
+npm run harness:check                                                    #    검증
+```
+
+**순서 주의:** 훅을 먼저 설치하면 안 된다. `pre-commit`이 `npm run harness:check`를
+실행하는데 `.harness`가 비어 있으면 스크립트를 찾지 못해 **그 저장소에서 커밋이 전부
+막힌다.** 서브모듈 복구(3단계)가 반드시 선행돼야 한다.
+
+`attach`를 다시 실행하면 텍스트 파일로 남은 어댑터는 symlink로 **복구된다**(내용이
+정확히 하네스 타겟을 가리킬 때만 교체하므로 프로젝트가 손으로 둔 override는 건드리지
+않는다). `harness:check`도 이 상태를 어댑터 무결성 오류로 보고한다.
+
+`.harness`가 빈 디렉터리로 남은 경우(`git clone`에서 `--recurse-submodules`를 빠뜨림)
+최종 증상은 "스킬이 안 보인다"로 같다. `git submodule status`의 선행 `-`가 미초기화
+표시다. 두 원인이 겹칠 수 있으므로 서브모듈부터 확인한다.
+
 ## 신규 프로젝트 장착
 
 소비 프로젝트 루트에서 실행한다.
@@ -34,7 +102,13 @@ docs/wiki/
 docs/wiki/index.md
 package.json
 .claude/settings.json
+.gitattributes
 ```
+
+`.gitattributes`에는 `* text=auto eol=lf`와 바이너리 명시를 심는다. `eol=lf`가
+`core.autocrlf`를 이기므로, Windows 기본 설정이 무엇이든 워킹트리가 LF로 체크아웃된다
+(위 "Windows 사전조건"의 CRLF 손상을 원천에서 끊는다). 이미 `.gitattributes`가 있으면
+덮어쓰지 않고, EOL을 고정하지 않았을 때만 경고한다.
 
 이때 `docs/wiki/index.md`의 초기 골격은
 `.harness/harness/templates/wiki/index.md`를 그대로 사용한다. 소비 프로젝트는 이

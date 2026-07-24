@@ -1,0 +1,24 @@
+# Git for Windows는 시스템 gitconfig에 core.autocrlf=true를 심어 두고 배포된다.
+# 그 상태로 clone하면 워킹트리가 CRLF로 바뀌고, 하네스의 frontmatter 파서가
+# `---\n`을 못 찾아 "frontmatter 없음"으로 오판한다(읽기 경로는 오탐, 쓰기 경로는
+# 기존 블록 위에 새 블록을 prepend해서 아티팩트를 실제로 손상시킨다).
+# 저장소가 EOL을 직접 못박아 두면 core.autocrlf 값과 무관하게 항상 LF로 체크아웃된다.
+* text=auto eol=lf
+
+# 텍스트 변환 대상에서 제외한다. text=auto의 자동 감지만으로도 대개 동작하지만,
+# 이미지가 많은 저장소에서 오탐 한 번이 곧 자산 손상이므로 명시해 둔다.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.gz binary
+*.mp4 binary
+*.webm binary

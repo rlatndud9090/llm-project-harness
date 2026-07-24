@@ -14,6 +14,60 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-25 windows-environment-fixes
+
+**변경**
+
+GitHub 이슈 #1·#2·#3(전부 Windows 환경 파손)을 해소했다. 세 문제 모두 리눅스 CI에서는
+재현되지 않고 저장소에 흔적도 남지 않아, Windows 소비 프로젝트에서만 조용히 터졌다.
+
+- **#1 `harness:gate`가 첫 스텝에서 ENOENT로 죽음** — `gate.mjs`가 `npm`을 shell 없이
+  spawn했다. 이슈가 제안한 처방(`npm.cmd`)은 **실제로는 통하지 않는다**: Node
+  18.20.2/20.12.2/21.7.3의 CVE-2024-27980 대응 이후 `.cmd`를 shell 없이 띄우면 EINVAL이
+  난다(Node 22.12.0/win32 실측). 그래서 `npm_execpath`가 가리키는 패키지 매니저 JS
+  진입점을 `process.execPath`로 직접 실행하고, 그 변수가 없을 때만 win32에서 shell을
+  경유한다(pnpm·yarn 소비 프로젝트는 자기 매니저를 그대로 쓴다). spawn 실패와 스텝
+  실패를 갈라 보고해, 원인 메시지 없이 죽던 문제도 함께 닫았다.
+- **#2 CRLF 워킹트리에서 frontmatter 파서 전멸 + `harness:approve`가 파일 손상** —
+  `lib.mjs`의 `readText`/`gitShow`에서 EOL·BOM을 정규화하고, frontmatter 경계 판정을
+  `frontmatterBounds` 한 곳으로 모아 CRLF를 허용했다. `setFrontmatterField`는 파일이
+  쓰던 EOL을 보존해 수술적 편집 계약을 지킨다(예전에는 CRLF 파일에서 "frontmatter
+  없음"으로 오판해 기존 블록 위에 새 블록을 얹었고, approve 한 번에 state.md에 블록이
+  3개 쌓였다). `claude-approval-guard`도 같은 정규화를 타게 해, CRLF 파일에서 literal
+  치환이 빗나가 승인 플립을 놓치던 fail-open 우회를 닫았다.
+- **#3 symlink 어댑터가 조용히 텍스트 파일이 됨** — `attach-submodule.mjs`가 첫 링크
+  전에 환경을 진단한다(`core.symlinks`·`core.autocrlf`의 값과 **출처**, 실제 symlink
+  생성 프로브). 문제가 있으면 아무것도 바꾸지 않고 중단하고, `.git/config`에 값이
+  박힌 경우에는 `--global`로 안 고쳐진다는 사실과 `--unset` 처방을 함께 낸다
+  (`--no-env-check` / `HARNESS_SKIP_ENV_CHECK=1`로 opt-out). 소비 프로젝트에
+  `.gitattributes`(`* text=auto eol=lf` + 바이너리 명시)를 심어 CRLF 유입을 원천
+  차단한다. 이미 텍스트 파일로 깨진 어댑터는 attach 재실행으로 복구하고(내용이 정확히
+  하네스 타겟을 가리킬 때만 교체 — 프로젝트 override는 불변), `harness:check`에
+  어댑터 무결성 검사를 추가했다(소비 모드 전용, 내용 기반 판정).
+- 함께 고친 Windows 파손: `attach-submodule.mjs`의 경로 출력이 백슬래시를 뱉어
+  Windows에서 attach 테스트 4/8이 실패하던 것(POSIX 정규화), `kickoff`의 첫 줄 unit
+  경로가 백슬래시로 나와 커밋 링크·ingest 인자로 그대로 흘러가던 것, `docs/wiki`의
+  `desktop.ini`/`Thumbs.db` 때문에 `harness:check`가 빨개지던 것.
+- 회귀 테스트: CRLF/BOM frontmatter 단위 케이스, CRLF 워킹트리 end-to-end(approve가
+  블록을 쌓지 않는지 · check가 통과하는지), gate의 매니저 해석과 실패 status 전파,
+  어댑터 stand-in 탐지·복구·override 불변, `.gitattributes` 시딩. 전부 플랫폼 독립이라
+  리눅스 CI에서도 돈다.
+- 이 저장소 자체도 CRLF에 오염돼 있어(추적 파일 113개) `harness:check`가 어댑터
+  divergence 11건으로 실패 중이었다. `.gitattributes` 추가 + 워킹트리 재정규화로 green.
+
+**소비자 조치**
+
+1. Windows에서 작업하는 소비 프로젝트는 `.harness/harness/protocols/submodule-attach.md`의
+   **"Windows 사전조건"** 절차를 실행한다. 특히 이미 clone된 저장소는
+   `git config --unset core.symlinks && git config --unset core.autocrlf`가 **필수**다
+   (`--global`만으로는 실효값이 바뀌지 않는다).
+2. `attach`를 다시 실행한다. `.gitattributes`가 없으면 새로 심기고, 텍스트 파일로
+   깨져 있던 어댑터는 symlink로 복구된다. 진단이 중단시키면 메시지의 처방을 먼저 따른다.
+3. 워킹트리가 이미 CRLF라면 `.gitattributes` 반영 후
+   `git rm --cached -rq . && git reset --hard`로 재정규화한다(작업 트리가 깨끗할 때만).
+4. `npm run harness:check`와 `npm run harness:gate`가 통과하는지 확인한다. Windows에서
+   `harness:gate`가 처음부터 돌아가는 것이 이 항목의 핵심 확인점이다.
+
 ## 2026-07-23 prd-adr-altitude-examples
 
 **변경**

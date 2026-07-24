@@ -12,8 +12,23 @@ export function fail(message) {
   process.exit(1);
 }
 
+// Git for Windows는 시스템 gitconfig에 `core.autocrlf=true`를 심어 배포되므로,
+// Windows 소비 프로젝트의 워킹트리는 기본적으로 CRLF다. 하네스의 검사는 거의
+// 전부 줄 단위 문자열 매칭(`---\n` 구분자, `^##\s+제목$` 같은 앵커, 라인 split)
+// 이라, CR 한 글자가 붙는 것만으로 "frontmatter 없음", "필수 섹션 없음" 같은
+// 대량 오탐이 난다. 리눅스 CI는 인덱스(LF)를 보므로 재현되지 않아 원인을 찾기도
+// 어렵다. 그래서 하네스가 텍스트를 읽어 들이는 단일 지점에서 EOL을 정규화한다.
+// BOM도 같은 실패 모드(첫 구분자 매칭 실패)를 만들므로 함께 벗긴다.
+//
+// 정규화는 "하네스가 보는 내용"만 바꾼다. 디스크의 파일을 건드리지 않으므로 이
+// 함수만으로 워킹트리가 변환되지는 않는다(예방은 소비 프로젝트의 `.gitattributes`가
+// 맡는다. attach가 심어 준다).
+export function normalizeEol(content) {
+  return content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+}
+
 export function readText(filePath) {
-  return fs.readFileSync(filePath, "utf8");
+  return normalizeEol(fs.readFileSync(filePath, "utf8"));
 }
 
 export function writeText(filePath, content) {
@@ -296,13 +311,35 @@ export function normalizeIssueRef(value) {
   return null;
 }
 
+// frontmatter 블록의 경계를 CRLF·BOM에 관계없이 찾는다. readText가 이미 EOL을
+// 정규화하지만, 이 함수들은 파일을 거치지 않은 문자열도 받는다(예:
+// claude-approval-guard가 직접 읽은 state.md, git show 출력, 테스트 입력). 구분자
+// 판정을 여기서도 CRLF에 열어 둬야 "frontmatter가 있는데 없다고 판정"하는 경로가
+// 남지 않는다 — 그 오판은 읽기 경로에서는 오탐이지만 쓰기 경로(setFrontmatterField)
+// 에서는 기존 블록 위에 새 블록을 얹는 실제 파일 손상이 된다.
+//
+// 반환하는 인덱스는 원본 문자열 기준이다.
+//   start        : 여는 `---` 줄 다음(= 첫 필드 줄의 시작)
+//   end          : 닫는 구분자를 시작하는 개행의 위치
+//   closeLength  : 그 개행 + `---`의 길이("\n---" = 4, "\r\n---" = 5)
+function frontmatterBounds(content) {
+  const open = /^\uFEFF?---\r?\n/.exec(content);
+  if (!open) return null;
+
+  const start = open[0].length;
+  const close = /\r?\n---/.exec(content.slice(start));
+  if (!close) return null;
+
+  return { start, end: start + close.index, closeLength: close[0].length };
+}
+
 export function parseFrontmatter(content) {
-  if (!content.startsWith("---\n")) return null;
-  const end = content.indexOf("\n---", 4);
-  if (end === -1) return null;
-  const body = content.slice(4, end).trim();
+  const bounds = frontmatterBounds(content);
+  if (!bounds) return null;
+
+  const body = content.slice(bounds.start, bounds.end).trim();
   const fields = {};
-  for (const line of body.split("\n")) {
+  for (const line of body.split(/\r?\n/)) {
     const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
     if (!match) continue;
     const [, key, rawValue] = match;
@@ -315,10 +352,9 @@ export function parseFrontmatter(content) {
 // when there is no frontmatter). Content/placeholder checks use this so they
 // never match frontmatter keys.
 export function bodyAfterFrontmatter(content) {
-  if (!content.startsWith("---\n")) return content;
-  const end = content.indexOf("\n---", 4);
-  if (end === -1) return content;
-  return content.slice(end + 4);
+  const bounds = frontmatterBounds(content);
+  if (!bounds) return content;
+  return content.slice(bounds.end + bounds.closeLength);
 }
 
 // The first body H1. Skips the leading frontmatter block first so a `# ...`
@@ -360,11 +396,16 @@ export function listMarkdownFiles(directory) {
 // new raw unit). Callers treat null as "no previous state to compare".
 export function gitShow(relativePosixPath, ref = "HEAD") {
   try {
-    return execFileSync("git", ["show", `${ref}:${relativePosixPath}`], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    // git show는 인덱스에 저장된 그대로(대개 LF)를 준다. 이 출력은 워킹트리를
+    // readText로 읽은 내용과 곧장 비교되므로(ADR 본문 불변, status 전이), 같은
+    // 정규화를 거치게 해서 "EOL만 다른데 본문이 바뀌었다"는 오판을 막는다.
+    return normalizeEol(
+      execFileSync("git", ["show", `${ref}:${relativePosixPath}`], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }),
+    );
   } catch {
     return null;
   }
@@ -496,17 +537,29 @@ export function adrBodyLooksAuthored(adrContent, skeletonBody = skeletonAdrBody(
 // status flips are surgical edits, never a full-file rewrite.
 export function setFrontmatterField(content, key, value) {
   const line = `${key}: ${value}`;
-  if (!content.startsWith("---\n")) {
-    return `---\n${line}\n---\n\n${content}`;
-  }
-  const end = content.indexOf("\n---", 4);
-  if (end === -1) return content;
+  const bounds = frontmatterBounds(content);
 
-  const frontmatter = content.slice(4, end);
-  const rest = content.slice(end); // begins with "\n---"
+  // "frontmatter 없음" 분기는 블록을 통째로 앞에 붙인다. 구분자를 CRLF까지
+  // 인식하지 못하면 CRLF 파일이 전부 이 분기를 타고, 멀쩡한 frontmatter 위에
+  // 두 번째 블록이 얹힌다(원본 블록은 본문으로 밀려나고 status는 그대로 남는다).
+  // approve는 한 번에 이 함수를 최대 7번 부르므로 실행 한 번에 state.md에 블록이
+  // 3개, prd.md에 2개 쌓였다. 승인을 기록하는 명령이 승인 아티팩트를 깨뜨리는 셈이라,
+  // 경계 판정은 반드시 frontmatterBounds 한 곳을 거친다.
+  if (!bounds) {
+    const eol = content.includes("\r\n") ? "\r\n" : "\n";
+    return `---${eol}${line}${eol}---${eol}${eol}${content}`;
+  }
+
+  const frontmatter = content.slice(bounds.start, bounds.end);
+  const head = content.slice(0, bounds.start); // BOM + 여는 `---` 줄, 원본 그대로
+  const rest = content.slice(bounds.end); // 닫는 구분자부터 끝까지, 원본 그대로
+  // 편집한 줄의 EOL은 그 파일이 이미 쓰던 것을 따른다. 여기서 LF로 통일해 버리면
+  // CRLF 워킹트리에서 파일 전체가 바뀐 것처럼 보여, 필드 하나를 뒤집는 수술적
+  // 편집이라는 이 함수의 계약이 깨진다.
+  const eol = frontmatter.includes("\r\n") || rest.startsWith("\r\n") ? "\r\n" : "\n";
   const keyPattern = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:`);
   let replaced = false;
-  const lines = frontmatter.split("\n").map((existing) => {
+  const lines = frontmatter.split(/\r?\n/).map((existing) => {
     if (!replaced && keyPattern.test(existing)) {
       replaced = true;
       return line;
@@ -514,7 +567,7 @@ export function setFrontmatterField(content, key, value) {
     return existing;
   });
   if (!replaced) lines.push(line);
-  return `---\n${lines.join("\n")}${rest}`;
+  return `${head}${lines.join(eol)}${rest}`;
 }
 
 // state.md records each approval as one strict, regex-parseable line so the CLI
