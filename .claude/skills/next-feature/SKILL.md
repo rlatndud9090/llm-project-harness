@@ -14,10 +14,10 @@ description: "다음 작업 단위 후보를 추천하고 하나를 선택할 �
 3. `.harness/harness/roles/intake-helper.md`, `unit-planner.md`로 후보 3~5개를 만든다.
 4. 1순위 추천과 이유를 제시하고 사용자가 하나를 선택하게 한다.
 
-후보는 branch name, raw path, area(발전시키는 기능/구조 영역), scope, non-scope,
-검증 방법, PRD/ADR 필요성을 포함한다. 확정된 단위는 `docs/raw/.next-unit`에
-`<type>/<slug> | <제목> | <영역>`로 남겨 kickoff이 영역을 시드하게 한다. 구현이나 PRD
-작성은 하지 않는다. 선택된 작업 단위는 `$kickoff`로 넘긴다.
+후보 필드·우선순위·`area`/`section` 판정 규칙은 프로토콜을 정본으로 따른다. 확정된 단위만
+`docs/raw/.next-unit`에 `<type>/<slug> | <제목> | <영역> | <섹션>` 한 줄로 남겨 kickoff이
+영역·섹션을 시드하게 한다(섹션은 선택 — 안 쓰면 4번째 필드를 비운다). 구현이나 PRD 작성은
+하지 않고, 선택된 작업 단위는 `$kickoff`로 넘긴다.
 
 ## 질문 도구
 
@@ -37,55 +37,22 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
 ## Claude Code — agents 화면 세션 제목 (필수)
 
 이 스킬을 실행하면 **즉시** 현재 세션의 agents 화면(FleetView) 제목을
-`<프로젝트 약어> next-feature` 형식으로 바꾼다. 어떤 프로젝트의 어떤 세션이 "다음 작업
-단위 탐색" 중인지 목록에서 한눈에 보이게 하기 위함이다. (대화형·background 세션 모두 항상 실행한다.)
+`<프로젝트 약어> next-feature` 형식으로 바꾼다(대화형·background 세션 모두 항상). 어떤
+프로젝트의 어떤 세션이 "다음 작업 단위 탐색" 중인지 목록에서 한눈에 보이게 하기 위함이다.
 
-- **프로젝트 약어**: 현재 프로젝트 폴더명(git 루트 basename)을 `-`/`_`/공백으로 나눈 각
-  토큰의 첫 글자를 대문자로 모아 `<...>`로 감싼다. 예: `poke-battle-quiz` → `<PBQ>`.
-  약어가 1글자 이하로 나오면 폴더명 앞 3글자를 대문자로 쓴다(`frontend` → `<FRO>`). 아래
-  스니펫이 자동 계산하며, 어색하면 사람이 읽기 좋은 2~4글자로 바꿔도 된다.
-- agents 화면 제목은 `~/.claude/jobs/<job>/state.json`의 `name` 필드다. 아래 스크립트로
-  현재 세션(`$CLAUDE_CODE_SESSION_ID`)에 해당하는 job의 `name`을 `<약어> next-feature`로
-  설정하고 `nameSource`를 `user`로 지정한다(`user`여야 Claude Code 자동 영문 이름이 덮어쓰지 않는다).
-- 스크립트 맨 앞의 가드가 **먼저** agents 세션인지(=job `state.json` 존재) 확인하므로,
-  agents 모드가 아닌 대화형 세션에서 그대로 실행해도 실패 exit code 없이 조용히 넘어간다.
-  즉 세션 종류를 신경 쓰지 말고 항상 실행하면 된다.
+제목 세팅은 공용 헬퍼가 담당한다. agents 세션이 아니면 조용히 no-op이고 절대 실패하지
+않으므로 세션 종류를 신경 쓰지 말고 항상 호출한다.
 
 ```bash
-# 가드: agents(FleetView) 세션에서만 제목을 바꾼다. job state.json이 하나도 없으면
-# (= agents 모드가 아님) 여기서 조용히 건너뛴다 — 실패 exit code 없이 정상 종료한다.
-if [ -z "$CLAUDE_CODE_SESSION_ID" ] || ! ls ~/.claude/jobs/*/state.json >/dev/null 2>&1; then
-  echo "agents 세션 아님(job state.json 없음) — 제목 설정 건너뜀"
-else
-  proj="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
-  abbr="$(printf '%s' "$proj" | tr '_ ' '--' | awk -F'-' '{s="";for(i=1;i<=NF;i++)if($i!="")s=s toupper(substr($i,1,1));print s}')"
-  [ "${#abbr}" -lt 2 ] && abbr="$(printf '%s' "$proj" | tr '[:lower:]' '[:upper:]' | cut -c1-3)"
-  python3 - "$CLAUDE_CODE_SESSION_ID" "<$abbr> next-feature" <<'PY'
-import json, sys, glob, os
-sid, title = sys.argv[1], sys.argv[2]
-target = None
-for p in glob.glob(os.path.expanduser("~/.claude/jobs/*/state.json")):
-    try:
-        d = json.load(open(p))
-    except Exception:
-        continue
-    if d.get("sessionId") == sid or d.get("resumeSessionId") == sid:
-        target = (p, d)
-        break
-if not target:
-    print(f"이 세션에 해당하는 job 없음(sessionId={sid}) — 제목 설정 건너뜀")
-    raise SystemExit(0)
-p, d = target
-d["name"] = title
-d["nameSource"] = "user"
-json.dump(d, open(p, "w"), ensure_ascii=False, indent=2)
-print("agents 화면 제목 설정:", title)
-PY
-fi
+# provider 레포/미부착 소비 프로젝트엔 .harness가 없을 수 있으므로 파일 존재를 먼저 본다.
+[ -f .harness/scripts/harness/set-fleet-title.mjs ] \
+  && node .harness/scripts/harness/set-fleet-title.mjs --label "next-feature" 2>/dev/null || true
 ```
 
-> 작업 단위를 확정해 `$kickoff`로 넘어가면, kickoff이 제목의 `next-feature` 부분을
-> 확정된 작업명으로 교체한다(약어 prefix는 유지).
+- 헬퍼가 git 루트 폴더명에서 약어를 자동 계산한다(`poke-battle-quiz` → `<PBQ>`). 어색하면
+  `--abbr <2~4글자>`를 덧붙여 덮어쓴다.
+- 작업 단위를 확정해 `$kickoff`로 넘어가면 kickoff이 제목의 `next-feature` 부분을 확정된
+  작업명으로 교체한다(약어 prefix는 유지).
 
 ## Claude Code — Background 세션 result 형식 (필수)
 

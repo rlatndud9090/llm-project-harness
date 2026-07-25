@@ -14,10 +14,10 @@ description: "다음 작업 단위 후보를 추천하고 하나를 선택할 �
 3. `.harness/harness/roles/intake-helper.md`, `unit-planner.md`로 후보 3~5개를 만든다.
 4. 1순위 추천과 이유를 제시하고 사용자가 하나를 선택하게 한다.
 
-후보는 branch name, raw path, area(발전시키는 기능/구조 영역), scope, non-scope,
-검증 방법, PRD/ADR 필요성을 포함한다. 확정된 단위는 `docs/raw/.next-unit`에
-`<type>/<slug> | <제목> | <영역>`로 남겨 kickoff이 영역을 시드하게 한다. 구현이나 PRD
-작성은 하지 않는다. 선택된 작업 단위는 `$kickoff`로 넘긴다.
+후보 필드·우선순위·`area`/`section` 판정 규칙은 프로토콜을 정본으로 따른다. 확정된 단위만
+`docs/raw/.next-unit`에 `<type>/<slug> | <제목> | <영역> | <섹션>` 한 줄로 남겨 kickoff이
+영역·섹션을 시드하게 한다(섹션은 선택 — 안 쓰면 4번째 필드를 비운다). 구현이나 PRD 작성은
+하지 않고, 선택된 작업 단위는 `$kickoff`로 넘긴다.
 
 ## 질문 도구
 

@@ -35,6 +35,9 @@ PRD는 한국어로 작성한다. branch name, file path, command, TypeScript id
 
 ## 진행 루프
 
+단순한 PRD(작은 범위·명확한 요구)는 메인이 직접 작성·검토한다. `researcher`/`prd-writer`/`reviewer`
+서브에이전트 위임은 리서치·리뷰 부담이 실제로 클 때만 편다(위임 비용은 `session-start.md` "위임 비용" 참조).
+
 ### Phase 1: 의견 수집
 
 1. 목표, 성공 기준, 비목표, 결정 경계를 끌어낸다. `$deep-interview`가 설치돼

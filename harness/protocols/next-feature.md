@@ -19,11 +19,16 @@ branch-sized 작업 단위 후보를 추천하고 하나를 확정하는 단계�
 - `intake-helper`: 후보를 발굴하고 추천한다.
 - `unit-planner`: 후보를 branch/raw 단위로 자른다.
 
+후보 추리기가 단순하면 메인(오케스트레이터)이 직접 3~5개를 뽑는다. `intake-helper`/`unit-planner`
+위임은 아이디어가 넓거나 쪼개기가 복잡해 실제로 분업이 이득일 때만 쓴다(위임 비용은 `session-start.md`
+"위임 비용" 참조).
+
 ## 단계
 
 ### Phase 0: 컨텍스트 로딩
 
-1. `AGENTS.md`, `docs/wiki/index.md`, `.harness/harness/README.md`를 읽는다.
+1. `AGENTS.md`, `docs/wiki/index.md`, `.harness/harness/README.md`를 읽는다(이 컨텍스트에
+   아직 로드돼 있지 않을 때만 — `session-start`에서 이미 읽었으면 중복 재판독하지 않는다).
 2. 현재 브랜치와 관련 raw unit을 확인한다.
 3. 기존 raw unit이 새 요청과 충돌하면 먼저 사용자에게 결정 경계를 묻는다.
 

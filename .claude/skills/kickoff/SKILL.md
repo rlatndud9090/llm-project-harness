@@ -51,58 +51,22 @@ kickoff 로그 줄). 이슈 번호를 스크립트에 직접 넘기면 실패하
 ## Claude Code — agents 화면 세션 제목 (필수)
 
 `npm run harness:kickoff`으로 브랜치·raw 골격을 만든 직후 **즉시** 현재 세션의 agents
-화면(FleetView) 제목을 `<프로젝트 약어> <작업명>` 형식으로 바꾼다. next-feature 단계에서
-붙였던 `<약어> next-feature` 제목의 `next-feature` 부분을, 확정된 작업 단위 이름으로
-교체하는 것이다(약어 prefix는 그대로 유지). (대화형·background 세션 모두 항상 실행한다.)
+화면(FleetView) 제목을 `<프로젝트 약어> <작업명>` 형식으로 바꾼다(대화형·background 세션
+모두 항상). next-feature 단계에서 붙였던 `<약어> next-feature` 제목의 `next-feature`
+부분을, 확정된 작업 단위 이름으로 교체하는 것이다(약어 prefix는 그대로 유지).
 
-- **프로젝트 약어**: next-feature와 같은 규칙. 현재 프로젝트 폴더명(git 루트 basename)을
-  `-`/`_`/공백으로 나눈 각 토큰의 첫 글자를 대문자로 모아 `<...>`로 감싼다
-  (`poke-battle-quiz` → `<PBQ>`). 아래 스니펫이 자동 계산한다.
-- **작업명 = 브랜치 slug의 하이픈을 공백으로 바꾼 표현**. 예: `feature/do-next-thing` →
-  `do next thing`, `bugfix/session-restore` → `session restore`. 즉 최종 제목은
-  `<PBQ> do next thing`처럼 된다.
+- **작업명 = 브랜치 slug의 하이픈을 공백으로 바꾼 표현**(`feature/do-next-thing` →
+  `do next thing`). 아래 호출에 slug을 넣으면 공용 헬퍼가 변환한다.
 - slug은 kickoff 명령의 `--slug` 값 또는 현재 브랜치 `{type}/{slug}`의 `{slug}` 부분이다
   (kickoff 출력의 `- unit: {type}/{slug}` 줄에서도 확인할 수 있다).
-- 방법: 아래 스크립트의 `slug=` 값만 실제 slug로 바꿔 실행한다. agents 화면 제목은
-  `~/.claude/jobs/<job>/state.json`의 `name` 필드이며, `nameSource`를 `user`로 두어야
-  Claude Code 자동 영문 이름이 덮어쓰지 않는다.
-- 스크립트 맨 앞의 가드가 **먼저** agents 세션인지(=job `state.json` 존재) 확인하므로,
-  agents 모드가 아닌 대화형 세션에서 그대로 실행해도 실패 exit code 없이 조용히 넘어간다.
-  즉 세션 종류를 신경 쓰지 말고 항상 실행하면 된다.
+- 제목 세팅·약어 자동 계산·가드는 공용 헬퍼가 담당한다. agents 세션이 아니면 조용히
+  no-op이고 절대 실패하지 않으므로 세션 종류를 신경 쓰지 말고 항상 호출한다.
 
 ```bash
-slug="do-next-thing"  # ← 실제 작업 단위 slug로 바꾼다 (브랜치 {type}/{slug}의 {slug})
-# 가드: agents(FleetView) 세션에서만 제목을 바꾼다. job state.json이 하나도 없으면
-# (= agents 모드가 아님) 여기서 조용히 건너뛴다 — 실패 exit code 없이 정상 종료한다.
-if [ -z "$CLAUDE_CODE_SESSION_ID" ] || ! ls ~/.claude/jobs/*/state.json >/dev/null 2>&1; then
-  echo "agents 세션 아님(job state.json 없음) — 제목 설정 건너뜀"
-else
-  proj="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
-  abbr="$(printf '%s' "$proj" | tr '_ ' '--' | awk -F'-' '{s="";for(i=1;i<=NF;i++)if($i!="")s=s toupper(substr($i,1,1));print s}')"
-  [ "${#abbr}" -lt 2 ] && abbr="$(printf '%s' "$proj" | tr '[:lower:]' '[:upper:]' | cut -c1-3)"
-  work="$(printf '%s' "$slug" | tr '-' ' ')"
-  python3 - "$CLAUDE_CODE_SESSION_ID" "<$abbr> $work" <<'PY'
-import json, sys, glob, os
-sid, title = sys.argv[1], sys.argv[2]
-target = None
-for p in glob.glob(os.path.expanduser("~/.claude/jobs/*/state.json")):
-    try:
-        d = json.load(open(p))
-    except Exception:
-        continue
-    if d.get("sessionId") == sid or d.get("resumeSessionId") == sid:
-        target = (p, d)
-        break
-if not target:
-    print(f"이 세션에 해당하는 job 없음(sessionId={sid}) — 제목 설정 건너뜀")
-    raise SystemExit(0)
-p, d = target
-d["name"] = title
-d["nameSource"] = "user"
-json.dump(d, open(p, "w"), ensure_ascii=False, indent=2)
-print("agents 화면 제목 설정:", title)
-PY
-fi
+# 아래 "do-next-thing"을 실제 작업 단위 slug로 바꿔 실행한다(브랜치 {type}/{slug}의 {slug}).
+# 헬퍼가 하이픈→공백 변환·약어 계산을 한다. 약어가 어색하면 --abbr <2~4글자>를 덧붙인다.
+[ -f .harness/scripts/harness/set-fleet-title.mjs ] \
+  && node .harness/scripts/harness/set-fleet-title.mjs --slug "do-next-thing" 2>/dev/null || true
 ```
 
 ## Claude Code — Background 세션 result 형식 (필수)

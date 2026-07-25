@@ -14,6 +14,73 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-25 cost-aware-delegation-gate
+
+**변경**
+
+토큰이 유한하다는 전제를 흐름 전반에 명시했다. 서브에이전트 fan-out과 워크플로우가 각 단계
+토큰의 몸통인데(각 서브에이전트가 격리 컨텍스트에서 파일·코드를 재로드·재탐색), 지금까지는
+"역할에 위임한다"가 무조건 톤이었고 `feature-develop` Phase 0.5는 심지어 "모호하면 무거운 쪽을
+택한다"였다. 위임을 "기본값이 아니라 크기가 정당화할 때만 쓰는 가속기"로 재정의했다.
+
+- **`session-start.md`에 "위임 비용(항상 인지)" 정본 섹션 신설** — bugfix·chore·한 파일 국소
+  수정·단순 문서/PRD는 메인이 직접 작게 수행하고, feature도 fan-out 폭을 규모에 비례시키며,
+  검증·리뷰 라운드도 중대도에 비례한다. ultracode 같은 철저함 모드에서도 유지(철저함은 fan-out
+  폭이 아니라 판단의 깊이로).
+- **각 단계 프로토콜에 위임 판정 규율 인라인** — `next-feature`(후보 추리기가 단순하면 메인
+  직접), `prd-helper`(단순 PRD는 메인 직접), `adr-helper`(단순 결정은 메인 직접), `feature-develop`
+  Phase 0.5(role 체인은 병렬 분업이 이득인 변경에만; 단일 관심사는 메인 직접/1~2 역할).
+  `feature-develop` 어댑터 실행 원칙도 대칭 반영(`.claude`/`.codex` parity 유지).
+- **모호할 때 확인 가드레일(과잉 절약 방지)** — 아끼려다 필요한 fan-out을 놓치는 것도 실패다.
+  세 갈래로 정리했다: **명백히 작으면 직접, 명백히 크면 fan-out, 모호하면(경계선) 구조화 질문
+  으로 사용자에게 확인**. 명백한 경우까지 묻지 않아 질문 폭탄은 피하고, 확인은 자율 실행(워크플로우)
+  바깥 오케스트레이터에서 위임 착수 전에 한다. `session-start.md` "위임 비용" + `feature-develop`
+  Phase 0.5에 반영.
+- **컨텍스트 브리핑 주입(fan-out 시 재탐색 제거)** — 서브에이전트는 격리 컨텍스트라 오케스트레이터가
+  읽은 것을 물려받지 못해, 방치하면 N명이 각자 PRD/ADR·코드를 처음부터 재로드·재탐색한다(토큰 몸통).
+  위임 프롬프트에 **브리핑(관련 결정·수용 기준·건드릴 파일 경로+역할·인터페이스 계약)** 을 주입하고,
+  코드 지도는 한 번 만들어(plan/notes) 여러 역할이 공유하도록 규율화했다. `session-start.md` "위임
+  비용" 공용 원칙 + `feature-develop` 실행 레인·Phase 1 계획 산출물 + 어댑터 Workflow 골격에 반영.
+
+강도는 산문 규율(모델 재량)이다 — 작업 크기 판정은 의미 판단이라 기계 하드게이트로 강제하기
+부적합하고, "구조는 기계강제·의미는 모델재량" 철학과 정합한다. 기계강제 축은 불변.
+
+**소비자 조치**: 없음. 위임 규율은 에이전트 행동 가이드라 소비 프로젝트가 별도로 반영할 산출물이
+없다. 다만 이 방향을 소비 프로젝트에서도 적용하려면 자기 `AGENTS.md`가 fan-out을 과하게 권하지
+않는지 점검하면 좋다.
+
+## 2026-07-25 flow-token-efficiency-pass-1
+
+**변경**
+
+`next-feature → kickoff → prd-helper → adr-helper → feature-develop` 흐름의 토큰 효율을
+개선했다(중복 로드 제거, 기능·게이트 불변). 세 갈래다.
+
+- **세션제목 스크립트 추출** — next-feature/kickoff 어댑터에 near-verbatim으로 복제돼 있던
+  ~50줄 bash+python 세션제목 스크립트를 공용 헬퍼 `scripts/harness/set-fleet-title.mjs`
+  하나로 뽑았다. 어댑터는 `[ -f .harness/scripts/harness/set-fleet-title.mjs ] && node … || true`
+  실패관용 호출 1줄로 축약한다(agents 세션 아니거나 `.harness` 부재 시 조용히 no-op, 절대
+  하드페일 없음). 헬퍼는 `--label`/`--slug`(하이픈→공백)/`--abbr`(약어 오버라이드)를 받는다.
+- **어댑터 절차·필드 재진술 축약** — 어댑터가 프로토콜을 읽으면서(어댑터 1단계) 그 프로토콜
+  규칙을 다시 산문으로 재진술하던 이중 로드를 줄였다. next-feature 어댑터의 후보 필드 열거를
+  프로토콜 포인터로 바꾸고(`.next-unit` 앵커는 4필드 `<type>/<slug> | <제목> | <영역> | <섹션>`로
+  프로토콜과 정합화), feature-develop 어댑터의 필수 로딩·승인 게이트·실행 원칙을 압축했다.
+  load-bearing(먼저 `state.md`·`harness:check`·`harness:approve` 명령·"의도≠승인"·자율레인
+  분리·`harness:gate`·`commit-protocol`)은 전부 보존한다. `.claude`/`.codex` 대칭 편집으로
+  parity 유지(`harness:check`의 `assertAdapterParity` green).
+- **컨텍스트 재판독 조건부화** — `AGENTS.md`·`docs/wiki/index.md`·`README`를 스테이지마다 다시
+  읽으라던 지시를 "이 컨텍스트에 아직 로드돼 있지 않을 때만(session-start에서 이미 읽었으면
+  재판독 금지)"으로 바꿨다(next-feature Phase 0, feature-develop Phase 1 + 어댑터 필수 로딩).
+  런타임 중립 문구라 격리 서브에이전트는 여전히 안전하게 읽고(로드 안 돼 있으므로), 오케스트레이터
+  재판독만 준다.
+
+기계강제 축(`state.md` 원장·`harness:approve`·PreToolUse 가드·CI `harness:check`·어댑터 parity)과
+의도적으로 폐기된 하드게이트는 건드리지 않았다. 순수 중복 산문/스크립트 정리다.
+
+**소비자 조치**: 없음. 서브모듈을 업데이트하면 새 헬퍼가 함께 따라오고, 구버전 `.harness`라도
+어댑터 호출이 파일 부재 시 no-op이라 깨지지 않는다. `.next-unit` 앵커를 직접 파싱하는 소비자
+자동화가 있으면 4번째 필드(섹션, 선택)를 허용하도록 확인만 하면 된다.
+
 ## 2026-07-25 windows-environment-fixes
 
 **변경**
