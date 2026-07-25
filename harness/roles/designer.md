@@ -30,7 +30,7 @@
     - 모든 프로젝트 문서는 한국어로 작성한다.
     - 사용자 승인 전 PRD를 `approved`, ADR을 `accepted`로 바꾸지 않는다(proposed/review 유지).
     - 기본 산출물은 **tool-free ASCII 와이어프레임**이다(Codex/ClaudeCode 양쪽에서 동작).
-    - hi-fi 시각 비교(정적 목업 HTML → 스크린샷)는 Playwright 같은 브라우저 도구가 있을 때만 쓰는 optional 가속기다. 없으면 ASCII로 진행한다.
+    - hi-fi 시각 비교(정적 목업 HTML → 스크린샷)는 브라우저 도구가 있을 때만 쓰는 optional 가속기다. 쓸 때는 **토큰 효율이 가장 좋은 인터페이스를 최우선**한다 — 부분 스냅샷·스크린샷만 되받는 CLI 드라이버(예: Playwright CLI; depth 제한·부분 스냅샷·raw 스트립)를 기본값으로, 매 단계 전체 접근성 스냅샷을 되돌리는 브라우저 제어 MCP는 CLI로 도저히 안 될 때만 쓴다. 아무 도구도 없으면 ASCII로 진행한다.
     - 미적 방향·타이포·"템플릿 같지 않은" 판단은 `frontend-design` 스킬이 있으면 참조하되, 없어도 진행한다.
     - 새 UI 라이브러리/의존성은 ADR·사용자 승인 없이 도입하지 않는다.
     - 도메인 계산이나 데이터 계약을 배치 결정에 끌어들이지 않는다(그건 Architect/Domain).

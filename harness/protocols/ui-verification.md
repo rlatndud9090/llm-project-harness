@@ -27,7 +27,7 @@ UI 레이아웃, 상호작용, 반응형 동작이 바뀌었을 때 사용한다
    ```sh
    npm run dev -- --host 127.0.0.1
    ```
-3. desktop과 mobile viewport를 확인한다.
+3. desktop과 mobile viewport를 확인한다. 브라우저 도구로 스냅샷/스크린샷을 뜰 때는 **토큰 효율이 가장 좋은 인터페이스를 최우선**한다 — 부분 스냅샷·스크린샷만 되받는 CLI 드라이버(예: Playwright CLI; depth 제한·부분 스냅샷·raw 스트립)가 기본값, 매 단계 전체 접근성 스냅샷을 되돌리는 브라우저 제어 MCP는 CLI로 도저히 안 될 때만 쓴다.
 4. screenshot 또는 관찰 결과를 notes에 남긴다.
 5. `npm run harness:gate`를 실행한다.
 

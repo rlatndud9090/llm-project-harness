@@ -14,6 +14,26 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-26 browser-tool-token-efficiency
+
+**변경**
+
+브라우저 가속기(디자인 hi-fi 목업 비교·UI 검증)를 쓸 때 **토큰 효율이 가장 좋은 인터페이스를
+최우선**하도록 명세했다. 지금까지 `designer`/`adr-helper`는 예시로 "Playwright MCP"를 못박아,
+매 단계 전체 접근성 스냅샷을 되돌리는 브라우저 제어 MCP가 기본값처럼 읽혔다. 브라우저 제어
+MCP는 스텝마다 풀 스냅샷을 컨텍스트로 끌어와 토큰의 몸통이 되는데, 부분 스냅샷·스크린샷만
+되받는 CLI 드라이버(예: Playwright CLI; depth 제한·부분 스냅샷·raw 스트립)가 같은 검증을
+훨씬 싸게 해낸다. 특정 런타임 개인 MCP(예: claude-in-chrome) 이름은 공용 harness에 박지 않고,
+"CLI 드라이버 기본값 / 브라우저 제어 MCP는 CLI로 도저히 안 될 때만"이라는 토큰 효율 축의
+보편 원칙만 넣었다.
+
+- **`harness/roles/designer.md`·`harness/protocols/adr-helper.md`** — hi-fi 비교 가속기 문구를
+  CLI 우선으로 교체(Playwright MCP 예시 제거).
+- **`harness/protocols/ui-verification.md`** — 스냅샷/스크린샷 절차에 CLI 우선 원칙 인라인.
+- **어댑터 parity** — `.claude`/`.codex`의 `designer`·`ui-verification`을 동일 문구로 동기화.
+
+**소비자 조치:** 없음. 정보성 명세 변경이며 게이트·frontmatter 스키마에 영향 없다.
+
 ## 2026-07-25 cost-aware-delegation-gate
 
 **변경**
