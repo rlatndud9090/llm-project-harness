@@ -414,16 +414,30 @@ export function gitShow(relativePosixPath, ref = "HEAD") {
 // Only the unambiguous backward moves are forbidden. Reopening a rejected PRD
 // (rejected -> draft) or retiring an accepted ADR (accepted -> superseded) stay
 // allowed on purpose. Each entry is [fromStatus, toStatus].
+//
+// Approval runs in two tiers: review -> pre-approved (build-entry gate) -> approved
+// (final, recorded at $make-pr); proposed -> pre-accepted -> accepted for the ADR.
+// A recorded (pre-)approval must never silently rewind: dropping out of pre-approved
+// back to review/draft, or demoting a final approval back to a pre-approval, are all
+// forbidden. Both flips are only ever produced by harness:approve (writing via fs, so
+// the runtime guard never sees them); these rules are the git-time backstop.
 export const FORBIDDEN_STATUS_TRANSITIONS = {
   "prd.md": [
     ["approved", "draft"],
     ["approved", "review"],
+    ["approved", "pre-approved"],
+    ["pre-approved", "draft"],
+    ["pre-approved", "review"],
   ],
   "adr.md": [
     ["accepted", "proposed"],
+    ["accepted", "pre-accepted"],
+    ["pre-accepted", "proposed"],
     ["deprecated", "proposed"],
+    ["deprecated", "pre-accepted"],
     ["deprecated", "accepted"],
     ["superseded", "proposed"],
+    ["superseded", "pre-accepted"],
     ["superseded", "accepted"],
   ],
   "bugfix.md": [
@@ -451,17 +465,23 @@ export const STAGE_VALUES = new Set([
   "adr-draft",
   "adr-review",
   "awaiting-approval",
+  "pre-approved",
   "approved",
   "implementing",
   "integrated",
 ]);
 
-// Stages that only exist once the user has approved. Moving out of one of these
-// back into a pre-approval stage is an "un-approval" and is forbidden (a new
-// session must never silently rewind past a recorded approval). Forward moves,
-// and rework that stays at/after `approved`, are allowed.
-export const POST_APPROVAL_STAGES = new Set(["approved", "implementing", "integrated"]);
-export const PRE_APPROVAL_STAGES = new Set([
+// The build tier: stages a unit only reaches once the user's PRE-approval (the
+// build-entry gate) is recorded. `pre-approved` enters the build, `implementing`
+// is the work, `approved` is the FINAL approval stamped at $make-pr, `integrated`
+// is post-merge. Moving out of the build tier back into a pre-build stage is an
+// "un-approval" and is forbidden — a new session must never silently rewind past a
+// recorded pre-approval.
+export const BUILD_STAGES = new Set(["pre-approved", "approved", "implementing", "integrated"]);
+// Stages that require a FINAL (approved) PRD, not just a pre-approval. Reached only
+// after $make-pr flips the artifacts to approved/accepted.
+export const FINAL_STAGES = new Set(["approved", "integrated"]);
+export const PRE_BUILD_STAGES = new Set([
   "kickoff",
   "prd-draft",
   "prd-review",
@@ -470,17 +490,17 @@ export const PRE_APPROVAL_STAGES = new Set([
   "awaiting-approval",
 ]);
 
-// Stages that ARE the ADR authoring phase. Re-entering these from `approved` is
-// legitimate when the PRD was approved first and the ADR is still being written
-// (the PRD stays approved on its own axis, so this is not an un-approval).
+// Stages that ARE the ADR authoring phase. Re-entering these from a build-tier
+// stage is legitimate when the PRD was (pre-)approved first and the ADR is still
+// being written (the PRD stays (pre-)approved on its own axis, not an un-approval).
 const ADR_PHASE_STAGES = new Set(["adr-draft", "adr-review"]);
 
 export function isForbiddenStageTransition(fromStage, toStage) {
-  // Allow resuming ADR authoring after a PRD-first approval. The PRD approval is
+  // Allow resuming ADR authoring after a PRD-first (pre-)approval. The PRD state is
   // still protected on the prd_status axis (approval events + status transitions),
-  // so moving `approved` -> `adr-draft`/`adr-review` does not rewind it.
-  if (fromStage === "approved" && ADR_PHASE_STAGES.has(toStage)) return false;
-  return POST_APPROVAL_STAGES.has(fromStage) && PRE_APPROVAL_STAGES.has(toStage);
+  // so moving a build-tier stage -> `adr-draft`/`adr-review` does not rewind it.
+  if (BUILD_STAGES.has(fromStage) && ADR_PHASE_STAGES.has(toStage)) return false;
+  return BUILD_STAGES.has(fromStage) && PRE_BUILD_STAGES.has(toStage);
 }
 
 // Step separation between $prd-helper and $adr-helper is machine-enforced on the
@@ -488,7 +508,7 @@ export function isForbiddenStageTransition(fromStage, toStage) {
 // the ADR phase (stage adr-draft) or later. Before that, adr.md stays the kickoff
 // skeleton and the ADR-need decision lives in prd.md "## ADR 필요 여부". This stops
 // a PRD session from drifting into ADR authoring.
-export const ADR_AUTHORING_STAGES = new Set(["adr-draft", "adr-review", "approved", "implementing", "integrated"]);
+export const ADR_AUTHORING_STAGES = new Set(["adr-draft", "adr-review", "pre-approved", "approved", "implementing", "integrated"]);
 
 // True only for a recognized stage that precedes the ADR phase. An unknown or
 // missing stage returns false so callers fail open (they never gate on an
@@ -572,13 +592,16 @@ export function setFrontmatterField(content, key, value) {
 
 // state.md records each approval as one strict, regex-parseable line so the CLI
 // (writer) and artifact-check (reader) share an unambiguous format. The verbatim
-// user quote is everything after `::` on the line.
-//   - APPROVAL prd 2026-07-02 harness:approve :: 응 이대로 승인, 구현 들어가
-export const APPROVAL_EVENT_RE = /^- APPROVAL (prd|adr) (\d{4}-\d{2}-\d{2}) (\S+) :: (.+)$/;
+// user quote is everything after `::` on the line. The kind separates the two tiers:
+// PREAPPROVAL is the build-entry gate (review -> pre-approved), APPROVAL is the final
+// stamp at $make-pr (pre-approved -> approved).
+//   - PREAPPROVAL prd 2026-07-29 harness:approve :: 이대로 구현 들어가자
+//   - APPROVAL    prd 2026-07-30 harness:approve :: 좋아, 이대로 PR 올려
+export const APPROVAL_EVENT_RE = /^- (PREAPPROVAL|APPROVAL) (prd|adr) (\d{4}-\d{2}-\d{2}) (\S+) :: (.+)$/;
 
-export function formatApprovalEvent({ target, date, transport, quote }) {
+export function formatApprovalEvent({ kind = "APPROVAL", target, date, transport, quote }) {
   const oneLine = quote.replace(/\s+/g, " ").trim();
-  return `- APPROVAL ${target} ${date} ${transport} :: ${oneLine}`;
+  return `- ${kind} ${target} ${date} ${transport} :: ${oneLine}`;
 }
 
 export function parseApprovalEvents(content) {
@@ -586,7 +609,7 @@ export function parseApprovalEvents(content) {
   for (const rawLine of content.split(/\r?\n/)) {
     const match = APPROVAL_EVENT_RE.exec(rawLine.trim());
     if (match) {
-      events.push({ target: match[1], date: match[2], transport: match[3], quote: match[4].trim() });
+      events.push({ kind: match[1], target: match[2], date: match[3], transport: match[4], quote: match[5].trim() });
     }
   }
   return events;
@@ -760,15 +783,15 @@ export function readUnitSection(unitDir, type) {
 
 // True once a unit has settled enough to be required in the wiki (its first
 // ingest is due). This is the same "content settled" line the placeholder /
-// required-section / area gates use: feature at prd.md review|approved, bugfix at
-// bugfix.md review|fixed. A chore is notes-only with no review status, so kickoff
-// links it immediately — it is always considered settled. A pre-review skeleton
-// (kickoff / prd-draft) is NOT settled, so the wiki-link gates skip it (honoring
-// the documented "harness:check is green right after kickoff" contract).
+// required-section / area gates use: feature at prd.md review|pre-approved|approved,
+// bugfix at bugfix.md review|fixed. A chore is notes-only with no review status, so
+// kickoff links it immediately — it is always considered settled. A pre-review
+// skeleton (kickoff / prd-draft) is NOT settled, so the wiki-link gates skip it
+// (honoring the documented "harness:check is green right after kickoff" contract).
 export function unitIsSettled(unitDir, type) {
   if (type === "feature") {
     const status = readArtifactStatus(unitDir, "prd.md");
-    return status === "review" || status === "approved";
+    return status === "review" || status === "pre-approved" || status === "approved";
   }
   if (type === "bugfix") {
     const status = readArtifactStatus(unitDir, "bugfix.md");

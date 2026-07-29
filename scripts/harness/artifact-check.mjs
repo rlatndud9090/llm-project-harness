@@ -8,7 +8,8 @@ import {
   CURRENT_MARKER,
   FRESHNESS_THROTTLE_MS,
   OPERATIONS_CATEGORIES,
-  POST_APPROVAL_STAGES,
+  BUILD_STAGES,
+  FINAL_STAGES,
   changelogHeadId,
   REPO_ROOT,
   STAGE_VALUES,
@@ -378,7 +379,7 @@ function assertAreaField() {
   if (!pathExists(artifactPath)) return;
 
   const status = parseFrontmatter(readText(artifactPath))?.status;
-  if (status !== "review" && status !== "approved") return;
+  if (status !== "review" && status !== "pre-approved" && status !== "approved") return;
 
   if (readUnitAreas(unitDir, "feature").length === 0) {
     const rel = toPosix(path.relative(process.cwd(), unitDir));
@@ -670,8 +671,8 @@ function assertFrontmatter() {
   // chore units are notes-only (notes.md, no status lifecycle), so only these
   // three carry a machine-checked status.
   const allowedStatuses = {
-    "prd.md": new Set(["draft", "review", "approved", "rejected"]),
-    "adr.md": new Set(["proposed", "accepted", "deprecated", "superseded"]),
+    "prd.md": new Set(["draft", "review", "pre-approved", "approved", "rejected"]),
+    "adr.md": new Set(["proposed", "pre-accepted", "accepted", "deprecated", "superseded"]),
     "bugfix.md": new Set(["draft", "review", "fixed", "rejected"]),
   };
 
@@ -703,12 +704,13 @@ function assertFrontmatter() {
       addError(`frontmatter unit_type must be ${expectedType}: ${relative}`);
     }
 
-    if (baseName === "prd.md" && fields.status === "approved") {
-      assertApprovalField(fields, relative, "approved PRD");
+    // Both approval tiers carry the user:YYYY-MM-DD:<reason> provenance field.
+    if (baseName === "prd.md" && (fields.status === "pre-approved" || fields.status === "approved")) {
+      assertApprovalField(fields, relative, `${fields.status} PRD`);
     }
 
-    if (baseName === "adr.md" && fields.status === "accepted") {
-      assertApprovalField(fields, relative, "accepted ADR");
+    if (baseName === "adr.md" && (fields.status === "pre-accepted" || fields.status === "accepted")) {
+      assertApprovalField(fields, relative, `${fields.status} ADR`);
     }
   }
 }
@@ -731,11 +733,11 @@ function assertApprovalField(fields, relative, label) {
 // the narrative "no placeholder PRD/ADR" rule into a machine gate.
 const PLACEHOLDER_SENTINELS = {
   "prd.md": {
-    statuses: new Set(["review", "approved"]),
+    statuses: new Set(["review", "pre-approved", "approved"]),
     markers: ["목표 1", "요구사항 1", "완료 기준 1", "제외 항목 1"],
   },
   "adr.md": {
-    statuses: new Set(["accepted"]),
+    statuses: new Set(["pre-accepted", "accepted"]),
     markers: ["후속 작업 1"],
   },
   "bugfix.md": {
@@ -782,11 +784,11 @@ function assertNoPlaceholders() {
 // 섹션명은 harness/templates/raw 의 feature-prd.md / feature-adr.md 기준이다.
 const REQUIRED_SECTIONS = {
   "prd.md": {
-    statuses: new Set(["review", "approved"]),
+    statuses: new Set(["review", "pre-approved", "approved"]),
     sections: ["배경", "목표", "비목표", "요구사항", "수용 기준"],
   },
   "adr.md": {
-    statuses: new Set(["accepted"]),
+    statuses: new Set(["pre-accepted", "accepted"]),
     sections: ["컨텍스트", "결정", "선택지", "선택 근거", "결과", "후속 작업", "검증"],
   },
   // A bugfix.md is the lightweight PRD-equivalent for a bug: it must preserve the
@@ -885,11 +887,15 @@ function assertStateLedger() {
     const adrStatus = pathExists(adrPath) ? parseFrontmatter(readText(adrPath))?.status : undefined;
 
     if (!pathExists(statePath)) {
-      // Hard-require the ledger only where it is load-bearing (an approval
-      // happened). Pre-approval units without state.md only get a nudge, so
+      // Hard-require the ledger only where it is load-bearing (a (pre-)approval
+      // happened). A plain review/draft unit without state.md only gets a nudge, so
       // upgrading the harness never breaks a legacy draft unit.
-      if (prdStatus === "approved") addError(`approved PRD requires a state.md ledger with an approval event: ${rel}`);
-      if (adrStatus === "accepted") addError(`accepted ADR requires a state.md ledger with an approval event: ${rel}`);
+      if (prdStatus === "approved" || prdStatus === "pre-approved") {
+        addError(`${prdStatus} PRD requires a state.md ledger with a recorded approval event: ${rel}`);
+      }
+      if (adrStatus === "accepted" || adrStatus === "pre-accepted") {
+        addError(`${adrStatus} ADR requires a state.md ledger with a recorded approval event: ${rel}`);
+      }
       if (prdStatus === "review") {
         console.warn(`[harness:check] WARNING: ${rel} has a review PRD but no state.md checkpoint; run npm run harness:kickoff to create it.`);
       }
@@ -904,29 +910,60 @@ function assertStateLedger() {
       addError(`state.md has an invalid or missing stage "${stage ?? ""}": ${rel}`);
     }
 
-    // Approval-axis consistency (both directions): the ledger and the artifact
-    // must agree on approved-ness, catching a hand-flipped status that skipped
-    // harness:approve.
+    // Approval-axis consistency (both directions, both tiers): the ledger and the
+    // artifact must agree on the pre-approved and approved predicates, catching a
+    // hand-flipped status that skipped harness:approve.
     if ((prdStatus === "approved") !== (state.prd_status === "approved")) {
+      addError(`state.md prd_status ("${state.prd_status ?? ""}") disagrees with prd.md status ("${prdStatus ?? ""}"): ${rel}`);
+    }
+    if ((prdStatus === "pre-approved") !== (state.prd_status === "pre-approved")) {
       addError(`state.md prd_status ("${state.prd_status ?? ""}") disagrees with prd.md status ("${prdStatus ?? ""}"): ${rel}`);
     }
     if ((adrStatus === "accepted") !== (state.adr_status === "accepted")) {
       addError(`state.md adr_status ("${state.adr_status ?? ""}") disagrees with adr.md status ("${adrStatus ?? ""}"): ${rel}`);
     }
+    if ((adrStatus === "pre-accepted") !== (state.adr_status === "pre-accepted")) {
+      addError(`state.md adr_status ("${state.adr_status ?? ""}") disagrees with adr.md status ("${adrStatus ?? ""}"): ${rel}`);
+    }
 
-    // Approval-event backing: an approved/accepted artifact must carry a
-    // recorded, quoted approval event in the ledger.
+    // Approval-event backing: each (pre-)approved artifact must carry the matching
+    // recorded, quoted event — PREAPPROVAL for the build-entry tier, APPROVAL for
+    // the final stamp.
     const events = parseApprovalEvents(stateContent);
-    if (prdStatus === "approved" && !events.some((event) => event.target === "prd" && event.quote)) {
-      addError(`approved PRD has no matching approval event in state.md: ${rel}`);
+    const hasEvent = (eventKind, target) =>
+      events.some((event) => event.kind === eventKind && event.target === target && event.quote);
+    if (prdStatus === "approved" && !hasEvent("APPROVAL", "prd")) {
+      addError(`approved PRD has no matching APPROVAL event in state.md: ${rel}`);
     }
-    if (adrStatus === "accepted" && !events.some((event) => event.target === "adr" && event.quote)) {
-      addError(`accepted ADR has no matching approval event in state.md: ${rel}`);
+    if (prdStatus === "pre-approved" && !hasEvent("PREAPPROVAL", "prd")) {
+      addError(`pre-approved PRD has no matching PREAPPROVAL event in state.md: ${rel}`);
+    }
+    if (adrStatus === "accepted" && !hasEvent("APPROVAL", "adr")) {
+      addError(`accepted ADR has no matching APPROVAL event in state.md: ${rel}`);
+    }
+    if (adrStatus === "pre-accepted" && !hasEvent("PREAPPROVAL", "adr")) {
+      addError(`pre-accepted ADR has no matching PREAPPROVAL event in state.md: ${rel}`);
     }
 
-    // Stage/status coherence: post-approval stages require an approved PRD.
-    if (POST_APPROVAL_STAGES.has(stage) && prdStatus !== "approved") {
-      addError(`state.md stage "${stage}" requires an approved PRD (prd.md status "${prdStatus ?? ""}"): ${rel}`);
+    // Stage/status coherence: build-tier stages (pre-approved, implementing) require
+    // at least a pre-approved PRD; the final stages (approved, integrated) require a
+    // fully approved PRD.
+    if (BUILD_STAGES.has(stage) && prdStatus !== "pre-approved" && prdStatus !== "approved") {
+      addError(`state.md stage "${stage}" requires at least a pre-approved PRD (prd.md status "${prdStatus ?? ""}"): ${rel}`);
+    }
+    if (FINAL_STAGES.has(stage) && prdStatus !== "approved") {
+      addError(`state.md stage "${stage}" requires a fully approved PRD (prd.md status "${prdStatus ?? ""}"): ${rel}`);
+    }
+    // ADR-axis symmetry: an ADR that was taken onto the approval axis (pre-accepted)
+    // must not ship still provisional. At a final stage it has to reach accepted
+    // (via harness:approve --final --adr) — otherwise the decision record is shipped
+    // unaccepted and, because the immutable-body lock only engages at accepted, stays
+    // silently editable. A never-needed ADR stays at `proposed` and is unaffected.
+    if (FINAL_STAGES.has(stage) && adrStatus === "pre-accepted") {
+      addError(
+        `state.md stage "${stage}" finalizes the unit but adr.md is still pre-accepted; ` +
+          `run npm run harness:approve --final --adr (or supersede it) so the shipped ADR is accepted: ${rel}`,
+      );
     }
 
     assertNoStageRegression(statePath, stage, rel);
@@ -1106,6 +1143,11 @@ function assertHarnessAdapters() {
       name: "feature develop",
       codex: [rootAdapterPath(".codex", "skills", "feature-develop", "SKILL.md")],
       claude: [rootAdapterPath(".claude", "skills", "feature-develop", "SKILL.md")],
+    },
+    {
+      name: "make pr",
+      codex: [rootAdapterPath(".codex", "skills", "make-pr", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "make-pr", "SKILL.md")],
     },
     {
       name: "prd helper",

@@ -17,18 +17,26 @@ import {
   writeText,
 } from "./lib.mjs";
 
-// The ONLY sanctioned way to move a PRD to `approved` / an ADR to `accepted`.
-// It refuses unless the artifact is genuinely awaiting approval, records the
-// user's verbatim approval into state.md, and writes the frontmatter + ledger
-// atomically. Hand-editing status instead of using this leaves an inconsistent
-// ledger that `harness:check` fails — that is by design.
+// The ONLY sanctioned way to move a PRD/ADR along the approval axis. Approval runs
+// in two tiers and this one command records both, refusing unless the artifact is
+// at the right precondition status, recording the user's verbatim words into
+// state.md, and writing the frontmatter + ledger atomically. Hand-editing status
+// instead of using this leaves an inconsistent ledger that `harness:check` fails —
+// that is by design.
 //
+//   PRE-approval (default) — the build-entry gate ($prd-helper / $adr-helper):
+//     review -> pre-approved  (and proposed -> pre-accepted with --adr)
 //   npm run harness:approve -- --unit docs/raw/feature/<slug> \
-//     --quote "응 이대로 승인, 구현 들어가" [--adr]
+//     --quote "이대로 구현 들어가자" [--adr]
 //
-// --quote MUST be the user's actual approval words (verbatim). Never synthesize
-// it, never derive it from an intent/scope statement. If the user has not
-// explicitly approved, do not run this command.
+//   FINAL approval (--final) — stamped at $make-pr, just before commit + PR:
+//     pre-approved -> approved  (and pre-accepted -> accepted with --adr)
+//   npm run harness:approve -- --unit docs/raw/feature/<slug> \
+//     --quote "좋아, 이대로 PR 올려" --final [--adr]
+//
+// --quote MUST be the user's actual approval words (verbatim) for THIS transition.
+// Never synthesize it, never derive it from an intent/scope statement. If the user
+// has not explicitly (pre-)approved, do not run this command.
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -68,6 +76,18 @@ if (EXAMPLE_QUOTES.has(quote) || /\{[^}\n]{1,40}\}/.test(quote) || /^<.*>$/.test
 }
 
 const alsoAdr = Boolean(args.adr);
+
+// Mode select: default = PRE-approval (the build-entry gate); --final = the final
+// stamp recorded at $make-pr. Each mode has its own precondition status, target
+// status, event kind, and stage.
+const isFinal = Boolean(args.final);
+const kind = isFinal ? "APPROVAL" : "PREAPPROVAL";
+const prdFrom = isFinal ? "pre-approved" : "review";
+const prdTo = isFinal ? "approved" : "pre-approved";
+const adrFrom = isFinal ? "pre-accepted" : "proposed";
+const adrTo = isFinal ? "accepted" : "pre-accepted";
+const stageTo = isFinal ? "approved" : "pre-approved";
+
 const date = typeof args.date === "string" ? args.date : today();
 if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
   fail("--date must be YYYY-MM-DD");
@@ -104,16 +124,27 @@ const stateContent = readText(statePath);
 const prdStatus = parseFrontmatter(prdContent)?.status;
 const adrStatus = parseFrontmatter(adrContent)?.status;
 
-// Guard: only approve an artifact that has reached `review`, so a raw draft
-// cannot jump straight to approved. This is a structural precondition, NOT proof
-// of user intent — that is the caller's responsibility: --quote MUST be the
-// user's explicit answer to an approval request naming this transition (see the
-// prd-helper/feature-develop protocols). Never synthesize or infer it.
-if (prdStatus !== "review" && prdStatus !== "approved") {
-  fail(`PRD must be in "review" before approval (current: "${prdStatus}"). Take it through $prd-helper first.`);
+// Guard: only advance an artifact that is at this mode's precondition status (or
+// already at the target, so re-running is idempotent), so a raw draft cannot jump
+// straight to approved and a review PRD cannot skip the pre-approval tier. This is a
+// structural precondition, NOT proof of user intent — that is the caller's
+// responsibility: --quote MUST be the user's explicit answer to an approval request
+// naming THIS transition (see the prd-helper/adr-helper/make-pr protocols). Never
+// synthesize or infer it.
+if (prdStatus !== prdFrom && prdStatus !== prdTo) {
+  if (isFinal) {
+    fail(
+      `PRD must be in "pre-approved" before final approval (current: "${prdStatus}"). ` +
+        `Run pre-approval first (npm run harness:approve, no --final); $make-pr does the final stamp.`,
+    );
+  }
+  fail(`PRD must be in "review" before pre-approval (current: "${prdStatus}"). Take it through $prd-helper first.`);
 }
-if (alsoAdr && adrStatus !== "proposed" && adrStatus !== "accepted") {
-  fail(`ADR must be in "proposed" before acceptance (current: "${adrStatus}").`);
+if (alsoAdr && adrStatus !== adrFrom && adrStatus !== adrTo) {
+  if (isFinal) {
+    fail(`ADR must be in "pre-accepted" before final acceptance (current: "${adrStatus}").`);
+  }
+  fail(`ADR must be in "proposed" before pre-acceptance (current: "${adrStatus}").`);
 }
 
 const reason = sanitizeReason(quote);
@@ -124,26 +155,26 @@ let nextPrd = prdContent;
 let nextState = stateContent;
 const approvalLines = [];
 
-if (prdStatus === "review") {
-  nextPrd = setFrontmatterField(nextPrd, "status", "approved");
+if (prdStatus === prdFrom) {
+  nextPrd = setFrontmatterField(nextPrd, "status", prdTo);
   nextPrd = setFrontmatterField(nextPrd, "approval", approvalValue);
-  nextState = setFrontmatterField(nextState, "prd_status", "approved");
-  approvalLines.push(formatApprovalEvent({ target: "prd", date, transport, quote }));
-  done.push("PRD review -> approved");
+  nextState = setFrontmatterField(nextState, "prd_status", prdTo);
+  approvalLines.push(formatApprovalEvent({ kind, target: "prd", date, transport, quote }));
+  done.push(`PRD ${prdFrom} -> ${prdTo}`);
 } else {
-  done.push("PRD already approved (unchanged)");
+  done.push(`PRD already ${prdTo} (unchanged)`);
 }
 
 let nextAdr = adrContent;
 if (alsoAdr) {
-  if (adrStatus === "proposed") {
-    nextAdr = setFrontmatterField(nextAdr, "status", "accepted");
+  if (adrStatus === adrFrom) {
+    nextAdr = setFrontmatterField(nextAdr, "status", adrTo);
     nextAdr = setFrontmatterField(nextAdr, "approval", approvalValue);
-    nextState = setFrontmatterField(nextState, "adr_status", "accepted");
-    approvalLines.push(formatApprovalEvent({ target: "adr", date, transport, quote }));
-    done.push("ADR proposed -> accepted");
+    nextState = setFrontmatterField(nextState, "adr_status", adrTo);
+    approvalLines.push(formatApprovalEvent({ kind, target: "adr", date, transport, quote }));
+    done.push(`ADR ${adrFrom} -> ${adrTo}`);
   } else {
-    done.push("ADR already accepted (unchanged)");
+    done.push(`ADR already ${adrTo} (unchanged)`);
   }
 }
 
@@ -153,9 +184,12 @@ if (approvalLines.length === 0) {
   process.exit(0);
 }
 
-nextState = setFrontmatterField(nextState, "stage", "approved");
+nextState = setFrontmatterField(nextState, "stage", stageTo);
 nextState = recordApprovalEvents(nextState, approvalLines);
-nextState = appendStageLog(nextState, `- ${date} approved: 사용자 명시 승인 (harness:approve)`);
+nextState = appendStageLog(
+  nextState,
+  `- ${date} ${stageTo}: 사용자 명시 ${isFinal ? "최종 승인" : "사전 승인"} (harness:approve${isFinal ? " --final" : ""})`,
+);
 
 writeText(prdPath, nextPrd);
 if (alsoAdr) writeText(adrPath, nextAdr);
@@ -192,7 +226,9 @@ function headingIndex(content, name) {
 // them right under the "## 승인 이벤트" heading when the placeholder is gone.
 function recordApprovalEvents(content, lines) {
   const block = lines.join("\n");
-  const placeholder = /^\(아직 승인 없음[^\n]*\)$/m;
+  // Matches both the current "(아직 사전 승인 없음 …)" placeholder and the legacy
+  // "(아직 승인 없음 …)" one still present in older consumer state.md files.
+  const placeholder = /^\(아직 (?:사전 )?승인 없음[^\n]*\)$/m;
   if (placeholder.test(content)) {
     return content.replace(placeholder, block);
   }

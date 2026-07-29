@@ -9,9 +9,11 @@
 - `reviewer` 역할로 작성 중인 PRD를 지속 검토한다.
 
 전제: `$kickoff`로 raw unit(`docs/raw/<type>/<slug>/`)이 이미 생성돼 있고, 그 안에
-단계 체크포인트 원장 `state.md`가 있다. PRD는 `review` 상태로 작성하고, 사용자 명시
-승인 전에는 `approved`로 바꾸지 않는다. `approved` 전환은 오직 `harness:approve`로만
-한다(직접 frontmatter 편집 금지 — 런타임 훅과 `harness:check`가 막는다).
+단계 체크포인트 원장 `state.md`가 있다. PRD는 `review` 상태로 작성한다. 승인은 2단계이며,
+이 단계에서 받는 것은 **사전 승인(pre-approval)** — 빌드(feature-develop) 진입 게이트 — 이다:
+사용자 명시 사전 승인 전에는 PRD를 `pre-approved`로 바꾸지 않는다. `pre-approved` 전환은 오직
+`harness:approve`로만 한다(직접 frontmatter 편집 금지 — 런타임 훅과 `harness:check`가 막는다).
+최종 `approved` 확정은 이 단계가 아니라 `$make-pr`(PR 직전)에서 이뤄진다.
 
 ## 이 단계의 범위 (엄격한 단계 분리)
 
@@ -24,8 +26,8 @@
 
 이 단계의 산출물은 오직 두 갈래로만 끝난다:
 
-- **ADR 불필요**로 판정 → PRD 단독 승인을 대기한다(아래 "정리와 승인").
-- **ADR 필요**로 판정 → PRD 승인을 아직 요청하지 않고 `$adr-helper`로 넘긴다. 승인은
+- **ADR 불필요**로 판정 → PRD 단독 **사전 승인**을 대기한다(아래 "정리와 사전 승인").
+- **ADR 필요**로 판정 → 사전 승인을 아직 요청하지 않고 `$adr-helper`로 넘긴다. 사전 승인은
   ADR까지 작성된 뒤 PRD·ADR을 **한 번에** 받는다(`$adr-helper`가 담당).
 
 ## 언어
@@ -133,17 +135,17 @@ durable decision에는 **화면 배치 결정**도 포함될 수 있다. 이 유
 디자인 결정 레인을 태우지 않고 build-first로 둔다.
 
 - **필요하면**(구조/데이터/엔진/의존성 또는 다투는 화면 배치): PRD의 `## ADR 필요 여부`에
-  "필요: <이유>"를 적고, **여기서 멈춘다.** PRD 승인을 요청하지 말고 `state.md`의 `stage`를
+  "필요: <이유>"를 적고, **여기서 멈춘다.** PRD 사전 승인을 요청하지 말고 `state.md`의 `stage`를
   `prd-review`로 둔 채 다음 스킬로 `$adr-helper`를 안내한다. `adr.md`는 스켈레톤 그대로 둔다.
 - **필요 없으면**: PRD의 `## ADR 필요 여부`에 "불필요: <이유>"를 적는다. `adr.md`는
-  손대지 않고 스켈레톤(status `proposed`)으로 그대로 둔다. 그다음 아래 "정리와 승인"의
-  **PRD 단독 승인**으로 진행한다.
+  손대지 않고 스켈레톤(status `proposed`)으로 그대로 둔다. 그다음 아래 "정리와 사전 승인"의
+  **PRD 단독 사전 승인**으로 진행한다.
 
 `adr.md` 파일 자체는 삭제하지 않는다. feature 단위는 항상 `adr.md`를 유지한다(`$kickoff`가
 생성하고 `harness:check`가 존재를 요구한다). ADR이 불필요해도 그 사유는 `adr.md`가 아니라
 PRD의 `## ADR 필요 여부`에 남기고, `adr.md`는 미작성 스켈레톤으로 둔다.
 
-## 정리와 승인
+## 정리와 사전 승인
 
 PRD 초안이 자리를 잡으면(area가 frontmatter에 선언된 상태에서):
 
@@ -158,39 +160,42 @@ npm run harness:check
 
 이 단계는 PRD를 `review` 상태로 마무리한다. `review`로 올릴 때 `state.md`의 `stage`를
 `prd-review`로, `prd_status`를 `review`로 갱신하고 단계 로그에 한 줄 남긴다. 여기까지가
-이 프로토콜의 끝이다. **여기서 절대로 approved로 넘어가지 않는다.**
+이 프로토콜의 끝이다. **여기서 최종 `approved`로 넘어가지 않는다**(최종 확정은 `$make-pr`).
+이 단계의 승인은 `pre-approved`(사전 승인)까지다.
 
-### 승인 분기: ADR 필요 여부에 따라 갈린다
+### 사전 승인 분기: ADR 필요 여부에 따라 갈린다
 
-- **ADR 필요로 판정한 경우 — 여기서 승인을 요청하지 않는다.** PRD는 `review`,
-  `state.md`는 `prd-review`로 둔 채 `$adr-helper`로 넘어간다. PRD·ADR 통합 승인은
+- **ADR 필요로 판정한 경우 — 여기서 사전 승인을 요청하지 않는다.** PRD는 `review`,
+  `state.md`는 `prd-review`로 둔 채 `$adr-helper`로 넘어간다. PRD·ADR 통합 사전 승인은
   `$adr-helper`가 담당한다(ADR 피드백을 반영하다 PRD를 함께 고쳐야 할 수 있으므로 한
-  번에 승인한다).
-- **ADR 불필요로 판정한 경우에만 — 여기서 PRD 단독 승인을 요청한다.** 아래 명시 의례를
+  번에 사전 승인한다).
+- **ADR 불필요로 판정한 경우에만 — 여기서 PRD 단독 사전 승인을 요청한다.** 아래 명시 의례를
   따른다.
 
-### PRD 단독 승인은 오직 명시 의례로만 (ADR 불필요일 때)
+### PRD 단독 사전 승인은 오직 명시 의례로만 (ADR 불필요일 때)
 
-`approved` 전환은 사용자의 명시 승인이 있을 때만, 오직 `harness:approve`로만 한다.
+`pre-approved` 전환은 사용자의 명시 사전 승인이 있을 때만, 오직 `harness:approve`로만 한다.
 
 1. 현재 런타임의 구조화 질문 도구(ClaudeCode는 `AskUserQuestion`)로, **대상 문서와 전환
-   상태를 명시해** 승인을 요청한다. 예: "이 PRD를 approved로 전환할까요? (승인 / 아직)".
-2. 사용자가 분명히 승인하면 **그 발화를 그대로 인용**해 실행한다.
+   상태를 명시해** 사전 승인을 요청한다. 예: "이 PRD를 pre-approved로 올려 구현에 들어갈까요?
+   (사전 승인 / 아직)". 이건 잠정 승인이며, 구현 결과를 보고 PRD를 개정할 수 있고 최종 확정은
+   `$make-pr`에서 다시 받는다는 점을 함께 알린다.
+2. 사용자가 분명히 사전 승인하면 **그 발화를 그대로 인용**해 실행한다.
 
 ```sh
-npm run harness:approve -- --unit docs/raw/<type>/<slug> --quote "<사용자의 승인 발화 verbatim>"
+npm run harness:approve -- --unit docs/raw/<type>/<slug> --quote "<사용자의 사전 승인 발화 verbatim>"
 ```
 
-`harness:approve`가 status·`approval:` 근거·`state.md` 승인 이벤트를 원자적으로 함께
-기록한다(`--adr` 없이 PRD만 전환한다). 에이전트가 직접 frontmatter status를 `approved`로
-고치지 않는다.
+`harness:approve`(기본 모드)가 status를 `pre-approved`로, `approval:` 근거와 `state.md`
+`PREAPPROVAL` 이벤트를 원자적으로 함께 기록한다(`--adr` 없이 PRD만 전환한다). 에이전트가 직접
+frontmatter status를 고치지 않는다.
 
-**승인으로 간주하지 않는 것(중요):** "이렇게 하려고 했어", "이거 작업해야 돼", "좋아
-보인다", 목표·범위·아이디어 설명, 인터뷰 질문에 대한 답 — 이 중 어느 것도 승인이
-아니다. 승인은 위 승인 요청에 대한 사용자의 분명한 긍정 응답만을 뜻한다. 조금이라도
-모호하면 승인이 아니며, `review`로 둔 채 다시 구조화 질문으로 확인한다.
+**사전 승인으로 간주하지 않는 것(중요):** "이렇게 하려고 했어", "이거 작업해야 돼", "좋아
+보인다", 목표·범위·아이디어 설명, 인터뷰 질문에 대한 답 — 이 중 어느 것도 사전 승인이
+아니다. 사전 승인은 위 사전 승인 요청에 대한 사용자의 분명한 긍정 응답만을 뜻한다. 조금이라도
+모호하면 사전 승인이 아니며, `review`로 둔 채 다시 구조화 질문으로 확인한다.
 
-구현은 승인이 `state.md`에 기록된 이후 `feature-develop`에서 진행한다.
+구현은 사전 승인(`PREAPPROVAL`)이 `state.md`에 기록된 이후 `feature-develop`에서 진행한다.
 
 ## 품질 게이트
 
@@ -213,15 +218,15 @@ PRD 초안은 아래 질문에 답할 수 있어야 한다.
 - **나쁨:** 초안을 한 번 쓰고 그대로 둔다.
 - **좋음:** `reviewer` 리뷰 → 수정 루프로 수용 기준과 비목표를 다듬는다.
 
-- **나쁨:** PRD 초안을 작성하자마자 `approved`로 둔다.
-- **좋음:** `review`로 두고, 사용자 명시 승인 발화를 받아 `harness:approve`로 `approved`로 바꾼다.
+- **나쁨:** PRD 초안을 작성하자마자 `pre-approved`(또는 `approved`)로 둔다.
+- **좋음:** `review`로 두고, 사용자 명시 사전 승인 발화를 받아 `harness:approve`로 `pre-approved`로 바꾼다.
 
-- **나쁨:** "이렇게 하려고 했어" 같은 의도·아이디어 발화를 승인으로 오인해 바로 전환·구현한다.
-- **좋음:** 그런 발화는 승인이 아니라고 보고, 구조화 질문으로 명시 승인을 다시 확인한다.
+- **나쁨:** "이렇게 하려고 했어" 같은 의도·아이디어 발화를 사전 승인으로 오인해 바로 전환·구현한다.
+- **좋음:** 그런 발화는 사전 승인이 아니라고 보고, 구조화 질문으로 명시 사전 승인을 다시 확인한다.
 
 - **나쁨:** PRD를 쓰다 같은 흐름으로 `adr.md`까지 채워 넣는다(단계가 뒤섞인다).
 - **좋음:** `adr.md`는 손대지 않고, ADR 필요 여부·이유만 PRD `## ADR 필요 여부`에 남긴 뒤
   필요하면 `$adr-helper`로 넘긴다. `adr.md` 작성은 `stage`가 `adr-draft`로 올라간 다음이다.
 
-- **나쁨:** ADR이 필요한데 PRD만 먼저 승인받고 `$adr-helper`로 넘어간다.
-- **좋음:** ADR이 필요하면 PRD 승인을 미루고, ADR까지 작성한 뒤 PRD·ADR을 한 번에 승인받는다.
+- **나쁨:** ADR이 필요한데 PRD만 먼저 사전 승인받고 `$adr-helper`로 넘어간다.
+- **좋음:** ADR이 필요하면 PRD 사전 승인을 미루고, ADR까지 작성한 뒤 PRD·ADR을 한 번에 사전 승인받는다.

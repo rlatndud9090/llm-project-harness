@@ -148,6 +148,23 @@ describe("isForbiddenTransition", () => {
     expect(isForbiddenTransition("adr.md", "accepted", "deprecated")).toBe(false);
   });
 
+  it("blocks un-(pre-)approval rewinds on both approval tiers", () => {
+    // Dropping out of pre-approved, or demoting a final approval back to a
+    // pre-approval, are forbidden on both the PRD and ADR axes.
+    expect(isForbiddenTransition("prd.md", "pre-approved", "review")).toBe(true);
+    expect(isForbiddenTransition("prd.md", "pre-approved", "draft")).toBe(true);
+    expect(isForbiddenTransition("prd.md", "approved", "pre-approved")).toBe(true);
+    expect(isForbiddenTransition("adr.md", "pre-accepted", "proposed")).toBe(true);
+    expect(isForbiddenTransition("adr.md", "accepted", "pre-accepted")).toBe(true);
+  });
+
+  it("allows forward progress through both approval tiers", () => {
+    expect(isForbiddenTransition("prd.md", "review", "pre-approved")).toBe(false);
+    expect(isForbiddenTransition("prd.md", "pre-approved", "approved")).toBe(false);
+    expect(isForbiddenTransition("adr.md", "proposed", "pre-accepted")).toBe(false);
+    expect(isForbiddenTransition("adr.md", "pre-accepted", "accepted")).toBe(false);
+  });
+
   it("ignores files without a transition policy", () => {
     expect(isForbiddenTransition("notes.md", "draft", "done")).toBe(false);
     expect(FORBIDDEN_STATUS_TRANSITIONS["notes.md"]).toBeUndefined();
@@ -185,6 +202,20 @@ describe("isForbiddenStageTransition", () => {
     // but a true rewind of the PRD-approval process is still blocked
     expect(isForbiddenStageTransition("approved", "prd-review")).toBe(true);
     expect(isForbiddenStageTransition("approved", "awaiting-approval")).toBe(true);
+  });
+
+  it("treats pre-approved as a build-tier stage", () => {
+    // In the build tier: rewinding to any pre-build stage is an un-pre-approval.
+    expect(isForbiddenStageTransition("pre-approved", "prd-review")).toBe(true);
+    expect(isForbiddenStageTransition("pre-approved", "kickoff")).toBe(true);
+    expect(isForbiddenStageTransition("implementing", "prd-review")).toBe(true);
+    // forward through the tier is allowed
+    expect(isForbiddenStageTransition("prd-review", "pre-approved")).toBe(false);
+    expect(isForbiddenStageTransition("pre-approved", "implementing")).toBe(false);
+    expect(isForbiddenStageTransition("implementing", "approved")).toBe(false);
+    // ADR authored late after a PRD-only pre-approval: entering the ADR phase is OK
+    expect(isForbiddenStageTransition("pre-approved", "adr-draft")).toBe(false);
+    expect(isForbiddenStageTransition("pre-approved", "adr-review")).toBe(false);
   });
 });
 
@@ -510,11 +541,25 @@ describe("shouldProbeFreshness", () => {
 });
 
 describe("approval events", () => {
-  it("round-trips a formatted approval event", () => {
+  it("round-trips a formatted approval event (default kind APPROVAL)", () => {
     const line = formatApprovalEvent({ target: "prd", date: "2026-07-02", transport: "harness:approve", quote: "응 이대로\n승인해" });
     expect(line).toBe("- APPROVAL prd 2026-07-02 harness:approve :: 응 이대로 승인해");
     const events = parseApprovalEvents(`잡음\n${line}\n잡음`);
-    expect(events).toEqual([{ target: "prd", date: "2026-07-02", transport: "harness:approve", quote: "응 이대로 승인해" }]);
+    expect(events).toEqual([{ kind: "APPROVAL", target: "prd", date: "2026-07-02", transport: "harness:approve", quote: "응 이대로 승인해" }]);
+  });
+
+  it("round-trips a PREAPPROVAL event and preserves the kind", () => {
+    const line = formatApprovalEvent({ kind: "PREAPPROVAL", target: "adr", date: "2026-07-29", transport: "harness:approve", quote: "이대로 구현 들어가자" });
+    expect(line).toBe("- PREAPPROVAL adr 2026-07-29 harness:approve :: 이대로 구현 들어가자");
+    expect(parseApprovalEvents(line)).toEqual([
+      { kind: "PREAPPROVAL", target: "adr", date: "2026-07-29", transport: "harness:approve", quote: "이대로 구현 들어가자" },
+    ]);
+  });
+
+  it("parses both tiers together, in order", () => {
+    const pre = formatApprovalEvent({ kind: "PREAPPROVAL", target: "prd", date: "2026-07-29", transport: "harness:approve", quote: "먼저 사전 승인" });
+    const fin = formatApprovalEvent({ kind: "APPROVAL", target: "prd", date: "2026-07-30", transport: "harness:approve", quote: "최종 확정" });
+    expect(parseApprovalEvents(`${pre}\n${fin}`).map((e) => e.kind)).toEqual(["PREAPPROVAL", "APPROVAL"]);
   });
 
   it("ignores lines that are not approval events", () => {

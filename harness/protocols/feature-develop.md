@@ -1,21 +1,24 @@
 # 기능 개발 프로토콜
 
-승인된 PRD/ADR 기반으로 기능을 설계, 구현, 검증, 커밋까지 진행하는 공용
-오케스트레이션 절차다. 절차와 게이트의 강도는 이 하네스가 유지하고, 도메인
-특수성은 소비 프로젝트의 PRD/ADR과 `AGENTS.md`가 제공한다고 가정한다.
+**사전 승인된(pre-approved)** PRD/ADR 기반으로 기능을 설계, 구현, 검증까지 진행하는 공용
+오케스트레이션 절차다. 최종 확정·커밋·PR은 이 프로토콜이 아니라 `$make-pr`가 담당한다.
+절차와 게이트의 강도는 이 하네스가 유지하고, 도메인 특수성은 소비 프로젝트의 PRD/ADR과
+`AGENTS.md`가 제공한다고 가정한다.
 
 ## 입력과 출력
 
 ```txt
-입력: docs/raw/feature/<slug>/prd.md
-출력: 구현 완료 + wiki ingest + harness gate 통과 + Lore commit
+입력: docs/raw/feature/<slug>/prd.md (status: pre-approved)
+출력: 구현 완료 + wiki ingest + harness gate 통과 → $make-pr(최종 확정 + 커밋 + PR)
 ```
 
-feature raw unit은 `prd.md`, `adr.md`, `notes.md`, `state.md`를 가진다. 에이전트는
-PRD/ADR 초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를 `approved`, ADR을
-`accepted`로 바꾸지 않는다. 승인 전환은 오직 `harness:approve`로만 하며, 그 근거는
-`state.md`의 승인 이벤트에 사용자 발화 verbatim으로 기록된다. 구현은 `state.md`에 승인이
-기록된 이후에만 시작한다.
+feature raw unit은 `prd.md`, `adr.md`, `notes.md`, `state.md`를 가진다. 승인은 2단계다:
+**사전 승인**(PRD `pre-approved`/ADR `pre-accepted`)이 이 빌드 단계의 진입 게이트이고,
+**최종 확정**(`approved`/`accepted`)은 `$make-pr`에서 PR 직전에 이뤄진다. 에이전트는 PRD/ADR
+초안을 작성할 수 있지만, 사용자 명시 사전 승인 전에는 `pre-approved`/`pre-accepted`로 바꾸지
+않는다. 전환은 오직 `harness:approve`로만 하며, 그 근거는 `state.md`의 승인 이벤트
+(`PREAPPROVAL`)에 사용자 발화 verbatim으로 기록된다. 구현은 `state.md`에 사전 승인이 기록된
+이후에만 시작한다.
 
 ## 역할
 
@@ -27,9 +30,11 @@ PRD/ADR 초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를 `ap
 | `test-engineer` | 도메인/통합/UI 검증 전략과 테스트 구현 |
 | `integrator` | raw/wiki 검증, gate 실행, 커밋 프로토콜 |
 
-## Phase 0: 승인 게이트 (하드 차단)
+## Phase 0: 사전 승인 게이트 (하드 차단)
 
 구현 앞에 반드시 통과해야 하는 게이트다. 이 게이트를 건너뛰고 구현으로 넘어가지 않는다.
+여기서 요구하는 것은 **사전 승인**(pre-approved)이지 최종 승인이 아니다 — 최종 확정은
+`$make-pr`에서 한다.
 
 1. 현재 branch와 raw path를 확인한다.
 2. **`state.md`를 먼저 읽는다.** `stage`와 `## 승인 이벤트`가 단일 진실원이다(채팅
@@ -37,12 +42,12 @@ PRD/ADR 초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를 `ap
 3. `docs/raw/feature/<slug>/prd.md`와 `adr.md`를 읽고 status와 `approval:` 근거를 확인한다.
 4. `npm run harness:check`를 실행해 승인 정합성(승인 이벤트 backing, state↔status)을 확인한다.
 5. **차단 조건:** 아래 중 하나라도 참이면 구현하지 않는다.
-   - PRD가 `approved`가 아니다.
-   - `state.md`에 PRD 승인 이벤트가 없다(사용자 발화 verbatim 미기록).
-   - ADR 결정이 필요한데 ADR이 `accepted`가 아니다.
+   - PRD가 `pre-approved`(또는 이미 `approved`)가 아니다.
+   - `state.md`에 PRD 사전 승인 이벤트(`PREAPPROVAL`)가 없다(사용자 발화 verbatim 미기록).
+   - ADR 결정이 필요한데 ADR이 `pre-accepted`(또는 이미 `accepted`)가 아니다.
 
-   이 경우 `$prd-helper`/`$adr-helper`로 되돌아가 사용자의 명시 승인을 구조화 질문으로
-   받고, 승인 전환은 오직 `harness:approve`로 한다. **에이전트가 스스로 승인을 만들거나
+   이 경우 `$prd-helper`/`$adr-helper`로 되돌아가 사용자의 명시 사전 승인을 구조화 질문으로
+   받고, 전환은 오직 `harness:approve`로 한다. **에이전트가 스스로 승인을 만들거나
    상태를 전환하지 않는다.**
 6. 게이트를 통과했으면 `state.md`의 `stage`를 `implementing`으로 갱신한다.
 7. 사용자 요청이 신규 구현, 재작업, 부분 수정, PRD 보강 중 무엇인지 분류한다.
@@ -54,6 +59,25 @@ PRD/ADR 초안을 작성할 수 있지만, 사용자 승인 전에는 PRD를 `ap
 | 구현이 일부 있음 + 같은 PRD | 개선 실행 | 변경 범위만 재계획 |
 | 특정 모듈만 수정 | 부분 실행 | 해당 role 중심으로 진행 |
 | ADR 결정이 바뀜 | 새 결정 | 기존 ADR superseded 또는 새 ADR 작성 |
+
+## Phase 0.6: 빌드 중 PRD/ADR 개정 (사전 승인의 핵심)
+
+사전 승인은 **잠정**이다. 구현된 결과물을 보고 사용자가 요구를 추가·변경하는 일은 자연스럽고,
+그걸 위해 `pre-approved`/`pre-accepted` 상태를 둔다. 빌드 중 PRD/ADR을 고칠 수 있되 규율이 있다:
+
+- **사용자 확인이 전제다.** feature-develop 피드백으로 PRD/ADR을 바꿔야 하면, 먼저 현재 런타임의
+  구조화 질문 도구(ClaudeCode는 `AskUserQuestion`)로 **무엇을 어떻게 개정할지 요지와 함께 개정
+  여부를 확인**받는다. 확인 없이 사전 승인된 문서의 요구·결정을 임의로 바꾸지 않는다.
+- **개정은 본문 편집이다.** 확인받았으면 `prd.md`/`adr.md` 본문을 고친다. status는 `pre-approved`/
+  `pre-accepted` 그대로 둔다(승인 축을 다시 만지지 않는다 — `harness:approve`를 개정마다 재실행하지
+  않는다). 런타임 가드는 사전 승인된 문서의 **본문 편집을 막지 않는다**(status 플립만 막는다).
+- **개정을 기록한다.** `state.md`의 `## 단계 로그`에 "무엇을 왜 바꿨는지 + 사용자가 개정을
+  확인했다"를 한 줄로 남긴다. 이게 잠정 승인 아래 개정을 정식 절차로 만드는 지점이다.
+- **최종 재확인은 `$make-pr`가 한다.** 개정이 쌓인 최종 PRD/ADR 전체를 PR 직전에 사용자가 다시
+  확인하고 `approved`/`accepted`로 확정한다. 그래서 중간 개정은 가볍게 간다.
+
+ADR 결정 자체가 바뀌는 경우(단순 문구 개정이 아니라 다른 구조를 택함)는 개정이 아니라 **새 결정**
+이다 — 위 표의 "ADR 결정이 바뀜"을 따라 새 ADR을 작성하거나 기존을 superseded 처리한다.
 
 ## Phase 0.5: 실행 레일 선택
 
@@ -125,14 +149,16 @@ domain-engineer/ui-engineer/test-engineer → integrator` role 체인으로 펼�
 
 게이트:
 
-- ADR이 proposed placeholder 상태이면 구현으로 넘어가지 않는다.
-- 사용자가 명시 승인하지 않은 ADR은 `proposed`로 유지한다.
-- PRD가 아직 `review`이고 ADR이 `proposed`이면 사용자에게 **구조화 질문으로** 명시 승인을
-  요청한다(대상 문서와 전환 상태를 명시). 사용자가 분명히 승인하면 그 발화를 그대로 인용해
-  `npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<발화>" [--adr]`로만
-  전환한다. 에이전트가 직접 frontmatter status를 고치지 않는다(런타임 훅과 `harness:check`가 막는다).
-- "이렇게 하려고 했어" 같은 의도·아이디어 발화는 승인이 아니다. 모호하면 승인이 아니다.
-- 사용자 승인을 받지 못했으면 구현하지 않고 `$prd-helper`/`$adr-helper`로 되돌린다.
+- 이 시점에는 PRD가 이미 `pre-approved`, (ADR 결정이 필요하면) ADR이 `pre-accepted`여야 한다
+  (Phase 0의 사전 승인 게이트를 이미 통과했다). **feature-develop은 여기서 사전 승인을 새로 받지
+  않는다** — 사전 승인은 `$prd-helper`/`$adr-helper`의 몫이고, 최종 확정은 `$make-pr`의 몫이다.
+  에이전트가 직접 frontmatter status를 고치거나 승인을 만들어내지 않는다(런타임 훅과
+  `harness:check`가 막는다).
+- ADR이 아직 `proposed` placeholder인데 이 유닛이 ADR 결정을 요구하면(빌드 중 뒤늦게 필요해진
+  경우 포함) 구현으로 넘어가지 않고 `$adr-helper`로 되돌린다 — 거기서 ADR을 작성하고 `pre-accepted`
+  까지 사전 승인받은 뒤 돌아온다.
+- 전제(사전 승인)가 미충족이면 구현하지 않고 `$prd-helper`/`$adr-helper`로 되돌린다. "이렇게 하려고
+  했어" 같은 의도·아이디어 발화는 사전 승인이 아니다. 모호하면 사전 승인이 아니다.
 - 사용자의 제품 판단이 필요한 질문은 숨기지 않고 보고하며, 현재 런타임의 구조화
   질문 도구를 우선 사용한다.
 
@@ -175,16 +201,24 @@ npm run harness:gate
 이 `harness:ingest`는 wiki lineage의 **둘째 touch**다(멱등 — `$prd-helper`의 첫 링크를
 중복 없이 재확인). 구현·결정이 확정된 지금 계보를 **큐레이션**한다: 이 결정이 같은 area의
 이전 결정을 대체하면 이전 줄에 `_(superseded by …)_`, 이 줄에 `_(현재)_`를 단다
-(`wiki-ingest.md` "실행 시점", `adr-helper.md` 참고). 성공 후 명시적 파일만 stage하고
-Lore commit을 작성한다.
+(`wiki-ingest.md` "실행 시점", `adr-helper.md` 참고).
+
+구현·검증·ingest가 끝나고 사용자가 결과에 만족하면 **여기서 최종 확정·커밋하지 않고
+`$make-pr`로 넘어간다.** `$make-pr`가 PRD/ADR 최종 확정(`pre-approved`→`approved`,
+`pre-accepted`→`accepted`), 명시적 stage, Lore commit, PR 생성을 한 흐름으로 담당한다. 빌드
+중 만든 중간 구현 커밋은 자기 브랜치에 둘 수 있지만, PRD/ADR을 `approved`로 올리는 확정 커밋은
+`$make-pr`의 몫이다.
 
 ## 실패 모드
 
 - **나쁨:** ADR placeholder를 둔 채 구현한다.
 - **좋음:** data contract, state model, engine boundary 같은 결정을 ADR에 남긴 뒤 구현한다.
 
-- **나쁨:** 에이전트가 ADR을 작성한 뒤 곧바로 `accepted`로 바꾼다.
-- **좋음:** ADR은 `proposed`로 남기고, 사용자 명시 승인 후 `harness:approve --adr`로 `accepted`로 바꾼다.
+- **나쁨:** 에이전트가 ADR을 작성한 뒤 곧바로 `pre-accepted`/`accepted`로 바꾼다.
+- **좋음:** ADR은 `proposed`로 남기고, 사용자 명시 사전 승인 후 `harness:approve --adr`로 `pre-accepted`로 바꾼다(최종 `accepted`는 `$make-pr`).
+
+- **나쁨:** `pre-approved`인 PRD를 빌드 중 PR 없이 스스로 `approved`로 확정하거나, 사용자 확인 없이 요구를 바꿔 버린다.
+- **좋음:** 개정은 사용자 확인 후 본문만 고쳐 `pre-approved`로 두고 단계 로그에 남기며, 최종 `approved` 확정은 `$make-pr`에서 받는다.
 
 - **나쁨:** UI가 권한, 가격, 판정, 시뮬레이션 같은 핵심 규칙을 컴포넌트 안에서 직접 계산한다.
 - **좋음:** UI는 domain/application result를 렌더링하고 판정은 핵심 로직에 둔다.

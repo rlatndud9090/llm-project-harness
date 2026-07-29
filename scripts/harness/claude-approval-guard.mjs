@@ -2,16 +2,20 @@
 // ClaudeCode PreToolUse guard (tool-specific accelerator, opt-in).
 //
 // A runtime tripwire, ONE STEP AHEAD of the git-time backstop. It blocks the
-// common self-approval edit paths through the Edit/Write/MultiEdit tools:
-//   - prd.md / adr.md whose resulting `status:` is approved/accepted
-//   - state.md whose resulting `prd_status: approved` / `adr_status: accepted`,
-//     or that introduces an `- APPROVAL ...` ledger line
+// common self-approval edit paths through the Edit/Write/MultiEdit tools, for BOTH
+// approval tiers (pre-approved/pre-accepted build-entry gate, and approved/accepted
+// final stamp at $make-pr):
+//   - prd.md / adr.md whose resulting `status:` is pre-approved/approved/
+//     pre-accepted/accepted
+//   - state.md whose resulting `prd_status`/`adr_status` moves onto the approval
+//     axis, or that introduces a `- PREAPPROVAL ...` / `- APPROVAL ...` ledger line
 //   - adr.md edited while the sibling state.md stage is still pre-ADR (the PRD
 //     phase): $prd-helper must not drift into ADR authoring — the ADR is authored
 //     only after $adr-helper advances the stage to adr-draft.
 // Only `npm run harness:approve` should set the approval statuses, and it writes
 // via Node fs (not the Edit/Write tools), so the sanctioned path never trips
-// this hook.
+// this hook. Editing the BODY of an already-(pre-)approved artifact is allowed, so
+// mid-build revisions of a pre-approved PRD/ADR pass.
 //
 // It inspects the RECONSTRUCTED post-edit file (not just the edit fragment), so
 // a value-only edit (old_string "review" -> new_string "approved") is caught,
@@ -32,8 +36,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { isPreAdrStage, normalizeEol, parseFrontmatter } from "./lib.mjs";
 
-const STATUS_FLIP_RE = /^\s*status:\s*["']?(approved|accepted)\b/m;
-const APPROVAL_LINE_RE = /^\s*-\s*APPROVAL\s+(prd|adr)\b/m;
+// Both approval tiers are guarded: pre-approved/pre-accepted (build-entry gate)
+// and approved/accepted (final at $make-pr). Only harness:approve may set any of
+// them, and it writes via fs (not the Edit tools), so it never trips this.
+const STATUS_FLIP_RE = /^\s*status:\s*["']?(pre-approved|approved|pre-accepted|accepted)\b/m;
+const APPROVAL_LINE_RE = /^\s*-\s*(PREAPPROVAL|APPROVAL)\s+(prd|adr)\b/m;
+const PRD_APPROVAL_STATUSES = new Set(["pre-approved", "approved"]);
+const ADR_APPROVAL_STATUSES = new Set(["pre-accepted", "accepted"]);
 const GUARDED_BASENAMES = new Set(["prd.md", "adr.md", "state.md"]);
 
 let raw = "";
@@ -154,30 +163,32 @@ function violation(base, currentContent, nextContent, toolInput) {
   const cur = currentContent !== null ? (parseFrontmatter(currentContent) ?? {}) : {};
 
   if (base === "prd.md" || base === "adr.md") {
-    // Only a NEWLY introduced approval flip is blocked; editing the body of an
-    // already-approved artifact is fine.
-    if ((next.status === "approved" || next.status === "accepted") && next.status !== cur.status) {
+    // Only a NEWLY introduced approval flip is blocked (either tier); editing the
+    // body of an already-(pre-)approved artifact is fine, so mid-build revisions of
+    // a pre-approved PRD/ADR are not obstructed.
+    const approvalStatuses = base === "prd.md" ? PRD_APPROVAL_STATUSES : ADR_APPROVAL_STATUSES;
+    if (approvalStatuses.has(next.status) && next.status !== cur.status) {
       return `status를 "${next.status}"로 전환하려고 합니다`;
     }
     // Fragment fallback (file could not be reconstructed): scan raw fragments.
     if (currentContent === null && fragmentsFlip(toolInput)) {
-      return "status를 approved/accepted로 전환하려고 합니다";
+      return "status를 pre-approved/approved/pre-accepted/accepted로 전환하려고 합니다";
     }
     return null;
   }
 
   // state.md — approval axis only, and only when newly introduced. Stage
-  // progression (e.g. approved -> implementing) stays allowed; recording the
-  // approval evidence is approve.mjs's exclusive domain.
-  if (next.prd_status === "approved" && cur.prd_status !== "approved") {
-    return "prd_status를 approved로 바꾸려고 합니다 (approve.mjs 전용)";
+  // progression (e.g. pre-approved -> implementing) stays allowed; recording the
+  // (pre-)approval evidence is approve.mjs's exclusive domain.
+  if (PRD_APPROVAL_STATUSES.has(next.prd_status) && next.prd_status !== cur.prd_status) {
+    return `prd_status를 "${next.prd_status}"로 바꾸려고 합니다 (approve.mjs 전용)`;
   }
-  if (next.adr_status === "accepted" && cur.adr_status !== "accepted") {
-    return "adr_status를 accepted로 바꾸려고 합니다 (approve.mjs 전용)";
+  if (ADR_APPROVAL_STATUSES.has(next.adr_status) && next.adr_status !== cur.adr_status) {
+    return `adr_status를 "${next.adr_status}"로 바꾸려고 합니다 (approve.mjs 전용)`;
   }
   const hadApproval = currentContent !== null && APPROVAL_LINE_RE.test(currentContent);
   if (!hadApproval && APPROVAL_LINE_RE.test(nextContent)) {
-    return "승인 이벤트(- APPROVAL ...)를 직접 추가하려고 합니다 (approve.mjs 전용)";
+    return "승인 이벤트(- PREAPPROVAL/APPROVAL ...)를 직접 추가하려고 합니다 (approve.mjs 전용)";
   }
   return null;
 }

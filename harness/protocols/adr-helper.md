@@ -9,12 +9,14 @@
 이 단계로 들어온다.
 
 전제: feature raw unit에 `adr.md`와 `state.md`가 있다(`$kickoff`가 생성). ADR은
-`proposed` 상태로 작성하고, 사용자 명시 승인 전에는 `accepted`로 바꾸지 않는다.
-`accepted` 전환은 오직 `harness:approve --adr`로만 한다.
+`proposed` 상태로 작성한다. 승인은 2단계이며, 이 단계에서 받는 것은 **사전 승인(pre-approval)** —
+빌드 진입 게이트 — 이다: 사용자 명시 사전 승인 전에는 ADR을 `pre-accepted`로 바꾸지 않는다.
+`pre-accepted` 전환(사전 승인)은 오직 `harness:approve --adr`로만 하고, 최종 `accepted` 확정은
+`$make-pr`에서 이뤄진다.
 
 `$prd-helper`가 ADR 필요로 판정하고 넘겨준 시점에는 PRD가 아직 `review`, `state.md`
-`stage`가 `prd-review`다. **PRD 승인은 아직 하지 않는다.** ADR을 `proposed`로 끝까지
-작성해 리뷰 상태에 올려 두고, PRD·ADR을 **한 번에** 승인받는다(아래 "승인과 불변성").
+`stage`가 `prd-review`다. **PRD 사전 승인도 아직 하지 않는다.** ADR을 `proposed`로 끝까지
+작성해 리뷰 상태에 올려 두고, PRD·ADR을 **한 번에** 사전 승인받는다(아래 "사전 승인과 불변성").
 
 ## 진입: ADR 단계로 stage를 올린다 (adr.md 잠금 해제)
 
@@ -23,13 +25,14 @@
 막는 잠금). `adr-draft`로 올린 뒤에야 `adr.md` 본문을 작성할 수 있다. 초안이 자리를
 잡으면 `stage`를 `adr-review`로 갱신한다.
 
-드물게 PRD를 먼저 단독 승인해 `stage`가 이미 `approved`인 상태에서 뒤늦게 ADR을 붙여야
-하면, `approved` → `adr-draft`/`adr-review` 전이가 허용된다(PRD 승인은 `prd_status` 축에서
-그대로 보존되므로 un-approval이 아니다). ADR을 작성한 뒤 `harness:approve --adr`로 ADR만
-`accepted` 전환한다(이미 approved인 PRD는 그대로 둔다).
+드물게 PRD를 먼저 단독 **사전 승인**해 `stage`가 이미 `pre-approved`인 상태에서 뒤늦게 ADR을
+붙여야 하면, build-tier(`pre-approved`/`implementing` 등) → `adr-draft`/`adr-review` 전이가
+허용된다(PRD 사전 승인은 `prd_status` 축에서 그대로 보존되므로 un-approval이 아니다). ADR을
+작성한 뒤 `harness:approve --adr`로 ADR만 `pre-accepted` 전환한다(이미 `pre-approved`인 PRD는
+그대로 둔다). 최종 `accepted`는 `$make-pr`에서 확정한다.
 
 ADR을 다듬다 PRD 요구/수용 기준을 함께 고쳐야 하면 `prd.md`도 같이 수정한다(허용된다).
-PRD를 고쳐도 `review`를 유지하며, 승인은 마지막에 PRD·ADR을 한 번에 받는다.
+PRD를 고쳐도 `review`를 유지하며, 사전 승인은 마지막에 PRD·ADR을 한 번에 받는다.
 
 ## 이 단계로 들어온 이유 (필요 여부 판단은 `$prd-helper`가 이미 끝냄)
 
@@ -122,35 +125,38 @@ deep-interview 내부에서 현재 surface에 맞게 선택한다. `$deep-interv
 - (디자인 결정 레인이면) 배치 대안이 실제로 비교되고 시각 위계 근거가 남았는가?
 - placeholder 문장만 있고 실제 결정이 비어 있지 않은가?
 
-## 승인과 불변성 (PRD·ADR 통합 승인)
+## 사전 승인과 불변성 (PRD·ADR 통합 사전 승인)
 
-ADR은 에이전트가 단독으로 `accepted` 처리하지 않는다. 이 단계는 ADR을 `proposed`로만
-마무리하고, `state.md`의 `stage`를 `adr-review`로 갱신한다.
+ADR은 에이전트가 단독으로 `pre-accepted`/`accepted` 처리하지 않는다. 이 단계는 ADR을
+`proposed`로만 마무리하고, `state.md`의 `stage`를 `adr-review`로 갱신한다.
 
-**이 단계가 PRD·ADR 통합 승인을 담당한다.** ADR이 필요한 작업 단위는 PRD를 먼저 단독
-승인하지 않고, ADR이 리뷰 상태에 오른 뒤 PRD·ADR을 한 번에 승인받는다(ADR 피드백이
-PRD 수정으로 이어질 수 있기 때문이다).
+**이 단계가 PRD·ADR 통합 사전 승인을 담당한다.** ADR이 필요한 작업 단위는 PRD를 먼저 단독
+사전 승인하지 않고, ADR이 리뷰 상태에 오른 뒤 PRD·ADR을 한 번에 사전 승인받는다(ADR 피드백이
+PRD 수정으로 이어질 수 있기 때문이다). 최종 확정(`approved`/`accepted`)은 이 단계가 아니라
+`$make-pr`에서 이뤄진다.
 
 1. 현재 런타임의 구조화 질문 도구(ClaudeCode는 `AskUserQuestion`)로 **PRD와 ADR을 함께**
-   승인할지 묻는다. 대상 문서(PRD+ADR)와 전환 상태(approved/accepted)를 명시한다. 예:
-   "이 PRD와 ADR을 함께 승인할까요? (승인 / 아직)".
-2. 사용자가 분명히 승인하면 **그 발화를 그대로 인용**해 한 번의 명령으로 둘 다 전환한다.
+   사전 승인할지 묻는다. 대상 문서(PRD+ADR)와 전환 상태(pre-approved/pre-accepted)를 명시한다.
+   예: "이 PRD와 ADR을 pre-approved/pre-accepted로 올려 구현에 들어갈까요? (사전 승인 / 아직)".
+   이건 잠정이며 구현 결과를 보고 개정할 수 있고 최종 확정은 `$make-pr`에서 다시 받는다는 점을 알린다.
+2. 사용자가 분명히 사전 승인하면 **그 발화를 그대로 인용**해 한 번의 명령으로 둘 다 전환한다.
 
 ```sh
-npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의 승인 발화 verbatim>" --adr
+npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의 사전 승인 발화 verbatim>" --adr
 ```
 
-`harness:approve --adr`는 `review` PRD를 `approved`로, `proposed` ADR을 `accepted`로
-**원자적으로 함께** 전환하고, 각 status·`approval: "user:YYYY-MM-DD:<근거>"`·`state.md`
-승인 이벤트(PRD/ADR 각각)를 한 번에 기록한다. 에이전트가 직접 frontmatter status를
-`approved`/`accepted`로 고치지 않는다(런타임 훅과 `harness:check`가 막는다).
+`harness:approve --adr`(기본 모드)는 `review` PRD를 `pre-approved`로, `proposed` ADR을
+`pre-accepted`로 **원자적으로 함께** 전환하고, 각 status·`approval: "user:YYYY-MM-DD:<근거>"`·
+`state.md` `PREAPPROVAL` 이벤트(PRD/ADR 각각)를 한 번에 기록한다. 에이전트가 직접 frontmatter
+status를 고치지 않는다(런타임 훅과 `harness:check`가 막는다).
 
-**승인으로 간주하지 않는 것:** 결정 방향을 설명하거나 "그렇게 하자" 정도의 대화는
-승인이 아니다. 승인은 "이 PRD와 ADR을 approved/accepted로 전환한다"는 명시 요청에 대한
-사용자의 분명한 긍정 응답만을 뜻한다. 모호하면 PRD는 `review`, ADR은 `proposed`로 둔다.
+**사전 승인으로 간주하지 않는 것:** 결정 방향을 설명하거나 "그렇게 하자" 정도의 대화는
+사전 승인이 아니다. 사전 승인은 "이 PRD와 ADR을 pre-approved/pre-accepted로 전환한다"는 명시
+요청에 대한 사용자의 분명한 긍정 응답만을 뜻한다. 모호하면 PRD는 `review`, ADR은 `proposed`로 둔다.
 
-accepted ADR 본문은 과거 결정의 근거이므로 고쳐 쓰지 않는다. 결정이 바뀌면 새
-ADR을 추가하고 옛 ADR을 `superseded`로 표시한다.
+`pre-accepted` ADR 본문은 빌드 중 **사용자 확인 하에 개정할 수 있다**(feature-develop 피드백
+반영; 개정 시 `state.md` `## 단계 로그`에 한 줄). 최종 `accepted`로 확정된 이후에는 본문이
+과거 결정의 근거이므로 고쳐 쓰지 않는다 — 결정이 바뀌면 새 ADR을 추가하고 옛 ADR을 `superseded`로 표시한다.
 
 이 결정이 같은 영역의 이전 결정을 대체하면 wiki도 함께 신선하게 유지한다: 그 영역
 `### 헤딩` 아래에서 대체된 이전 줄에 `_(superseded by <대상>)_`를 달고, 새 결정 줄로
@@ -159,8 +165,8 @@ ADR을 추가하고 옛 ADR을 `superseded`로 표시한다.
 
 ## 다음 단계
 
-PRD/ADR이 모두 자리를 잡고 사용자 승인까지 끝나면 `feature-develop.md`로 넘어가
-구현을 시작한다.
+PRD/ADR이 모두 자리를 잡고 사용자 **사전 승인**까지 끝나면 `feature-develop.md`로 넘어가
+구현을 시작한다. 구현·검증이 끝나면 `$make-pr`가 최종 확정(`approved`/`accepted`)·커밋·PR을 담당한다.
 
 ## 실패 모드
 
@@ -170,11 +176,11 @@ PRD/ADR이 모두 자리를 잡고 사용자 승인까지 끝나면 `feature-dev
 - **나쁨:** 선택지 없이 결정 하나만 적는다.
 - **좋음:** 선택지 2개 이상과 선택 근거(채택·기각 사유)를 함께 남겨 결정 근거를 보존한다.
 
-- **나쁨:** 에이전트가 ADR을 작성한 뒤 곧바로 `accepted`로 바꾼다.
-- **좋음:** `proposed`로 두고, 사용자 명시 승인 후 `harness:approve --adr`로 `accepted`로 바꾼다.
+- **나쁨:** 에이전트가 ADR을 작성한 뒤 곧바로 `pre-accepted`/`accepted`로 바꾼다.
+- **좋음:** `proposed`로 두고, 사용자 명시 사전 승인 후 `harness:approve --adr`로 `pre-accepted`로 바꾼다(최종 `accepted`는 `$make-pr`).
 
 - **나쁨:** `stage`를 `prd-review`에 둔 채 `adr.md`를 작성하려다 가드에 막힌다.
 - **좋음:** 이 단계 진입 시 먼저 `stage`를 `adr-draft`로 올려 잠금을 풀고 `adr.md`를 작성한다.
 
-- **나쁨:** ADR이 필요한데 PRD를 먼저 단독 승인해 버린다.
-- **좋음:** PRD를 `review`로 둔 채 ADR을 마무리하고, `harness:approve --adr`로 PRD·ADR을 한 번에 승인한다.
+- **나쁨:** ADR이 필요한데 PRD를 먼저 단독 사전 승인해 버린다.
+- **좋음:** PRD를 `review`로 둔 채 ADR을 마무리하고, `harness:approve --adr`로 PRD·ADR을 한 번에 사전 승인한다.

@@ -1141,7 +1141,7 @@ describe("state ledger approval gate", () => {
     });
   });
 
-  it("harness:approve flips a review PRD (and ADR) and passes harness:check", () => {
+  it("harness:approve pre-approves a review PRD (and ADR), then --final approves; both pass harness:check", () => {
     withProject((projectRoot) => {
       attach(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "share");
@@ -1156,21 +1156,37 @@ describe("state ledger approval gate", () => {
       );
       ingest(projectRoot, "docs/raw/feature/share", "공유 기능");
 
-      const approve = runApprove(projectRoot, "docs/raw/feature/share", ["--quote", "그래 이 PRD랑 ADR 승인할게, 진행해", "--adr"]);
-      expect(approve.status).toBe(0);
+      // Tier 1: pre-approval (build-entry gate).
+      const pre = runApprove(projectRoot, "docs/raw/feature/share", ["--quote", "그래 이 PRD랑 ADR 사전 승인할게, 구현 진행해", "--adr"]);
+      expect(pre.status).toBe(0);
 
-      const prd = read(path.join(unitDir, "prd.md"));
-      const adr = read(path.join(unitDir, "adr.md"));
-      const state = read(path.join(unitDir, "state.md"));
+      let prd = read(path.join(unitDir, "prd.md"));
+      let adr = read(path.join(unitDir, "adr.md"));
+      let state = read(path.join(unitDir, "state.md"));
+      expect(prd).toContain("status: pre-approved");
+      expect(adr).toContain("status: pre-accepted");
+      expect(state).toContain("stage: pre-approved");
+      expect(state).toContain("- PREAPPROVAL prd 20");
+      expect(state).toContain("- PREAPPROVAL adr 20");
+      expect(state).toContain("그래 이 PRD랑 ADR 사전 승인할게, 구현 진행해");
+      expect(runCheck(projectRoot).status).toBe(0);
+
+      // Tier 2: final approval (stamped at make-pr).
+      const fin = runApprove(projectRoot, "docs/raw/feature/share", ["--quote", "좋아, 이대로 최종 확정하고 PR 올려", "--final", "--adr"]);
+      expect(fin.status).toBe(0);
+
+      prd = read(path.join(unitDir, "prd.md"));
+      adr = read(path.join(unitDir, "adr.md"));
+      state = read(path.join(unitDir, "state.md"));
       expect(prd).toContain("status: approved");
       expect(adr).toContain("status: accepted");
       expect(state).toContain("stage: approved");
       expect(state).toContain("- APPROVAL prd 20");
       expect(state).toContain("- APPROVAL adr 20");
-      expect(state).toContain("그래 이 PRD랑 ADR 승인할게, 진행해");
-
-      const result = runCheck(projectRoot);
-      expect(result.status).toBe(0);
+      expect(state).toContain("좋아, 이대로 최종 확정하고 PR 올려");
+      // The PREAPPROVAL evidence is preserved alongside the final APPROVAL.
+      expect(state).toContain("- PREAPPROVAL prd 20");
+      expect(runCheck(projectRoot).status).toBe(0);
     });
   });
 
@@ -1247,7 +1263,7 @@ describe("state ledger approval gate", () => {
 
       const result = runCheck(projectRoot);
       expect(result.status).not.toBe(0);
-      expect(`${result.stdout}${result.stderr}`).toContain("no matching approval event");
+      expect(`${result.stdout}${result.stderr}`).toContain("no matching APPROVAL event");
     });
   });
 
@@ -1388,6 +1404,127 @@ describe("artifact-check ADR phase gate (step separation)", () => {
   });
 });
 
+describe("two-tier approval gate (pre-approval / --final)", () => {
+  it("harness:approve --final refuses a PRD that was never pre-approved", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "skipfinal");
+      runKickoff(projectRoot, "feature", "skipfinal", "사전 없이 최종");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "SkipFinal", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      const fin = runApprove(projectRoot, "docs/raw/feature/skipfinal", ["--quote", "바로 최종 확정할게", "--final"]);
+      expect(fin.status).not.toBe(0);
+      expect(`${fin.stdout}${fin.stderr}`).toContain("pre-approved");
+    });
+  });
+
+  it("harness:check fails a pre-approved PRD with no PREAPPROVAL event", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "forgedpre");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "ForgedPre", status: "pre-approved", unit_type: "feature", approval: "user:2026-01-01:사전 승인함" })}\n${fullPrdBody()}`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "ForgedPre", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      // Mirror says pre-approved, but no PREAPPROVAL event backs it.
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({ stage: "pre-approved", prd_status: "pre-approved", adr_status: "proposed", approvals: [] }),
+      );
+      ingest(projectRoot, "docs/raw/feature/forgedpre");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("no matching PREAPPROVAL event");
+    });
+  });
+
+  it("harness:check passes a pre-approved PRD at stage implementing (build tier)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "buildok");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "BuildOk", status: "pre-approved", unit_type: "feature", approval: "user:2026-01-01:사전 승인함" })}\n${fullPrdBody()}`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "BuildOk", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({
+          stage: "implementing",
+          prd_status: "pre-approved",
+          adr_status: "proposed",
+          approvals: [{ kind: "PREAPPROVAL", target: "prd", quote: "이대로 구현 진행" }],
+        }),
+      );
+      ingest(projectRoot, "docs/raw/feature/buildok");
+
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("harness:check fails when stage is approved but the PRD is only pre-approved", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "finalstage");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "FinalStage", status: "pre-approved", unit_type: "feature", approval: "user:2026-01-01:사전 승인함" })}\n${fullPrdBody()}`,
+      );
+      writeFile(path.join(unitDir, "adr.md"), `${frontmatter({ title: "FinalStage", status: "proposed", unit_type: "feature" })}\n# ADR\n`);
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({
+          stage: "approved",
+          prd_status: "pre-approved",
+          adr_status: "proposed",
+          approvals: [{ kind: "PREAPPROVAL", target: "prd", quote: "사전 승인함" }],
+        }),
+      );
+      ingest(projectRoot, "docs/raw/feature/finalstage");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("fully approved PRD");
+    });
+  });
+
+  it("harness:check fails when a final stage ships an ADR still at pre-accepted", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "strandedadr");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "StrandedAdr", status: "approved", unit_type: "feature", approval: "user:2026-01-01:최종 확정" })}\n${fullPrdBody()}`,
+      );
+      writeFile(
+        path.join(unitDir, "adr.md"),
+        `${frontmatter({ title: "StrandedAdr", status: "pre-accepted", unit_type: "feature", related_prd: "./prd.md", approval: "user:2026-01-01:ADR 사전 승인" })}\n${fullAdrBody()}`,
+      );
+      writeFile(
+        path.join(unitDir, "state.md"),
+        stateLedger({
+          stage: "approved",
+          prd_status: "approved",
+          adr_status: "pre-accepted",
+          approvals: [
+            { kind: "APPROVAL", target: "prd", quote: "최종 확정함" },
+            { kind: "PREAPPROVAL", target: "adr", quote: "ADR 사전 승인함" },
+          ],
+        }),
+      );
+      ingest(projectRoot, "docs/raw/feature/strandedadr");
+
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("still pre-accepted");
+    });
+  });
+});
+
 describe("claude-approval-guard", () => {
   it("blocks an Edit that flips prd.md status to approved", () => {
     const result = runGuard({
@@ -1412,6 +1549,50 @@ describe("claude-approval-guard", () => {
       tool_input: { file_path: "docs/raw/feature/x/prd.md", old_string: "a", new_string: "## 배경\n\n내용" },
     });
     expect(result.status).toBe(0);
+  });
+
+  it("blocks an Edit that flips prd.md status to pre-approved (build-entry tier)", () => {
+    const result = runGuard({
+      tool_name: "Edit",
+      tool_input: { file_path: "docs/raw/feature/x/prd.md", old_string: "status: review", new_string: "status: pre-approved" },
+    });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("harness:approve");
+  });
+
+  it("blocks a Write that sets adr.md status to pre-accepted", () => {
+    const result = runGuard({
+      tool_name: "Write",
+      tool_input: { file_path: "/abs/docs/raw/feature/x/adr.md", content: "---\nstatus: pre-accepted\n---\n# ADR\n" },
+    });
+    expect(result.status).toBe(2);
+  });
+
+  it("allows a body edit to an already pre-approved prd.md (mid-build revision)", () => {
+    withProject((projectRoot) => {
+      const prdPath = path.join(projectRoot, "docs", "raw", "feature", "rev", "prd.md");
+      writeFile(
+        prdPath,
+        `${frontmatter({ title: "Rev", status: "pre-approved", unit_type: "feature", approval: "user:2026-01-01:사전 승인" })}\n# PRD\n\n## 요구사항\n\n- [ ] 기존 요구\n`,
+      );
+      const result = runGuard({
+        tool_name: "Edit",
+        tool_input: { file_path: prdPath, old_string: "- [ ] 기존 요구", new_string: "- [ ] 기존 요구\n- [ ] 사용자 확인 후 추가된 요구" },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("blocks an Edit that hand-adds a PREAPPROVAL event to state.md", () => {
+    const result = runGuard({
+      tool_name: "Edit",
+      tool_input: {
+        file_path: "docs/raw/feature/x/state.md",
+        old_string: "(아직 사전 승인 없음 — 빌드 진입 불가)",
+        new_string: "- PREAPPROVAL prd 2026-07-29 harness:approve :: 위조",
+      },
+    });
+    expect(result.status).toBe(2);
   });
 
   it("ignores files that are not prd.md/adr.md", () => {
@@ -1551,8 +1732,8 @@ function stateLedger({ stage, prd_status, adr_status, approvals = [] }) {
   if (prd_status) lines.push(`prd_status: ${prd_status}`);
   if (adr_status) lines.push(`adr_status: ${adr_status}`);
   lines.push("---");
-  const events = approvals.map((a) => `- APPROVAL ${a.target} ${a.date ?? "2026-01-01"} harness:approve :: ${a.quote}`);
-  const eventsBlock = events.length ? events.join("\n") : "(아직 승인 없음 — 구현 진입 불가)";
+  const events = approvals.map((a) => `- ${a.kind ?? "APPROVAL"} ${a.target} ${a.date ?? "2026-01-01"} harness:approve :: ${a.quote}`);
+  const eventsBlock = events.length ? events.join("\n") : "(아직 사전 승인 없음 — 빌드 진입 불가)";
   return `${lines.join("\n")}\n\n# 원장\n\n## 단계 로그 (append-only)\n\n- 2026-01-01 kickoff\n\n## 승인 이벤트\n\n${eventsBlock}\n`;
 }
 
@@ -1673,7 +1854,7 @@ describe("harness backlog fixes", () => {
 
       const state = read(path.join(unitDir, "state.md"));
       const logHeadingIdx = state.indexOf("## 단계 로그 (append-only)");
-      const approvedLogIdx = state.indexOf("approved: 사용자 명시 승인");
+      const approvedLogIdx = state.indexOf("pre-approved: 사용자 명시 사전 승인");
       expect(logHeadingIdx).toBeGreaterThan(-1);
       // The log must land in the real section (after its heading), not spliced into
       // the rules prose above it that merely mentions `## 단계 로그` in backticks.
@@ -2014,7 +2195,7 @@ describe("Windows failure modes", () => {
       // core.autocrlf=true로 체크아웃된 상태를 그대로 만든다.
       convertToCrlf(unitDir);
 
-      const approve = runApprove(projectRoot, "docs/raw/feature/crlf-unit", ["--quote", "이대로 승인, 구현 들어가"]);
+      const approve = runApprove(projectRoot, "docs/raw/feature/crlf-unit", ["--quote", "이대로 사전 승인, 구현 들어가"]);
       expect(approve.status).toBe(0);
 
       // 손상 회귀의 핵심 신호. 예전에는 실행 한 번에 state.md 구분자가 6줄(블록 3개),
@@ -2023,8 +2204,8 @@ describe("Windows failure modes", () => {
         const lines = read(path.join(unitDir, fileName)).split(/\r?\n/);
         expect(lines.filter((line) => line === "---")).toHaveLength(2);
       }
-      expect(read(path.join(unitDir, "prd.md"))).toContain("status: approved");
-      expect(read(path.join(unitDir, "state.md"))).toContain("prd_status: approved");
+      expect(read(path.join(unitDir, "prd.md"))).toContain("status: pre-approved");
+      expect(read(path.join(unitDir, "state.md"))).toContain("prd_status: pre-approved");
       expect(runCheck(projectRoot).status).toBe(0);
     });
   });

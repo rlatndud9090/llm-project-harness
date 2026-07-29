@@ -14,6 +14,32 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-29 two-tier-approval-and-make-pr
+
+**변경**
+- 승인을 **2단계**로 나눴다. ① **사전 승인(pre-approval)** — PRD `pre-approved`/ADR `pre-accepted`가
+  feature-develop 진입 게이트다(기존 1단계 승인의 자리). ② **최종 확정(final approval)** — PRD
+  `approved`/ADR `accepted`는 새 `$make-pr`에서 PR 직전에 이뤄진다.
+- `harness:approve`의 **기본 동작이 사전 승인(review→pre-approved)으로 바뀌었다.** 최종 확정은
+  `harness:approve --final`(pre-approved→approved)로 한다. state.md 승인 이벤트도 `PREAPPROVAL`/
+  `APPROVAL` 두 종류로 나뉜다.
+- 상태값 추가: PRD `pre-approved`, ADR `pre-accepted`. 스테이지 추가: `pre-approved`. `harness:check`가
+  각 티어의 이벤트 backing·state↔status 정합·2티어 stage coherence·되감기 금지를 기계강제한다.
+  런타임 승인 가드(claude-approval-guard)도 네 상태(pre-approved/approved/pre-accepted/accepted)
+  플립을 모두 막는다. 사전 승인된 문서의 **본문 편집(빌드 중 개정)은 허용**된다.
+- 새 스킬/프로토콜 `make-pr`(정본 `harness/protocols/make-pr.md`, `.codex`/`.claude` 어댑터): 최종
+  확정 → 커밋 → PR 생성. ClaudeCode 어댑터는 result에 `[pr]` prefix를 붙이고 PR URL을 출력해
+  FleetView에 링크로 노출하며 PR 생성은 GitHub MCP를 우선 사용한다(gh 가정 안 함).
+- feature-develop은 진입 게이트를 `pre-approved`로 완화하고 "빌드 중 사용자 확인 개정"을 정식화했다
+  (본문만 고치고 status 유지, state.md 단계 로그에 기록). prd-helper/adr-helper는 사전 승인을 담당한다.
+
+**소비자 조치 (필수)**
+- 진행 중이던 작업의 승인 흐름이 바뀐다: 이제 **사전 승인으로 빌드에 진입**하고 **`$make-pr`에서
+  최종 확정+PR**을 한다. 기존에 `approved`/`accepted`로 굳은 유닛은 그대로 유효하다(하위호환).
+- `$make-pr` 스킬이 새로 노출된다. PR을 만들 때 이 스킬을 사용한다.
+- 기존 `review`/`approved` PRD·ADR 아티팩트는 마이그레이션이 필요 없다(레거시 state.md의
+  "(아직 승인 없음 …)" placeholder도 approve가 그대로 인식한다).
+
 ## 2026-07-26 browser-tool-token-efficiency
 
 **변경**

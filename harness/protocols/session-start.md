@@ -9,7 +9,8 @@
 - 현재 브랜치가 가리키는 raw unit을 확인한다.
 - 필요한 PRD/ADR만 읽어 컨텍스트를 과하게 불리지 않는다.
 - 열린 요청이면 `$next-feature`로, 작업이 정해졌으면 `$kickoff`→`$prd-helper`로,
-  승인된 PRD/ADR 기반 구현 요청이면 feature-develop로 진입한다.
+  사전 승인된(pre-approved) PRD/ADR 기반 구현 요청이면 `$feature-develop`로, 구현이 끝나
+  PR을 만들 차례면 `$make-pr`로 진입한다.
 
 ## 절차
 
@@ -42,7 +43,8 @@
 | PRD 작성/보강 | `prd-helper.md` |
 | ADR 작성/보강 (필요 시) | `adr-helper.md` |
 | 하네스 submodule 장착/업데이트 | `submodule-attach.md` |
-| 승인된 PRD/ADR 기반 기능 구현 | `feature-develop.md` |
+| 사전 승인된(pre-approved) PRD/ADR 기반 기능 구현 | `feature-develop.md` |
+| 최종 확정 + 커밋 + PR 생성 | `make-pr.md` |
 | 검증/커밋 | `integration-gate.md`, `commit-protocol.md` |
 
 ## 스킬과 명령
@@ -81,9 +83,10 @@ ClaudeCode에서 같은 단계가 `/command`와 skill 두 표면으로 노출되
 - 모든 raw 파일을 무작정 읽지 않는다.
 - 브랜치명과 raw path가 다를 때 조용히 진행하지 않는다.
 - product/architecture 결정을 채팅에만 남기지 않는다.
-- `state.md`의 승인 이벤트 없이 PRD를 `approved`, ADR을 `accepted`로 전환하거나 구현을
-  시작하지 않는다. 승인 전환은 오직 `harness:approve`로만 한다.
-- 사용자의 의도·아이디어 발화("이렇게 하려고 했어" 등)를 승인으로 추론하지 않는다.
+- `state.md`의 사전 승인 이벤트(`PREAPPROVAL`) 없이 PRD를 `pre-approved`, ADR을 `pre-accepted`로
+  전환하거나 구현을 시작하지 않는다. 최종 확정(`approved`/`accepted`)은 `$make-pr`에서 최종 승인
+  이벤트(`APPROVAL`)와 함께만 한다. 두 전환 모두 오직 `harness:approve`(최종은 `--final`)로만 한다.
+- 사용자의 의도·아이디어 발화("이렇게 하려고 했어" 등)를 (사전/최종) 승인으로 추론하지 않는다.
 
 ## 출력
 

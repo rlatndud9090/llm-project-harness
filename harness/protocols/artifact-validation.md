@@ -22,22 +22,29 @@ npm run harness:check
 - `approved` PRD와 `accepted` ADR에는 `approval: "user:YYYY-MM-DD:<근거>"` 형식의 승인
   근거가 기록돼 있다. 자동 검사는 근거의 형식과 존재를 강제한다. 근거가 사용자의 실제
   동의를 반영하는지는 아래 수동 검토 항목에서 확인한다.
-- feature 단위의 `state.md`(단계 체크포인트 원장)가 정합적이다.
-  - `approved` PRD / `accepted` ADR에는 `state.md`에 대응하는 승인 이벤트(사용자 발화
-    verbatim)가 있어야 한다. 없으면 실패한다(형식만 맞는 위조를 걸러낸다).
-  - `state.md`의 승인 축(`prd_status`/`adr_status`)이 실제 PRD/ADR status와 일치한다.
-    손으로 status만 바꾸고 원장을 안 고치면 불일치로 실패한다.
-  - `stage`는 유효한 값이고, `approved`/`implementing`/`integrated` stage는 승인된 PRD를
-    전제한다. `state.md`의 `stage`는 승인 이후 승인 이전 단계로 후퇴할 수 없다(git 대비).
-- 승인 전환은 오직 `npm run harness:approve`로만 한다. 이 명령이 status·`approval:`·
-  `state.md` 승인 이벤트를 원자적으로 함께 기록한다.
-- raw unit의 status는 git 기록 대비 명백한 후퇴로 바뀌지 않는다(예: PRD `approved`→`draft`, ADR `accepted`→`proposed`). reopen(`rejected`→`draft`)이나 retire(`accepted`→`superseded`)는 허용한다.
+- feature 단위의 `state.md`(단계 체크포인트 원장)가 정합적이다. 승인은 2단계다:
+  **사전 승인**(PRD `pre-approved`/ADR `pre-accepted`, 이벤트 `PREAPPROVAL`) → **최종 확정**
+  (PRD `approved`/ADR `accepted`, 이벤트 `APPROVAL`).
+  - `pre-approved`/`approved` PRD, `pre-accepted`/`accepted` ADR에는 `state.md`에 대응하는
+    승인 이벤트(사용자 발화 verbatim; 티어에 맞는 `PREAPPROVAL`/`APPROVAL`)가 있어야 한다.
+    없으면 실패한다(형식만 맞는 위조를 걸러낸다).
+  - `state.md`의 승인 축(`prd_status`/`adr_status`)이 실제 PRD/ADR status와 두 티어 모두에서
+    일치한다. 손으로 status만 바꾸고 원장을 안 고치면 불일치로 실패한다.
+  - `stage`는 유효한 값이고, 빌드 티어 stage(`pre-approved`/`implementing`)는 최소 사전 승인된
+    PRD를, 최종 stage(`approved`/`integrated`)는 최종 승인된 PRD를 전제한다. `state.md`의 `stage`는
+    사전 승인 이후 사전 승인 이전 단계로 후퇴할 수 없다(git 대비).
+- (사전/최종) 승인 전환은 오직 `npm run harness:approve`(최종은 `--final`)로만 한다. 이 명령이
+  status·`approval:`·`state.md` 승인 이벤트를 원자적으로 함께 기록한다.
+- raw unit의 status는 git 기록 대비 명백한 후퇴로 바뀌지 않는다(예: PRD `approved`→`draft`/`pre-approved`,
+  `pre-approved`→`review`, ADR `accepted`→`proposed`/`pre-accepted`, `pre-accepted`→`proposed`).
+  reopen(`rejected`→`draft`)이나 retire(`accepted`→`superseded`)는 허용한다.
 - ADR의 `related_prd`와 `supersedes` 링크는 실제 파일을 가리킨다(값이 비어 있으면 검사하지 않는다).
 - `accepted`/`deprecated`/`superseded` ADR의 본문은 git 기록 대비 바뀌지 않는다. status/approval 같은 frontmatter 변경은 허용한다.
 - public docs에는 금지된 출처/세션/로컬 설정 정보가 없다.
 - 공용 harness role은 Codex/ClaudeCode agent adapter를 가진다.
 - 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
 - Codex/ClaudeCode는 `next-feature`, `kickoff`, `prd-helper`, `adr-helper` skill adapter를 가진다.
+- Codex/ClaudeCode는 `feature-develop`, `make-pr` skill adapter를 가진다.
 - Codex/ClaudeCode는 `submodule-attach` skill adapter를 가진다.
 
 ## 수동 검토 항목
