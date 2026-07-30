@@ -17,8 +17,9 @@ afterEach(() => {
   fs.rmSync(home, { recursive: true, force: true });
 });
 
-function writeJob(jobId, state) {
-  const dir = path.join(home, ".claude", "jobs", jobId);
+function writeJob(jobId, state, profileDir) {
+  const base = profileDir ?? path.join(home, ".claude");
+  const dir = path.join(base, "jobs", jobId);
   fs.mkdirSync(dir, { recursive: true });
   const p = path.join(dir, "state.json");
   fs.writeFileSync(p, JSON.stringify(state));
@@ -26,9 +27,14 @@ function writeJob(jobId, state) {
 }
 
 function run(env, args) {
+  // 실제 테스트 세션의 프로필 오버라이드가 새어들지 않게 지운 뒤, 각 테스트가 명시한 것만 준다.
+  // (안 지우면 set-fleet-title 이 임시 HOME 대신 실제 .claude-mine 프로필을 뒤진다.)
+  const base = { ...process.env, HOME: home, USERPROFILE: home };
+  delete base.CLAUDE_JOB_DIR;
+  delete base.CLAUDE_CONFIG_DIR;
   return execFileSync("node", [HELPER, ...args], {
     encoding: "utf8",
-    env: { ...process.env, HOME: home, USERPROFILE: home, ...env },
+    env: { ...base, ...env },
   });
 }
 
@@ -62,5 +68,31 @@ describe("set-fleet-title", () => {
     // CLAUDE_CODE_SESSION_ID 를 비워 전달 → 실패 없이 종료해야 한다.
     expect(() => run({ CLAUDE_CODE_SESSION_ID: "" }, ["--label", "x"])).not.toThrow();
     expect(readName(sp).name).toBe("keep");
+  });
+
+  it("CLAUDE_CONFIG_DIR 로 대체 프로필(.claude-mine 등)의 jobs 를 찾는다", () => {
+    // .claude 하드코딩 버그의 회귀 방지: 프로필이 .claude 가 아닐 때도 현재 job 을 찾아야 한다.
+    const profile = path.join(home, ".claude-mine");
+    const sp = writeJob("m1", { sessionId: "SID", name: "old", nameSource: "auto" }, profile);
+    run({ CLAUDE_CODE_SESSION_ID: "SID", CLAUDE_CONFIG_DIR: profile }, ["--label", "next-feature", "--abbr", "AB"]);
+    const d = readName(sp);
+    expect(d.name).toBe("<AB> next-feature");
+    expect(d.nameSource).toBe("user");
+  });
+
+  it("CLAUDE_JOB_DIR 이 있으면 그 부모 jobs 디렉터리를 우선한다", () => {
+    const profile = path.join(home, ".claude-mine");
+    const sp = writeJob("m2", { sessionId: "SID", name: "old", nameSource: "auto" }, profile);
+    run(
+      { CLAUDE_CODE_SESSION_ID: "SID", CLAUDE_JOB_DIR: path.join(profile, "jobs", "m2") },
+      ["--label", "kickoff", "--abbr", "KO"],
+    );
+    expect(readName(sp).name).toBe("<KO> kickoff");
+  });
+
+  it("오버라이드가 없으면 기본 프로필(~/.claude)로 떨어진다(하위호환)", () => {
+    const sp = writeJob("d1", { sessionId: "SID", name: "old", nameSource: "auto" });
+    run({ CLAUDE_CODE_SESSION_ID: "SID" }, ["--label", "next-feature", "--abbr", "DF"]);
+    expect(readName(sp).name).toBe("<DF> next-feature");
   });
 });

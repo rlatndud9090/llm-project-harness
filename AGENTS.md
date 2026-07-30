@@ -14,11 +14,21 @@ This repository is the **harness provider**, not a product project.
 
 - It owns shared protocols, role prompts, tool adapters, raw/wiki templates,
   validation scripts, and submodule attach automation.
-- It does not use the consumer-project LLM Wiki workflow for its own work.
-- Do not require harness-repository changes to use `feature/*`, `bugfix/*`, or
-  `chore/*` branches.
-- Do not require harness-repository changes to create `docs/raw`,
-  `docs/wiki`, PRDs, ADRs, or approval frontmatter.
+- **Editing this repository means authoring the harness, not running it.** Do
+  the work directly on `main` and push to `main`. Do not create `feature/*`,
+  `bugfix/*`, or `chore/*` branches, and do not open a pull request, for a
+  harness self-edit — unless the user explicitly asks for a branch or PR.
+- **Do not invoke the harness's own skills/protocols to drive work here**
+  (`next-feature`, `kickoff`, `prd-helper`, `adr-helper`, `feature-develop`,
+  `make-pr`, `commit-protocol`, `wiki-ingest`, `artifact-check`, …). This
+  repository *defines* those flows; only consumer projects *run* them. A skill
+  name in this repo's own prose points at a definition to edit, not a flow to
+  execute against this repo.
+- Do not use the consumer-project LLM Wiki workflow, and do not create
+  `docs/raw`, `docs/wiki`, PRDs, ADRs, `state.md`, or approval frontmatter for a
+  harness self-edit.
+- Still run provider-mode verification before claiming done: `npm run
+  harness:check`, `npm run lint`, `npm run build`, `npm run test:run`.
 
 Consumer projects own those workflow artifacts:
 

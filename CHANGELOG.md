@@ -14,6 +14,26 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-30 artifact-address-neutrality-and-profile-aware-fleet-title
+
+**변경**
+- **산출물 사람 지칭 중립화(페르소나 누수 금지)를 단일 출처로 도입.** PRD·ADR·notes·bugfix
+  문서는 사람을 중립 역할어(`사용자`/`개발자`/`검증자`/`독자`)로만 지칭하고, 운영자 개인
+  호칭·별명(예: `형님`, `~님`, 실명)은 넣지 않는다 — 런타임 개인/전역 설정이 사용자를 그렇게
+  부르라 해도 그 페르소나는 대화에만 적용된다. 규칙 정본은 `templates/examples/README.md` §5,
+  이를 `feature-prd`/`feature-adr`/`notes`/`bugfix` 템플릿 콜아웃, `prd-helper`/`adr-helper`
+  리뷰 체크리스트, `prd-writer`/`architect`/`researcher` 역할이 **얇게 참조**한다(복제 금지).
+- **`set-fleet-title.mjs`가 프로필을 인식하도록 수정.** 기존에는 job 디렉터리를 `~/.claude/jobs`
+  로 하드코딩해, `CLAUDE_CONFIG_DIR`로 대체 프로필(예: `.claude-mine`)을 쓰는 세션에서는 현재
+  job을 못 찾아 FleetView 제목이 조용히 안 바뀌었다. 이제 `CLAUDE_JOB_DIR`→`CLAUDE_CONFIG_DIR`
+  →`~/.claude` 순으로 현재 세션의 프로필 jobs 디렉터리를 판별한다(Claude/FleetView 전용, Codex
+  parity 무관).
+
+**소비자 조치**
+- 지칭 중립화는 **신규 작성분에 적용**한다. 앞으로 PRD/ADR/notes/bugfix에 개인 호칭·별명을 넣지
+  않는다. 기존 산출물 마이그레이션은 필수 아님(발견 시 중립어로 바꾸는 정도 권장).
+- fleet-title 수정은 자동·하위호환이라 별도 조치 없음.
+
 ## 2026-07-29 two-tier-approval-and-make-pr
 
 **변경**

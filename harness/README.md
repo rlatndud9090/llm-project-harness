@@ -31,6 +31,7 @@
   - feature taxonomy는 broad bucket이 아니라 프로젝트별 세부 카테고리를 점진적으로 추가하는 방식을 전제로 둔다
 - `templates/examples/` — 채워진 PRD/ADR 짝 예시와 "무엇이 어디에 사는가" 고도 가이드
   - 코드레벨 디테일이 PRD에 새는 것을 막는 단일 출처 루브릭(3층 고도·누수 self-check·부검 대조표)
+  - 산출물의 **사람 지칭 중립화**(개인 호칭·별명 누수 금지) 단일 출처 규칙도 여기 있다
   - `prd-helper`/`adr-helper`/`prd-writer`/`architect`가 이 가이드를 얇게 참조한다(복제 금지)
 
 ## 소비 프로젝트 실행 흐름
