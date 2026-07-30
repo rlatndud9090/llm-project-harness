@@ -19,8 +19,9 @@ This repository is the **harness provider**, not a product project.
   `bugfix/*`, or `chore/*` branches, and do not open a pull request, for a
   harness self-edit — unless the user explicitly asks for a branch or PR.
 - **Do not invoke the harness's own skills/protocols to drive work here**
-  (`next-feature`, `kickoff`, `prd-helper`, `adr-helper`, `feature-develop`,
-  `make-pr`, `commit-protocol`, `wiki-ingest`, `artifact-check`, …). This
+  (`next-feature`, `one-shot`, `kickoff`, `prd-helper`, `adr-helper`,
+  `feature-develop`, `make-pr`, `commit-protocol`, `wiki-ingest`,
+  `artifact-check`, …). This
   repository *defines* those flows; only consumer projects *run* them. A skill
   name in this repo's own prose points at a definition to edit, not a flow to
   execute against this repo.

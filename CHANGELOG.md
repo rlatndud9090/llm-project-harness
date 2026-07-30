@@ -14,6 +14,28 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-30 one-shot-unattended-pipeline
+
+**변경**
+- **무인 파이프라인 스킬 `one-shot`을 추가.** 확정된 작은 작업 단위를 `$kickoff`→(feature면
+  `$prd-helper`→`$adr-helper`)→`$feature-develop`→`$make-pr`→PR 리뷰 수렴까지 사용자 개입
+  없이 한 흐름으로 진행한다. 승인 게이트는 없애지 않고, **`$one-shot` 호출 자체를 사용자의
+  포괄 사전위임으로 간주해** 자동 부여한다: 각 게이트에서 `harness:approve`를 사용자 위임
+  발화 verbatim(`--quote`) + `--transport one-shot`으로 호출한다. 발화를 합성하지 않고,
+  transport 컬럼이 "개별 승인이 아닌 포괄 위임 자동 부여"임을 감사 원장에 드러낸다.
+- **`approve.mjs`의 transport 화이트리스트에 `one-shot`을 추가**(`ALLOWED_TRANSPORTS`).
+  `state.md` 승인 이벤트 transport 컬럼에 `one-shot`이 유효하게 기록된다.
+- **PR 리뷰 수렴·머지/정리는 선택적 외부 가속기로 조건부 참조.** one-shot은 그 스킬 이름을
+  하드코딩하지 않고 역할로 가리킨다(`$deep-interview` 관용구와 동일) — 설치돼 있으면 쓰고,
+  없으면 건너뛴다. 종착점은 **리뷰 clean에서 정지**이며, 머지는 되돌리기 어려운 외부 작업
+  이라 무인 범위 밖(담당 스킬이 있으면 안내만, 실행은 사용자 확인 후).
+- 어댑터 쌍(`.claude`/`.codex`)과 `artifact-check`의 `requiredSurfaces` 등록, README/
+  session-start 진입 안내를 함께 추가했다.
+
+**소비자 조치**
+- 없음. `one-shot`은 옵트인 스킬이다 — 부르지 않으면 기존 단계별 흐름이 그대로다. 무인
+  진행이 필요할 때만 확정된 작은 작업에 대해 명시적으로 호출한다.
+
 ## 2026-07-30 artifact-address-neutrality-and-profile-aware-fleet-title
 
 **변경**

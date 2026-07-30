@@ -48,6 +48,12 @@
 각 단계는 독립 진입점이다. 무엇을 할지 모르면 1부터, 작업이 이미 정해졌으면
 2부터, PRD만 쓰면 3부터 들어간다.
 
+확정된 **작은** 작업 단위를 kickoff→(prd/adr)→feature-develop→make-pr→PR 리뷰 수렴까지
+**사용자 개입 없이 한 번에** 진행하려면 `.harness/harness/protocols/one-shot.md`를 쓴다. 호출
+자체가 사용자의 포괄 사전위임이 되어 각 승인 게이트를 `harness:approve --transport one-shot`
+으로 자동 부여·기록하고(quote는 위임 발화 verbatim), 리뷰 clean에서 정지한다(머지는 수동).
+열린 아이디어는 대상이 아니다 — 먼저 1(next-feature)로 작업을 확정한다.
+
 1. `.harness/harness/protocols/next-feature.md` — 다음 작업 단위 추천/선택
 2. `.harness/harness/protocols/kickoff.md` — 브랜치 + raw 골격 생성
 3. `.harness/harness/protocols/prd-helper.md` — PRD 작성 보조(interview/research/review)
@@ -86,6 +92,7 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 
 - [세션 시작](protocols/session-start.md)
 - [Next Feature](protocols/next-feature.md)
+- [One-Shot](protocols/one-shot.md)
 - [Kickoff](protocols/kickoff.md)
 - [PRD Helper](protocols/prd-helper.md)
 - [ADR Helper](protocols/adr-helper.md)

@@ -96,8 +96,11 @@ if (date > today()) {
   fail(`--date must not be in the future (got ${date}, today is ${today()})`);
 }
 // Constrain the provenance label to a known set so the state.md transport column
-// stays trustworthy for a human auditor.
-const ALLOWED_TRANSPORTS = new Set(["harness:approve", "AskUserQuestion", "deep-interview"]);
+// stays trustworthy for a human auditor. `one-shot` marks an approval AUTO-GRANTED
+// from a user's blanket delegation ($one-shot) rather than a per-gate answer — the
+// --quote still carries the user's real delegation words verbatim (never synthesized),
+// and this label tells the auditor it was blanket, not individually approved.
+const ALLOWED_TRANSPORTS = new Set(["harness:approve", "AskUserQuestion", "deep-interview", "one-shot"]);
 const transport = typeof args.transport === "string" ? args.transport : "harness:approve";
 if (!ALLOWED_TRANSPORTS.has(transport)) {
   fail(`--transport must be one of: ${[...ALLOWED_TRANSPORTS].join(", ")}`);

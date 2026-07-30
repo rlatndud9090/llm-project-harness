@@ -39,6 +39,7 @@
 | --- | --- |
 | "이제 뭐하지?", "다음 뭐 할까?" | `next-feature.md` |
 | "이 아이디어를 작업 단위로 쪼개줘" | `next-feature.md` |
+| 확정된 작은 작업을 PR 리뷰 수렴까지 무인으로 진행 | `one-shot.md` |
 | 작업 단위 초기세팅(raw 생성 + 브랜치 정리) | `kickoff.md` |
 | PRD 작성/보강 | `prd-helper.md` |
 | ADR 작성/보강 (필요 시) | `adr-helper.md` |

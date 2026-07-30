@@ -1127,6 +1127,11 @@ function assertHarnessAdapters() {
       claude: [rootAdapterPath(".claude", "skills", "next-feature", "SKILL.md")],
     },
     {
+      name: "one shot",
+      codex: [rootAdapterPath(".codex", "skills", "one-shot", "SKILL.md")],
+      claude: [rootAdapterPath(".claude", "skills", "one-shot", "SKILL.md")],
+    },
+    {
       name: "artifact validation",
       codex: [rootAdapterPath(".codex", "skills", "artifact-validation", "SKILL.md")],
       claude: [
