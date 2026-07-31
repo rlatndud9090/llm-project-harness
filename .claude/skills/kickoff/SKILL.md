@@ -51,20 +51,21 @@ kickoff 로그 줄). 이슈 번호를 스크립트에 직접 넘기면 실패하
 ## Claude Code — agents 화면 세션 제목 (필수)
 
 `npm run harness:kickoff`으로 브랜치·raw 골격을 만든 직후 **즉시** 현재 세션의 agents
-화면(FleetView) 제목을 `<프로젝트 약어> <작업명>` 형식으로 바꾼다(대화형·background 세션
-모두 항상). next-feature 단계에서 붙였던 `<약어> next-feature` 제목의 `next-feature`
-부분을, 확정된 작업 단위 이름으로 교체하는 것이다(약어 prefix는 그대로 유지).
+화면(FleetView) 제목을 확정된 `<작업명>`으로 바꾼다(대화형·background 세션 모두 항상).
+next-feature 단계에서 붙였던 `next-feature` 제목을 확정된 작업 단위 이름으로 교체하는
+것이다. 제목엔 프로젝트 약어 prefix를 붙이지 않는다(작업내역 요약만 남긴다 — agents 화면을
+디렉터리별로 정렬하면 프로젝트가 드러난다).
 
 - **작업명 = 브랜치 slug의 하이픈을 공백으로 바꾼 표현**(`feature/do-next-thing` →
   `do next thing`). 아래 호출에 slug을 넣으면 공용 헬퍼가 변환한다.
 - slug은 kickoff 명령의 `--slug` 값 또는 현재 브랜치 `{type}/{slug}`의 `{slug}` 부분이다
   (kickoff 출력의 `- unit: {type}/{slug}` 줄에서도 확인할 수 있다).
-- 제목 세팅·약어 자동 계산·가드는 공용 헬퍼가 담당한다. agents 세션이 아니면 조용히
-  no-op이고 절대 실패하지 않으므로 세션 종류를 신경 쓰지 말고 항상 호출한다.
+- 제목 세팅·가드는 공용 헬퍼가 담당한다. agents 세션이 아니면 조용히 no-op이고 절대
+  실패하지 않으므로 세션 종류를 신경 쓰지 말고 항상 호출한다.
 
 ```bash
 # 아래 "do-next-thing"을 실제 작업 단위 slug로 바꿔 실행한다(브랜치 {type}/{slug}의 {slug}).
-# 헬퍼가 하이픈→공백 변환·약어 계산을 한다. 약어가 어색하면 --abbr <2~4글자>를 덧붙인다.
+# 헬퍼가 하이픈→공백 변환을 한다.
 [ -f .harness/scripts/harness/set-fleet-title.mjs ] \
   && node .harness/scripts/harness/set-fleet-title.mjs --slug "do-next-thing" 2>/dev/null || true
 ```

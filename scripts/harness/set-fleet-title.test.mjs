@@ -43,18 +43,26 @@ function readName(statePath) {
 }
 
 describe("set-fleet-title", () => {
-  it("--slug 은 하이픈을 공백으로 바꾸고 --abbr 로 약어를 지정한다", () => {
+  it("--slug 은 하이픈을 공백으로 바꿔 작업명으로 쓴다", () => {
     const sp = writeJob("j1", { sessionId: "SID", name: "old", nameSource: "auto" });
-    run({ CLAUDE_CODE_SESSION_ID: "SID" }, ["--slug", "do-next-thing", "--abbr", "PBQ"]);
+    run({ CLAUDE_CODE_SESSION_ID: "SID" }, ["--slug", "do-next-thing"]);
     const d = readName(sp);
-    expect(d.name).toBe("<PBQ> do next thing");
+    expect(d.name).toBe("do next thing");
     expect(d.nameSource).toBe("user");
   });
 
   it("--label 은 그대로 쓰고 resumeSessionId 로도 매칭한다", () => {
     const sp = writeJob("j2", { resumeSessionId: "R1", name: "o", nameSource: "auto" });
-    run({ CLAUDE_CODE_SESSION_ID: "R1" }, ["--label", "next-feature", "--abbr", "AB"]);
-    expect(readName(sp).name).toBe("<AB> next-feature");
+    run({ CLAUDE_CODE_SESSION_ID: "R1" }, ["--label", "next-feature"]);
+    expect(readName(sp).name).toBe("next-feature");
+  });
+
+  it("제목엔 프로젝트 약어 prefix를 붙이지 않는다(작업내역 요약만)", () => {
+    const sp = writeJob("jp", { sessionId: "SID", name: "old", nameSource: "auto" });
+    run({ CLAUDE_CODE_SESSION_ID: "SID" }, ["--label", "make-pr"]);
+    const d = readName(sp);
+    expect(d.name).toBe("make-pr");
+    expect(d.name.startsWith("<")).toBe(false);
   });
 
   it("매칭되는 job 이 없으면 아무 파일도 바꾸지 않는다", () => {
@@ -74,9 +82,9 @@ describe("set-fleet-title", () => {
     // .claude 하드코딩 버그의 회귀 방지: 프로필이 .claude 가 아닐 때도 현재 job 을 찾아야 한다.
     const profile = path.join(home, ".claude-mine");
     const sp = writeJob("m1", { sessionId: "SID", name: "old", nameSource: "auto" }, profile);
-    run({ CLAUDE_CODE_SESSION_ID: "SID", CLAUDE_CONFIG_DIR: profile }, ["--label", "next-feature", "--abbr", "AB"]);
+    run({ CLAUDE_CODE_SESSION_ID: "SID", CLAUDE_CONFIG_DIR: profile }, ["--label", "next-feature"]);
     const d = readName(sp);
-    expect(d.name).toBe("<AB> next-feature");
+    expect(d.name).toBe("next-feature");
     expect(d.nameSource).toBe("user");
   });
 
@@ -85,14 +93,14 @@ describe("set-fleet-title", () => {
     const sp = writeJob("m2", { sessionId: "SID", name: "old", nameSource: "auto" }, profile);
     run(
       { CLAUDE_CODE_SESSION_ID: "SID", CLAUDE_JOB_DIR: path.join(profile, "jobs", "m2") },
-      ["--label", "kickoff", "--abbr", "KO"],
+      ["--label", "kickoff"],
     );
-    expect(readName(sp).name).toBe("<KO> kickoff");
+    expect(readName(sp).name).toBe("kickoff");
   });
 
   it("오버라이드가 없으면 기본 프로필(~/.claude)로 떨어진다(하위호환)", () => {
     const sp = writeJob("d1", { sessionId: "SID", name: "old", nameSource: "auto" });
-    run({ CLAUDE_CODE_SESSION_ID: "SID" }, ["--label", "next-feature", "--abbr", "DF"]);
-    expect(readName(sp).name).toBe("<DF> next-feature");
+    run({ CLAUDE_CODE_SESSION_ID: "SID" }, ["--label", "next-feature"]);
+    expect(readName(sp).name).toBe("next-feature");
   });
 });

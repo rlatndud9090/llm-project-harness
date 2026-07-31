@@ -29,10 +29,12 @@ import {
 //   npm run harness:approve -- --unit docs/raw/feature/<slug> \
 //     --quote "이대로 구현 들어가자" [--adr]
 //
-//   FINAL approval (--final) — stamped at $make-pr, just before commit + PR:
+//   FINAL approval (--final) — stamped at $make-pr, just before commit + PR.
+//     Invoking $make-pr IS the user's explicit final approval, so record it with
+//     --transport make-pr and the user's make-pr-invoking words as the quote:
 //     pre-approved -> approved  (and pre-accepted -> accepted with --adr)
 //   npm run harness:approve -- --unit docs/raw/feature/<slug> \
-//     --quote "좋아, 이대로 PR 올려" --final [--adr]
+//     --quote "이제 make-pr로 PR 올려줘" --transport make-pr --final [--adr]
 //
 // --quote MUST be the user's actual approval words (verbatim) for THIS transition.
 // Never synthesize it, never derive it from an intent/scope statement. If the user
@@ -96,14 +98,24 @@ if (date > today()) {
   fail(`--date must not be in the future (got ${date}, today is ${today()})`);
 }
 // Constrain the provenance label to a known set so the state.md transport column
-// stays trustworthy for a human auditor. `one-shot` marks an approval AUTO-GRANTED
-// from a user's blanket delegation ($one-shot) rather than a per-gate answer — the
-// --quote still carries the user's real delegation words verbatim (never synthesized),
-// and this label tells the auditor it was blanket, not individually approved.
-const ALLOWED_TRANSPORTS = new Set(["harness:approve", "AskUserQuestion", "deep-interview", "one-shot"]);
+// stays trustworthy for a human auditor. Two labels mark approvals granted from an
+// explicit user command rather than a per-gate AskUserQuestion answer:
+//   - `one-shot`: AUTO-GRANTED from a user's blanket delegation ($one-shot) covering
+//     the whole pipeline (both pre-approval and final).
+//   - `make-pr`: the FINAL approval, authorized by the user explicitly invoking
+//     $make-pr — the invocation itself IS the final-confirm intent, so $make-pr does
+//     not re-ask. It only ever pairs with --final.
+// In both cases --quote still carries the user's real words verbatim (never
+// synthesized); the label tells the auditor HOW the approval was obtained.
+const ALLOWED_TRANSPORTS = new Set(["harness:approve", "AskUserQuestion", "deep-interview", "one-shot", "make-pr"]);
 const transport = typeof args.transport === "string" ? args.transport : "harness:approve";
 if (!ALLOWED_TRANSPORTS.has(transport)) {
   fail(`--transport must be one of: ${[...ALLOWED_TRANSPORTS].join(", ")}`);
+}
+// `make-pr` is the final-approval-only label: reject it on the pre-approval tier so
+// the transport column can never mislabel a pre-approval as a $make-pr final stamp.
+if (transport === "make-pr" && !isFinal) {
+  fail("--transport make-pr is only for the final approval; pass --final (pre-approval uses no --transport, or --transport one-shot)");
 }
 
 const prdPath = path.join(unitDir, "prd.md");

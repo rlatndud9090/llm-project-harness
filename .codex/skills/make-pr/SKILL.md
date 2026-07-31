@@ -18,12 +18,14 @@ description: "사전 승인·구현이 끝난 작업 단위를 최종 확정(app
 
 1. **상태 확인**: 브랜치·raw unit·`state.md`(stage/승인 이벤트)를 확인한다. feature 단위면 PRD가
    `pre-approved`, (ADR 있으면) `pre-accepted`여야 한다.
-2. **최종 확정(approved/accepted)**: 사전 승인 이후 개정을 포함한 최종 PRD/ADR 요지를 제시하고,
-   현재 런타임의 구조화 질문 도구로 대상 문서·전환 상태를 명시해 최종 확정을 요청한다. 사용자가
-   분명히 확정하면 그 발화를 그대로 인용해 오직 아래 명령으로만 전환한다.
+2. **최종 확정(approved/accepted)**: **`$make-pr` 호출 자체가 사용자의 명시적 최종 승인이다** —
+   이미 make-pr를 부른 사용자에게 승인을 다시 묻지 않는다. 사전 승인 이후 개정이 있으면 최종
+   PRD/ADR 요지와 바뀐 점을 **통보**하고(되묻는 게이트가 아니라 투명성 통보), make-pr를 호출한
+   사용자 발화를 그대로 인용해 오직 아래 명령으로만 전환한다. 단, 개정이 사전 승인된 요구·결정을
+   **뒤집는** 수준이면 확정 전 정지해 확인받는다.
 
    ```sh
-   npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의 최종 확정 발화 verbatim>" --final [--adr]
+   npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의 make-pr 호출 발화 verbatim>" --transport make-pr --final [--adr]
    ```
 
    에이전트가 직접 frontmatter status를 고치지 않는다(런타임 훅과 `harness:check`가 막는다).

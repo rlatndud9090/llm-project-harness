@@ -2,9 +2,13 @@
 // FleetView(agents 화면) 세션 제목 설정 공용 헬퍼.
 //
 // next-feature/kickoff 스킬 어댑터에 near-verbatim으로 복제돼 있던 ~50줄 bash+python
-// 스크립트를 한 곳으로 추출한 것이다. 현재 Claude Code job의 제목을 "<ABBR> <label>"로
-// 바꾼다. agents/FleetView 세션이 아니면(=job state.json 없음) 조용히 no-op 하고, 어떤
-// 오류가 나도 절대 non-zero로 죽지 않는다(호출측 어댑터 흐름을 막지 않기 위해).
+// 스크립트를 한 곳으로 추출한 것이다. 현재 Claude Code job의 제목을 작업내역 요약(label)
+// 그대로 세팅한다. agents/FleetView 세션이 아니면(=job state.json 없음) 조용히 no-op 하고,
+// 어떤 오류가 나도 절대 non-zero로 죽지 않는다(호출측 어댑터 흐름을 막지 않기 위해).
+//
+// 제목엔 프로젝트 약어 prefix를 붙이지 않는다(작업 단계 요약만 남긴다). 이유: (1) 워크트리
+// 세션에선 git 루트가 워크트리 폴더라 약어가 브랜치명에서 엉뚱하게 계산됐고, (2) agents
+// 화면을 디렉터리별로 정렬하면 어차피 프로젝트가 드러나 prefix가 중복이다.
 //
 // job 은 **현재 세션이 쓰는 Claude Code 프로필** 디렉터리 아래에 있다(.claude 로 고정이
 // 아니다 — 사용자가 .claude-mine 같은 대체 프로필을 쓸 수 있다). 어느 프로필인지는
@@ -13,17 +17,14 @@
 // 사용:
 //   node .harness/scripts/harness/set-fleet-title.mjs --label "next-feature"
 //   node .harness/scripts/harness/set-fleet-title.mjs --slug  "do-next-thing"   # → "do next thing"
-//   node .harness/scripts/harness/set-fleet-title.mjs --slug  "x" --abbr "PBQ"  # 약어 수동 지정
 //
-// --label 은 그대로, --slug 은 하이픈을 공백으로 바꿔 작업명으로 쓴다. --abbr 를 주면
-// 자동 계산 약어를 덮어쓴다(약어가 어색할 때 사람이 읽기 좋은 2~4글자로).
+// --label 은 그대로, --slug 은 하이픈을 공백으로 바꿔 작업명으로 쓴다.
 //
 // Claude/FleetView 전용 편의 기능이므로 Codex 어댑터에는 대응 블록이 없다(parity 무관).
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 
 // 이 세션이 실제로 쓰는 Claude Code 프로필의 jobs 디렉터리를 찾는다. 프로필은 .claude 로
 // 고정돼 있지 않다 — 사용자가 CLAUDE_CONFIG_DIR 로 대체 프로필(.claude-mine 등)을 쓰면 job
@@ -46,7 +47,7 @@ function main() {
   const flags = {};
   for (let i = 0; i < argv.length; i += 1) {
     const key = argv[i];
-    if (key === "--label" || key === "--slug" || key === "--abbr") {
+    if (key === "--label" || key === "--slug") {
       flags[key.slice(2)] = argv[i + 1] ?? "";
       i += 1;
     }
@@ -70,26 +71,8 @@ function main() {
     return;
   }
 
-  // 약어: --abbr 우선, 없으면 git 루트 폴더명에서 자동 계산.
-  let abbr = flags.abbr;
-  if (!abbr) {
-    let proj;
-    try {
-      proj = path.basename(
-        execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim(),
-      );
-    } catch {
-      proj = path.basename(process.cwd());
-    }
-    abbr = proj
-      .split(/[-_ ]+/)
-      .filter(Boolean)
-      .map((token) => token[0].toUpperCase())
-      .join("");
-    if (abbr.length < 2) abbr = proj.slice(0, 3).toUpperCase();
-  }
-
-  const title = `<${abbr}> ${label}`;
+  // 제목은 작업내역 요약(label) 그대로. 프로젝트 약어 prefix는 붙이지 않는다(파일 상단 주석 참고).
+  const title = label;
 
   // 현재 세션에 해당하는 job의 state.json 을 찾아 name/nameSource 를 세팅한다.
   // nameSource="user" 여야 Claude Code 자동 영문 이름이 덮어쓰지 않는다.

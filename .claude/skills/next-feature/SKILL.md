@@ -36,9 +36,10 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
 
 ## Claude Code — agents 화면 세션 제목 (필수)
 
-이 스킬을 실행하면 **즉시** 현재 세션의 agents 화면(FleetView) 제목을
-`<프로젝트 약어> next-feature` 형식으로 바꾼다(대화형·background 세션 모두 항상). 어떤
-프로젝트의 어떤 세션이 "다음 작업 단위 탐색" 중인지 목록에서 한눈에 보이게 하기 위함이다.
+이 스킬을 실행하면 **즉시** 현재 세션의 agents 화면(FleetView) 제목을 작업내역 요약
+`next-feature`로 바꾼다(대화형·background 세션 모두 항상). 어떤 세션이 "다음 작업 단위 탐색"
+중인지 목록에서 한눈에 보이게 하기 위함이다. 제목엔 프로젝트 약어 prefix를 붙이지 않는다
+(agents 화면을 디렉터리별로 정렬하면 프로젝트가 드러나므로 작업 단계 요약만 남긴다).
 
 제목 세팅은 공용 헬퍼가 담당한다. agents 세션이 아니면 조용히 no-op이고 절대 실패하지
 않으므로 세션 종류를 신경 쓰지 말고 항상 호출한다.
@@ -49,10 +50,8 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
   && node .harness/scripts/harness/set-fleet-title.mjs --label "next-feature" 2>/dev/null || true
 ```
 
-- 헬퍼가 git 루트 폴더명에서 약어를 자동 계산한다(`poke-battle-quiz` → `<PBQ>`). 어색하면
-  `--abbr <2~4글자>`를 덧붙여 덮어쓴다.
-- 작업 단위를 확정해 `$kickoff`로 넘어가면 kickoff이 제목의 `next-feature` 부분을 확정된
-  작업명으로 교체한다(약어 prefix는 유지).
+- 작업 단위를 확정해 `$kickoff`로 넘어가면 kickoff이 제목의 `next-feature`를 확정된
+  작업명으로 교체한다.
 
 ## Claude Code — Background 세션 result 형식 (필수)
 

@@ -1200,6 +1200,21 @@ describe("state ledger approval gate", () => {
     });
   });
 
+  it("harness:approve refuses --transport make-pr without --final (final-only label)", () => {
+    withProject((projectRoot) => {
+      attach(projectRoot);
+      const unitDir = path.join(projectRoot, "docs", "raw", "feature", "mptransport");
+      runKickoff(projectRoot, "feature", "mptransport", "make-pr transport 가드");
+      writeFile(
+        path.join(unitDir, "prd.md"),
+        `${frontmatter({ title: "MpTransport", status: "review", unit_type: "feature" })}\n${fullPrdBody()}`,
+      );
+      const approve = runApprove(projectRoot, "docs/raw/feature/mptransport", ["--quote", "그래 사전 승인할게", "--transport", "make-pr"]);
+      expect(approve.status).not.toBe(0);
+      expect(`${approve.stdout}${approve.stderr}`).toContain("make-pr");
+    });
+  });
+
   it("harness:approve refuses without a --quote", () => {
     withProject((projectRoot) => {
       attach(projectRoot);

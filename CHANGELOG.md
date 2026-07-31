@@ -14,6 +14,29 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-07-31 fleet-title-no-prefix-and-make-pr-final-approval
+
+**변경**
+- **FleetView(agents 화면) 세션 제목에서 `<프로젝트 약어>` prefix를 제거.** 이제 제목은 작업내역
+  요약(label)만 남긴다. `set-fleet-title.mjs`가 git 루트 폴더명에서 약어를 계산해 `<ABBR> label`로
+  찍던 것을 `label` 그대로 세팅하도록 바꿨다(`--abbr` 플래그·약어 계산 로직 삭제). 이유: (1)
+  워크트리 세션에선 git 루트가 워크트리 폴더라 약어가 브랜치명에서 엉뚱하게 나왔고, (2) agents
+  화면을 디렉터리별로 정렬하면 프로젝트가 드러나 prefix가 중복이었다. next-feature/kickoff/
+  make-pr/one-shot 스킬의 제목 안내 문구도 함께 갱신.
+- **`$make-pr` 호출 자체를 명시적 최종 승인으로 규정.** 그동안 make-pr가 최종 확정 전 승인을
+  다시 되묻던 마찰을 없앴다. 이제 사용자가 `$make-pr`를 부른 행위가 "최종 PRD/ADR을 이대로
+  확정하고 PR을 올려라"는 최종 승인 의사표시이며, make-pr는 최종본을 통보한 뒤 그 호출 발화를
+  verbatim `--quote`로, `--transport make-pr`로 확정한다(one-shot 정직성 장치와 동일 — 감사
+  원장 transport 컬럼에 "개별 되물음이 아닌 명시 호출로 부여"임을 남긴다). 단, 빌드 중 개정이
+  사전 승인된 요구·결정을 **뒤집는** 수준이면 확정 전 정지해 확인받는다.
+- **`approve.mjs`의 transport 화이트리스트에 `make-pr`를 추가**(`ALLOWED_TRANSPORTS`, `--final`
+  전용). make-pr 프로토콜 정본과 `.claude`/`.codex` 어댑터 쌍을 함께 갱신했다.
+
+**소비자 조치**
+- 없음. 제목 prefix 제거는 표시 편의 변경이고, make-pr 최종 승인 규정은 기존 2단계 승인 흐름을
+  그대로 두되 최종 확정의 방아쇠를 "`$make-pr` 호출"로 명시한 것이다. 승인 게이트(state.md 원장·
+  `harness:approve`·frontmatter status 직접수정 금지)는 그대로다.
+
 ## 2026-07-30 one-shot-unattended-pipeline
 
 **변경**
