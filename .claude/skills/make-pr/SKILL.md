@@ -34,8 +34,8 @@ description: "사전 승인·구현이 끝난 작업 단위를 최종 확정(app
    통과해야 한다. 실패하면 커밋하지 않고 원인을 고쳐 처음부터 다시 실행한다.
 4. **커밋**: `commit-protocol`로 확정 커밋을 만든다(`관련 문서:` 블록·명시적 stage·HEREDOC).
    이 커밋이 `approved`/`accepted`로 올라간 PRD/ADR과 구현을 함께 담는다.
-5. **푸시·PR**: 작업 브랜치를 원격에 push하고 PR을 생성한다. PR 생성은 런타임의 GitHub 통합으로
-   프로그래밍적으로 하며 `gh` CLI 가용성을 가정하지 않는다. PR 본문에 raw unit(PRD/ADR)을 링크하고,
+5. **푸시·PR**: 작업 브랜치를 원격에 push하고 PR을 생성한다. PR 생성은 `gh` CLI를 우선 쓰고(미가용
+   시 런타임의 GitHub 통합으로 폴백). PR 본문에 raw unit(PRD/ADR)을 링크하고,
    저장소에 PR 템플릿이 있으면 그 구조를 따른다. 원격이 없으면 PR 단계는 건너뛰고 그 사실을 보고한다.
 6. **보고**: 생성된 PR URL을 보고한다.
 
@@ -57,10 +57,10 @@ description: "사전 승인·구현이 끝난 작업 단위를 최종 확정(app
 
 ## Claude Code — PR 생성과 링크 노출 (필수)
 
-- **PR 생성은 GitHub MCP 도구를 우선 사용한다** — `mcp__github__create_pull_request`(및 필요 시
-  `create_branch`/`update_pull_request`). `gh` CLI 가용성을 가정하지 않는다. base는 기본 브랜치,
-  head는 현재 작업 브랜치이며, 본문에 raw unit(PRD/ADR) 경로를 링크한다. 저장소에 PR 템플릿이
-  있으면 그 구조를 따른다.
+- **PR 생성은 `gh` CLI를 우선 사용한다** — `gh pr create --base <기본 브랜치> --head <현재 작업 브랜치>
+  --title "<제목>" --body "<본문>"`(토큰 효율·이 저장소는 gh 허용). **`gh` 미설치·미인증이면 GitHub
+  MCP로 폴백**한다 — `mcp__github__create_pull_request`(및 필요 시 `create_branch`/`update_pull_request`).
+  본문에 raw unit(PRD/ADR) 경로를 링크하고, 저장소에 PR 템플릿이 있으면 그 구조를 따른다.
 - **PR 링크를 FleetView에 노출**하려면 생성된 **PR URL을 그대로 출력**한다. FleetView는 세션
   출력에서 링크를 스캔해 표면화하므로, 아래 result 라인에 PR URL을 포함시키면 agents 화면에서 PR로
   바로 갈 수 있다.

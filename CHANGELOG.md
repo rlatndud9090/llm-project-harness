@@ -14,6 +14,26 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-08-01 github-adapters-gh-first
+
+**변경**
+- **make-pr·kickoff 어댑터(`.claude`/`.codex`)의 GitHub 접근 정책을 "GitHub MCP 우선 / `gh`
+  가용성 가정 안 함" → "`gh` CLI 우선, 미설치·미인증 시 GitHub MCP 폴백"으로 바꿨다.** 이유:
+  MCP 응답은 필드 투영이 안 돼 조회 시 토큰을 많이 먹고, `gh`는 `--json`/`--jq` 서버사이드
+  투영으로 훨씬 가볍다(같은 일을 더 적은 토큰으로).
+  - kickoff 이슈 조회: `gh issue view <N> --repo <O>/<R> --json title,body,labels` 우선, 폴백 MCP.
+  - make-pr PR 생성: `gh pr create --base … --head … --title … --body …` 우선, 폴백
+    `mcp__github__create_pull_request`.
+- **정본(`harness/protocols/{make-pr,kickoff}.md`)은 최소 변경.** 원래 "수단은 도구별 어댑터가
+  정의한다"는 런타임-불가지론적 문구였으므로, "gh 우선·미가용 시 GitHub 통합 폴백"으로 수단
+  선호만 명확히 하고 절차·게이트는 그대로 뒀다.
+- **이식성 유지:** 어댑터엔 개인 환경 전용 장치(`env -u GITHUB_TOKEN`·특정 계정 가드)를 넣지
+  않는다 — `gh` 인증·토큰 처리는 소비 환경 소관이다.
+
+**소비자 조치**: 없음(`gh`가 없어도 MCP 폴백으로 그대로 동작). `gh`를 설치·인증해 두면 이슈
+조회·PR 생성이 토큰-효율적으로 돈다. GitHub Enterprise 등 비-github.com 호스트 소비자는 그
+호스트로 `gh`가 인증돼 있어야 gh 경로가 쓰이며, 아니면 MCP 폴백으로 동작한다.
+
 ## 2026-07-31 fleet-title-no-prefix-and-make-pr-final-approval
 
 **변경**

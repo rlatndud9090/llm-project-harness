@@ -64,7 +64,8 @@ kickoff" 라는 뜻이다. 예: `/kickoff 42`, `/kickoff #42`, `/kickoff https:/
 생성과 provenance 기록만 한다(구조는 기계가, 의미는 모델이). 에이전트는 이렇게 진행한다:
 
 1. **저장소 파악** — `git remote get-url origin`에서 `owner/repo`를 얻는다.
-2. **이슈 조회** — 런타임의 GitHub 통합(GitHub MCP 도구: `issue_read`/`get_issue` 등)으로
+2. **이슈 조회** — `gh` CLI(`gh issue view <N> --repo <O>/<R> --json title,body,labels`)를
+   우선 쓰고, 미가용이면 런타임의 GitHub 통합(GitHub MCP 도구: `issue_read`/`get_issue` 등)으로
    제목·본문·라벨을 읽는다. `gh` CLI로 셸아웃하지 않는다(소비 프로젝트가 명시 허용한
    경우에만 예외).
 3. **유형 판정(feature/bugfix/chore)** — "브랜치 이름"이 아니라 "결정의 성질"로 정한다

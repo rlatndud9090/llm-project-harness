@@ -19,8 +19,9 @@ npm run harness:kickoff -- $ARGUMENTS
 `$ARGUMENTS`가 이슈 번호/URL 하나면 스크립트에 그대로 넘기지 말고 먼저 이슈를 조회·분류한다:
 
 1. `git remote get-url origin`으로 `owner/repo`를 얻는다.
-2. GitHub MCP 도구(`mcp__github*__issue_read`/`get_issue`/`search_issues` 등)로 이슈
-   제목·본문·라벨을 읽는다. **`gh` CLI를 쓰지 않는다.**
+2. `gh` CLI(`gh issue view <번호> --repo <owner>/<repo> --json title,body,labels`)로 이슈
+   제목·본문·라벨을 읽는다. **`gh` 미설치·미인증이면 GitHub MCP 도구(`mcp__github*__issue_read`/
+   `get_issue`/`search_issues` 등)로 폴백**한다.
 3. 유형을 판정한다(feature/bugfix/chore). 라벨 힌트: `bug`→bugfix,
    `enhancement`/`feature`→feature, `chore`/`dependencies`/`documentation`→chore. 모호하면
    본문으로 판단하고, 제품 판단이 필요하면 feature로 승격한다.

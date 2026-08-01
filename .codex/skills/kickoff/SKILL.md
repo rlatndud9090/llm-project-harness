@@ -29,8 +29,8 @@ raw 골격이 생기면 `$prd-helper`로 PRD 작성을 잇는다.
 하라는 뜻이다. 스크립트에 번호를 바로 넘기지 말고 먼저 이슈를 읽어 유형을 판정한다:
 
 1. `git remote get-url origin`으로 `owner/repo`를 얻는다.
-2. 런타임의 GitHub 통합(GitHub MCP 도구)으로 제목·본문·라벨을 읽는다. `gh` CLI로
-   셸아웃하지 않는다(프로젝트가 명시 허용한 경우만 예외).
+2. `gh` CLI(`gh issue view`)로 제목·본문·라벨을 읽는 것을 우선하고, 미설치·미인증이면
+   런타임의 GitHub 통합(GitHub MCP 도구)으로 폴백한다.
 3. 유형 판정(feature/bugfix/chore) — "결정의 성질"로. 라벨 힌트: `bug`→bugfix,
    `enhancement`/`feature`→feature, `chore`/`dependencies`/`documentation`→chore. 제품
    판단이 필요하면 feature로 승격한다.
