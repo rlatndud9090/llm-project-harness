@@ -14,6 +14,19 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-08-01 kickoff-protocol-gh-first-leftover-cleanup
+
+**변경**
+- **`harness/protocols/kickoff.md` 이슈 조회 절차의 잔재 문장 제거.** 직전 `github-adapters-gh-first`
+  에서 이 항목을 "`gh` CLI 우선·미가용 시 GitHub 통합 폴백"으로 바꿨는데, 바로 뒤의 옛 문장
+  "`gh` CLI로 셸아웃하지 않는다(소비 프로젝트가 명시 허용한 경우에만 예외)"를 지우지 않아, 같은
+  항목 안에서 "gh 우선"과 "gh 셸아웃 금지"가 충돌했다. 그 잔재 문장을 삭제해 `make-pr` 정본과
+  동일하게 gh-우선→폴백 한 방향으로 정합화했다. 어댑터(`.claude`/`.codex`/commands)엔 잔재가
+  없어 손대지 않았다.
+
+**소비자 조치**: 없음(정본 문구 정합화만, 동작·게이트 불변). 서브모듈을 올린 소비자는 실제 반영할
+게 없고 `npm run harness:sync --ack`로 head만 맞추면 된다.
+
 ## 2026-08-01 github-adapters-gh-first
 
 **변경**
