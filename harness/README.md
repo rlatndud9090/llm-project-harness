@@ -34,6 +34,13 @@
   - 산출물의 **사람 지칭 중립화**(개인 호칭·별명 누수 금지) 단일 출처 규칙도 여기 있다
   - `prd-helper`/`adr-helper`/`prd-writer`/`architect`가 이 가이드를 얇게 참조한다(복제 금지)
 
+## 가이드
+
+- `guides/implementation-guidelines.md` — 소비 프로젝트들의 자동 코드리뷰 지적 264건을
+  전수 클러스터링한 **구현 시점 예방 규칙**의 단일 출처. `feature-develop`의 architect가
+  표면 인덱스로 해당 섹션만 골라 구현 브리핑에 발췌하고, `domain-engineer`/`ui-engineer`/
+  `test-engineer`가 얇게 참조한다(전체 로드 금지·복제 금지).
+
 ## 소비 프로젝트 실행 흐름
 
 ### 1. 세션 시작
@@ -72,6 +79,8 @@ verbatim을 원장에 기록), 에이전트가 직접 frontmatter status를 `app
 1. `.harness/harness/protocols/feature-develop.md`
 2. 관련 raw PRD/ADR/notes
 3. 필요한 role 문서
+4. 작업 표면에 해당하는 `.harness/harness/guides/implementation-guidelines.md` 섹션
+   (§0 코어 원칙 + 표면 인덱스로 선택 — 전체 로드 금지)
 
 구조, 데이터, engine, dependency, 다중 모듈 변경은 설계를 먼저 확정한 뒤 구현한다
 (`architect` role로 계획을 수립하고, `$ralplan`이 설치돼 있으면 계획 게이트로 쓴다).

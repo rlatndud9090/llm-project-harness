@@ -15,6 +15,8 @@ description: "PRD/ADR 기반 기능 구현, 재작업, 부분 수정을 진행�
 3. 디스패치할 role 문서: `.harness/harness/roles/`.
 4. `AGENTS.md`·`docs/wiki/index.md`는 이 컨텍스트에 아직 로드돼 있지 않을 때만
    (`session-start`에서 이미 읽었으면 재판독하지 않는다).
+5. 작업 표면에 해당하는 `.harness/harness/guides/implementation-guidelines.md` 섹션 —
+   §0 코어 원칙 + 표면 인덱스로 선택해 구현 브리핑에 발췌한다(전체 로드 금지).
 
 ## 사전 승인 게이트 (구현 전 하드 차단)
 

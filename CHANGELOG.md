@@ -14,6 +14,33 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-08-04 implementation-guidelines-guide
+
+**변경**
+- **구현 지침 단일 출처 신설: `harness/guides/implementation-guidelines.md`.** 두 소비
+  프로젝트의 PR 76건을 조사해 그중 56건에 달린 자동 코드리뷰 인라인 지적 264건(P1 41건)
+  을 전수 클러스터링(커버리지 264/264)하고, 리뷰 18사이클을 돈 PR의 수렴 교훈 문서를
+  병합해 **구현 시점 예방 규칙**을 10개 표면(스펙·문서 동기화 / 단일 출처·파생 일관성 /
+  경계 입력 검증 / 상태 기계·종결 / 영속화·복원·동시 쓰기 / 비동기·타이머 / 레이아웃·
+  뷰포트·기하 / 접근성·포커스·IME / 데이터 파이프라인·캐시 / 게이트·릴리스·전환)으로
+  문서화했다. 전체 로드는 금지 — §0 코어 원칙 + 표면 인덱스로 해당 섹션만 골라 브리핑에
+  발췌하는 로딩 규칙을 문서 상단에 명시했다. 수렴 교훈 문서 중 리뷰 루프 운영 교훈
+  (재리뷰 트리거·완료 판정)은 구현 시점 지침 스코프 밖이라 의도적으로 병합하지 않았다
+  (PR 리뷰 스킬 소관).
+- `commit-protocol` 메시지 형식 보강: 제어문자가 섞일 수 있는 메시지는 HEREDOC 대신
+  파일 + `git commit -F`로 전달(raw NUL → `InputValidationError` 예방, 지침 §10 위생
+  규칙 상호 참조).
+- `feature-develop` 프로토콜 배선: Phase 1 설계가 표면 인덱스로 섹션을 골라 브리핑에
+  발췌 포함, Phase 2 구현이 발췌 규칙을 대조(§0은 항상 적용), Phase 3 테스트가 극단
+  케이스 검증 항목을 반영.
+- role 배선: `domain-engineer`(§2–§5)·`ui-engineer`(§6–§8)·`test-engineer`(검증 항목)에
+  얇은 단일 출처 참조 추가.
+- `.codex`/`.claude` feature-develop 어댑터 "필수 로딩"에 지침 섹션 선택 로딩 항목 추가
+  (parity 동일).
+- `AGENTS.md` Repository Shape와 `harness/README.md`에 `guides/` 네임스페이스 등재.
+
+**소비자 조치**: 없음(서브모듈 업데이트 후 다음 `$feature-develop` 실행부터 자동 적용).
+
 ## 2026-08-04 make-pr-no-fleet-title-override
 
 **변경**

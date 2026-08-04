@@ -141,6 +141,9 @@ domain-engineer/ui-engineer/test-engineer → integrator` role 체인으로 펼�
    - 검증
 4. 구현 계획을 notes 또는 별도 계획 섹션에 남긴다. 이 계획이 Phase 2 위임의 **브리핑**이 된다 —
    각 역할은 이걸 받아 재탐색 없이 진행한다(코드 지도는 여기 한 번 남겨 공유한다).
+   `guides/implementation-guidelines.md`(구현 지침 단일 출처)의 표면 인덱스에서 이 작업이
+   건드리는 섹션을 골라 해당 규칙을 브리핑에 발췌 포함한다 — 전체 로드 금지(로딩 규칙은
+   그 문서 상단). 서브에이전트는 발췌를 받으므로 지침 파일을 다시 열지 않는다.
    - domain 작업
    - UI 작업
    - 테스트 작업
@@ -167,6 +170,10 @@ domain-engineer/ui-engineer/test-engineer → integrator` role 체인으로 펼�
 
 담당: `domain-engineer`, `ui-engineer`
 
+구현은 브리핑에 발췌된 구현 지침(`guides/implementation-guidelines.md`) 규칙을 대조하며
+진행한다 — 지침의 §0 코어 원칙(스펙 동기화·단일 출처·경계 불신·왕복 완성)은 발췌와
+무관하게 항상 적용된다.
+
 domain 작업:
 
 - UI framework 의존을 최소화하고 테스트 가능한 핵심 로직으로 작성한다.
@@ -185,6 +192,8 @@ UI 작업:
 
 - 핵심 로직은 단위 테스트를 우선한다.
 - UI 변경은 렌더링/상호작용 테스트 또는 명시적 브라우저 검증을 남긴다.
+- 구현 지침에서 선택된 섹션의 검증 항목(극단 케이스: 최장 입력·최소 뷰포트·타 로케일·
+  직접 URL 진입·복원 왕복 등)을 테스트 관점에 반영한다.
 - 테스트가 아직 없는 영역이면 최소 smoke coverage를 추가하거나, 못 하는 이유를
   notes에 남긴다.
 - ADR이 있으면 거기 기록한 결정이 실제 구현에 반영됐는지(결정↔구현 정합성)

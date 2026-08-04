@@ -45,6 +45,7 @@ Consumer projects own those workflow artifacts:
 harness/
   protocols/          Shared workflow protocols consumed through .harness
   roles/              Shared role prompts
+  guides/             Shared single-source implementation guidelines
   templates/raw/      Starter templates for consumer docs/raw units
 
 scripts/harness/      Attach, kickoff, wiki-ingest, artifact-check, gate, install-hooks

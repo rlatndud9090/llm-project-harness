@@ -131,7 +131,10 @@ git commit --no-verify
 ## 메시지 형식
 
 커밋 메시지는 HEREDOC으로 전달한다. 짧은 `-m "..."` 한 줄 커밋은 본문과 trailer가
-깨지기 쉬우므로 사용하지 않는다.
+깨지기 쉬우므로 사용하지 않는다. 단, 메시지에 제어문자가 섞일 수 있으면(리뷰 코멘트
+인용 등) HEREDOC 대신 메시지를 파일로 쓰고 `git commit -F <file>`로 전달한다 — raw
+NUL 등은 `InputValidationError`를 일으키며, 그 파일 자체도 raw 제어문자 스캔을 한다
+(`guides/implementation-guidelines.md` §10 문서 위생 참고).
 
 ```sh
 git commit -m "$(cat <<'EOF'

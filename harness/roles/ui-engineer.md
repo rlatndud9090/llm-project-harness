@@ -29,6 +29,10 @@
     - 텍스트가 버튼/카드/패널 밖으로 넘치면 안 된다.
     - 새 라이브러리는 ADR/사용자 승인 없이 추가하지 않는다.
     - 도메인 계산을 CSS class나 component local state에 숨기지 않는다.
+    - 브리핑에 포함된 구현 지침 발췌를 구현 규칙으로 준수한다. 발췌가 없을 때만 단일
+      출처 `.harness/harness/guides/implementation-guidelines.md`에서 담당 표면 섹션
+      (§6 타이머·async, §7 레이아웃·뷰포트·기하 측정, §8 접근성·포커스·IME)을 직접
+      선택 로드한다.
   </Constraints>
 
   <Execution_Protocol>
