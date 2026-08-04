@@ -16,44 +16,86 @@ import fs from "node:fs";
 // 스텝 인자는 전부 고정 리터럴이라 shell 파싱으로 인한 위험이 없다.
 const packageManagerCli = resolvePackageManagerCli();
 
+// 성공한 스텝의 로그는 판정에 기여하지 않으면서 에이전트 컨텍스트로 그대로 흘러들어
+// 게이트 1회당 수 KB를 태운다. 그래서 모든 스텝을 캡처해 성공 시 `<step> ok` 한 줄로
+// 요약하고(test:run은 Tests 요약 라인만 표면화), 실패한 스텝만 전문을 낸다 — 실패
+// 디버깅 근거는 종전과 동일하다. 전체 출력이 필요하면 HARNESS_GATE_VERBOSE=1 또는
+// --verbose로 강제한다(캡처 후 일괄 출력이라 실시간 스트리밍은 아니다).
+const verbose = process.env.HARNESS_GATE_VERBOSE === "1" || process.argv.includes("--verbose");
+
+const maxBuffer = Number(process.env.HARNESS_GATE_MAX_BUFFER) || 64 * 1024 * 1024;
+
 const steps = ["harness:check", "lint", "build", "test:run"];
 
-for (const script of steps) {
-  console.log(`[harness:gate] npm run ${script}`);
+// process.exit()는 pending stdio를 flush하지 않아, 방금 write한 실패 전문 덤프가
+// 잘린 채 종료될 수 있다(Node 공식 문서 경고). exitCode만 세우고 자연 종료한다.
+process.exitCode = runGateSteps();
 
-  // The test step runs with --passWithNoTests, so a project with zero tests
-  // exits 0 and looks identical to a real pass. Capture its output, surface a
-  // WARNING when no tests were collected, and require the report to disclose it.
-  const captureOutput = script === "test:run";
-  const result = runScript(script, captureOutput ? { encoding: "utf8" } : { stdio: "inherit" });
+function runGateSteps() {
+  for (const script of steps) {
+    console.log(`[harness:gate] npm run ${script}`);
 
-  // spawn 자체가 실패하면 status가 null로 온다. 그대로 exit 1 하면 "check가
-  // 실패했다"로 오독되므로(원인 메시지가 한 줄도 안 나온다), 실행 실패와 스텝
-  // 실패를 갈라서 보고한다.
-  if (result.error) {
-    console.error(`[harness:gate] failed to run "npm run ${script}": ${result.error.code ?? result.error.message}`);
-    console.error(`[harness:gate] platform=${process.platform} node=${process.version} npm_execpath=${process.env.npm_execpath ?? "(unset)"}`);
-    console.error(`[harness:gate] 패키지 매니저를 실행하지 못했습니다. \`npm run harness:gate\`로 실행하거나 npm이 PATH에 있는지 확인하세요.`);
-    process.exit(1);
+    const result = runScript(script, { encoding: "utf8", maxBuffer });
+
+    // spawn 자체가 실패하면 status가 null로 온다. 그대로 exit 1 하면 "check가
+    // 실패했다"로 오독되므로(원인 메시지가 한 줄도 안 나온다), 실행 실패와 스텝
+    // 실패를 갈라서 보고한다. ENOBUFS는 셋 중 어느 쪽도 아니다 — 스텝은 돌았는데
+    // 출력이 캡처 한도를 넘은 것이므로, "npm PATH" 처방으로 오진하지 않는다.
+    if (result.error) {
+      if (result.error.code === "ENOBUFS") {
+        process.stdout.write(result.stdout ?? "");
+        process.stderr.write(result.stderr ?? "");
+        console.error(`[harness:gate] "npm run ${script}" 출력이 캡처 한도(maxBuffer)를 넘어 잘렸습니다. 위는 부분 출력입니다 — 스텝을 직접 실행해 전체 출력을 확인하세요.`);
+        return 1;
+      }
+      console.error(`[harness:gate] failed to run "npm run ${script}": ${result.error.code ?? result.error.message}`);
+      console.error(`[harness:gate] platform=${process.platform} node=${process.version} npm_execpath=${process.env.npm_execpath ?? "(unset)"}`);
+      console.error(`[harness:gate] 패키지 매니저를 실행하지 못했습니다. \`npm run harness:gate\`로 실행하거나 npm이 PATH에 있는지 확인하세요.`);
+      return 1;
+    }
+
+    const combinedOutput = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+
+    if (result.status !== 0 || verbose) {
+      process.stdout.write(result.stdout ?? "");
+      process.stderr.write(result.stderr ?? "");
+    }
+
+    if (result.status !== 0) {
+      return result.status ?? 1;
+    }
+
+    if (script === "test:run") {
+      // 테스트 스텝만은 "몇 개가 돌았는가"가 보고·Tested: trailer의 근거라 요약
+      // 라인(vitest `Tests`/`Test Files`, jest `Tests:`)을 성공 시에도 표면화한다.
+      for (const line of testSummaryLines(combinedOutput)) {
+        console.log(`[harness:gate] ${line}`);
+      }
+
+      // The test step runs with --passWithNoTests, so a project with zero tests
+      // exits 0 and looks identical to a real pass. Surface a WARNING when no
+      // tests were collected, and require the report to disclose it.
+      if (/no test files found/i.test(combinedOutput)) {
+        console.log(
+          "[harness:gate] WARNING: no tests collected (test:run passed via --passWithNoTests). Disclose this in the report and the commit Not-tested: trailer.",
+        );
+      }
+    }
+
+    console.log(`[harness:gate] ${script} ok`);
   }
 
-  if (captureOutput) {
-    process.stdout.write(result.stdout ?? "");
-    process.stderr.write(result.stderr ?? "");
-  }
-
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
-
-  if (captureOutput && /no test files found/i.test(`${result.stdout ?? ""}${result.stderr ?? ""}`)) {
-    console.log(
-      "[harness:gate] WARNING: no tests collected (test:run passed via --passWithNoTests). Disclose this in the report and the commit Not-tested: trailer.",
-    );
-  }
+  console.log("[harness:gate] ok");
+  return 0;
 }
 
-console.log("[harness:gate] ok");
+function testSummaryLines(output) {
+  return output
+    .split(/\r?\n/)
+    .filter((line) => /^\s*(Test Files|Tests)\s{2,}/.test(line) || /^Tests:/.test(line))
+    .slice(-2)
+    .map((line) => line.trim());
+}
 
 function runScript(script, options) {
   if (packageManagerCli) {

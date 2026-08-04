@@ -14,6 +14,38 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-08-04 make-pr-token-efficiency
+
+**변경**
+
+스킬별 토큰 사용량 1위였던 `make-pr`의 토큰 효율 패스. make-pr는 위임 없이 전 과정을 메인
+컨텍스트에서 돌기 때문에(지침 로딩 ~23KB + gate 전체 출력 판정 + 커밋 + PR), 로딩·출력 양쪽을
+줄였다. 기능·게이트 강도는 불변.
+
+- **`harness:gate` 성공 출력 압축(`gate.mjs`)** — 성공한 스텝의 출력을 `[harness:gate] <step> ok`
+  요약으로 줄이고(테스트 스텝은 `Tests …` 요약 라인과 no-tests WARNING만 표면화), **실패한 스텝은
+  종전처럼 전문을 출력**한 뒤 status를 전파한다. 성공 로그는 판정에 기여하지 않으면서 게이트 1회당
+  수 KB를 에이전트 컨텍스트로 흘려보내던 순수 노이즈였다. 전체 로그가 필요하면
+  `HARNESS_GATE_VERBOSE=1`(또는 `--verbose`)로 강제한다. 이 압축은 gate를 쓰는 모든 스킬
+  (`feature-develop`·`commit-protocol`·`make-pr`)에 공통 이득이다. 캡처 전환에 따르는 견고성도
+  함께 잡았다: 실패 덤프가 `process.exit`의 stdio 미flush로 잘리지 않게 `process.exitCode` 자연
+  종료로 바꾸고, maxBuffer 초과(ENOBUFS)를 "패키지 매니저 실행 실패"로 오진하지 않고 부분
+  출력과 함께 구분 보고한다. 요약/전문/verbose/ENOBUFS 계약을 고정하는 회귀 테스트 6건 추가.
+- **make-pr 재판독 조건부화(P1)** — 어댑터·정본이 `commit-protocol.md` 정본과 PRD/ADR **전문**을
+  "이 컨텍스트에 아직 로드돼 있지 않을 때만" 읽도록 바꿨다(같은 세션에서 빌드까지 마치고 넘어온
+  경우의 중복 재판독 제거). 승인 상태의 원장인 `state.md`는 계속 무조건 먼저 읽는다.
+  flow-token-efficiency-pass-1과 같은 런타임 중립 문구라 격리 서브에이전트는 여전히 읽는다.
+- **make-pr 어댑터 재진술 축약(P2)** — 정본을 읽는데도 어댑터가 절차를 통째로 재진술하던 산문을
+  압축했다(`.claude`/`.codex` 대칭 편집, parity green). load-bearing(state.md 먼저·
+  `harness:approve --transport make-pr --final` 명령·호출=최종승인·뒤집는 개정 정지·직접 status
+  편집 금지·ingest→gate 순서·gh 우선 폴백·PR URL 보고·FleetView 제목 불변·`[pr]` result prefix)은
+  전부 보존.
+
+**소비자 조치 (필수)**
+
+- 없음. gate 실패 시에는 종전처럼 전체 로그가 나오므로 디버깅 절차 변화 없음. CI 등에서 항상
+  전체 로그를 원하면 `HARNESS_GATE_VERBOSE=1`을 설정한다.
+
 ## 2026-08-04 implementation-guidelines-guide
 
 **변경**

@@ -32,6 +32,8 @@
 1. 현재 branch와 raw path를 확인한다(`git status --short --branch`). 작업 단위 브랜치 위에 있어야 한다.
 2. **`state.md`를 먼저 읽는다.** feature 단위는 PRD가 `pre-approved`, (ADR 필요 시) ADR이
    `pre-accepted`여야 한다 — 아직 사전 승인 전이면 `$prd-helper`/`$adr-helper`로 되돌린다.
+   승인 상태의 원장은 `state.md`다. PRD/ADR **전문**은 이 컨텍스트에서 이미 읽었고 이후
+   개정이 없으면 재판독하지 않는다(같은 세션에서 빌드까지 마치고 넘어온 경우가 그렇다).
 3. 구현과 검증이 실제로 끝났는지 확인한다. 미완이면 `feature-develop`로 되돌린다.
 
 ## Phase 1: 최종 확정 (`$make-pr` 호출 = 명시 최종 승인)
@@ -80,11 +82,14 @@ npm run harness:gate
 최종 확정으로 status가 바뀐 뒤 `harness:gate`(= `harness:check` + lint + build + test:run)를
 신선한 출력으로 판정한다. `harness:check`는 이제 `approved`/`accepted`와 `APPROVAL` 이벤트의
 정합성까지 교차검증한다. 실패하면 커밋하지 않고 원인을 수정한 뒤 처음부터 다시 실행한다.
+gate는 성공한 스텝의 출력을 `<step> ok` 요약으로 줄이고 실패한 스텝만 전문을 낸다 — 그 요약
+성공 라인이 곧 신선한 판정 근거이며, 전체 로그가 필요하면 `HARNESS_GATE_VERBOSE=1`로 강제한다.
 
 ## Phase 3: 커밋
 
 `commit-protocol`을 그대로 따른다(명시적 스테이징, `관련 문서:` 블록에 PRD/ADR 링크, Lore
-trailer, HEREDOC). 이 커밋이 작업 단위를 마무리하는 커밋이며, 최종 확정된 PRD/ADR status
+trailer, HEREDOC). 정본 `commit-protocol.md`는 이 컨텍스트에 아직 로드돼 있지 않을 때만
+읽는다 — 이미 읽었으면 재판독하지 않는다. 이 커밋이 작업 단위를 마무리하는 커밋이며, 최종 확정된 PRD/ADR status
 변경을 함께 담는다. 구현 중 브랜치에 남긴 중간 커밋이 있어도 무방하다.
 
 ## Phase 4: Push와 PR 생성

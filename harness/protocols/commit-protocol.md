@@ -97,6 +97,9 @@ npm run harness:gate
 3. `npm run build`
 4. `npm run test:run`
 
+gate는 성공한 스텝의 출력을 `<step> ok` 요약으로 줄이고(테스트 스텝은 Tests 요약 라인 표면화),
+실패한 스텝만 전문을 출력한다. 전체 로그가 필요하면 `HARNESS_GATE_VERBOSE=1`로 강제한다.
+
 실패한 단계가 있으면 커밋하지 않는다. 실패 원인을 읽고 수정한 뒤 처음부터 다시
 게이트를 실행한다.
 

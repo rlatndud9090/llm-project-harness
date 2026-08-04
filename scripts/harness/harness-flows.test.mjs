@@ -2265,6 +2265,92 @@ describe("Windows failure modes", () => {
   });
 });
 
+// 성공 스텝 로그는 에이전트 컨텍스트로 흘러드는 순수 노이즈라 gate가 요약하고,
+// 실패 스텝만 전문을 낸다. 이 계약(요약 성공 / 전문 실패 / verbose 탈출구)이 깨지면
+// 토큰 회귀거나 디버깅 근거 소실이므로 양방향 모두 고정한다.
+describe("harness:gate condensed output", () => {
+  it("summarizes passing steps instead of streaming their full output", () => {
+    withProject((projectRoot) => {
+      seedGateScripts(projectRoot, { lint: "node -e \"console.log('LINT_NOISE_LINE')\"" });
+
+      const result = runGate(projectRoot, { npm_execpath: undefined, HARNESS_GATE_VERBOSE: undefined });
+
+      expect(result.status).toBe(0);
+      const output = `${result.stdout}${result.stderr}`;
+      expect(output).not.toContain("LINT_NOISE_LINE");
+      expect(output).toContain("[harness:gate] lint ok");
+      expect(output).toContain("[harness:gate] ok");
+    });
+  });
+
+  it("dumps the failing step's full output before propagating its status", () => {
+    withProject((projectRoot) => {
+      seedGateScripts(projectRoot, { build: "node -e \"console.log('BUILD_FAIL_DETAIL'); process.exit(2)\"" });
+
+      const result = runGate(projectRoot, { npm_execpath: undefined, HARNESS_GATE_VERBOSE: undefined });
+
+      expect(result.status).toBe(2);
+      const output = `${result.stdout}${result.stderr}`;
+      expect(output).toContain("BUILD_FAIL_DETAIL");
+      expect(output).not.toContain("[harness:gate] ok");
+    });
+  });
+
+  it("HARNESS_GATE_VERBOSE=1 restores the full per-step output", () => {
+    withProject((projectRoot) => {
+      seedGateScripts(projectRoot, { lint: "node -e \"console.log('LINT_NOISE_LINE')\"" });
+
+      const result = runGate(projectRoot, { npm_execpath: undefined, HARNESS_GATE_VERBOSE: "1" });
+
+      expect(result.status).toBe(0);
+      const output = `${result.stdout}${result.stderr}`;
+      expect(output).toContain("LINT_NOISE_LINE");
+      expect(output).toContain("[harness:gate] ok");
+    });
+  });
+
+  it("surfaces the test summary lines from a passing test step", () => {
+    withProject((projectRoot) => {
+      seedGateScripts(projectRoot, {
+        "test:run": "node -e \"console.log('noisy per-file line'); console.log(' Tests  3 passed (3)')\"",
+      });
+
+      const result = runGate(projectRoot, { npm_execpath: undefined, HARNESS_GATE_VERBOSE: undefined });
+
+      expect(result.status).toBe(0);
+      const output = `${result.stdout}${result.stderr}`;
+      expect(output).toContain("[harness:gate] Tests  3 passed (3)");
+      expect(output).not.toContain("noisy per-file line");
+    });
+  });
+
+  it("reports a capture-limit overflow instead of misdiagnosing it as a spawn failure", () => {
+    withProject((projectRoot) => {
+      // 기본 스텝(배너+한 줄, ~50바이트)은 200바이트 한도를 통과하고,
+      // lint의 1KB 출력만 ENOBUFS를 결정적으로 일으킨다.
+      seedGateScripts(projectRoot, { lint: "node -e \"console.log('x'.repeat(1000))\"" });
+
+      const result = runGate(projectRoot, { npm_execpath: undefined, HARNESS_GATE_MAX_BUFFER: "200" });
+
+      expect(result.status).toBe(1);
+      const output = `${result.stdout}${result.stderr}`;
+      expect(output).toContain("캡처 한도");
+      expect(output).not.toContain("패키지 매니저를 실행하지 못했습니다");
+    });
+  });
+
+  it("still warns when the test step collected no tests", () => {
+    withProject((projectRoot) => {
+      seedGateScripts(projectRoot, { "test:run": "node -e \"console.log('no test files found')\"" });
+
+      const result = runGate(projectRoot, { npm_execpath: undefined, HARNESS_GATE_VERBOSE: undefined });
+
+      expect(result.status).toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("WARNING: no tests collected");
+    });
+  });
+});
+
 // gate 픽스처: 실제 하네스 스텝 대신 즉시 끝나는 스크립트를 둔다. 검증 대상은
 // 스텝의 내용이 아니라 "패키지 매니저를 띄울 수 있는가"이기 때문이다.
 function seedGateScripts(projectRoot, overrides = {}) {
