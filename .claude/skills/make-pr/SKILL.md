@@ -42,18 +42,18 @@ description: "사전 승인·구현이 끝난 작업 단위를 최종 확정(app
 전제가 아직 아니면(사전 승인 전, 구현 미완) `$prd-helper`/`$adr-helper`/`$feature-develop`로
 되돌린다. 규칙 변경은 `.claude`가 아니라 `.harness/harness`를 먼저 수정한다. 프로젝트 문서는 한국어로 작성한다.
 
-## Claude Code — agents 화면 세션 제목 (필수)
+## Claude Code — agents 화면 세션 제목: 덮어쓰지 않는다 (필수)
 
-이 스킬을 실행하면 **즉시** 현재 세션의 agents 화면(FleetView) 제목을 작업내역 요약
-`make-pr`로 바꾼다(대화형·background 세션 모두 항상). 어느 세션이 PR 확정·생성 중인지 목록에서
-한눈에 보이게 하기 위함이다. 제목엔 프로젝트 약어 prefix를 붙이지 않는다(작업 단계 요약만
-남긴다). agents 세션이 아니면 조용히 no-op이고 절대 실패하지 않으므로 항상 호출한다.
+make-pr는 **단계(phase) 스킬**이다 — 이미 `kickoff`으로 착수·구현까지 끝난 작업 단위의 마지막
+PR 단계일 뿐이다. 그러므로 **FleetView(agents 화면) 세션 제목을 절대 덮어쓰지 않는다.** 제목은
+그 세션의 정체(kickoff이 심은 작업명, 또는 one-shot 세션의 `one-shot`)를 그대로 유지하고, 지금
+어느 단계인지는 아래 result 라인의 `[pr]` prefix로만 드러낸다. 이는 `feature-develop`·
+`prd-helper`·`adr-helper`·`commit-protocol`과 동일한 단계-스킬 규약이다.
 
-```bash
-# provider 레포/미부착 소비 프로젝트엔 .harness가 없을 수 있으므로 파일 존재를 먼저 본다.
-[ -f .harness/scripts/harness/set-fleet-title.mjs ] \
-  && node .harness/scripts/harness/set-fleet-title.mjs --label "make-pr" 2>/dev/null || true
-```
+즉 `set-fleet-title.mjs`를 **호출하지 않는다.** 세션 제목을 세팅하는 건 세션-시작 스킬
+(`next-feature`·`kickoff`·`one-shot`)의 몫이다. make-pr가 제목을 `make-pr`로 바꾸면 kickoff이
+심어둔 작업명(예: `main layout`)이나 one-shot 제목이 마지막 단계에서 지워져 목록에서 어느
+작업의 PR인지 알 수 없게 된다. 재도입 금지.
 
 ## Claude Code — PR 생성과 링크 노출 (필수)
 

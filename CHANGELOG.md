@@ -14,6 +14,22 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-08-04 make-pr-no-fleet-title-override
+
+**변경**
+- **`make-pr` 스킬이 FleetView(agents 화면) 세션 제목을 덮어쓰지 않도록 수정.** make-pr는 이미
+  `kickoff`으로 착수·구현까지 끝난 작업 단위의 마지막 PR 단계인 **단계(phase) 스킬**인데,
+  단계 스킬 중 혼자만 `set-fleet-title.mjs --label "make-pr"`를 호출해 kickoff이 심어둔 작업명
+  (예: `main layout`)이나 one-shot 세션의 `one-shot` 제목을 마지막 단계에서 지워, 목록에서
+  어느 작업의 PR인지 알 수 없게 만들었다. `.claude/skills/make-pr/SKILL.md`의 세션 제목 설정
+  블록을 제거하고 `feature-develop`·`prd-helper`·`adr-helper`·`commit-protocol`과 동일하게
+  `[pr]` result prefix만 남겼다(재도입 금지 근거 명시). 세션 제목 설정은 세션-시작 스킬
+  (`next-feature`·`kickoff`·`one-shot`)의 몫이라는 분류를 문서화했다.
+- `set-fleet-title.mjs`는 Claude/FleetView 전용이라 `harness/` 정본·`.codex/` 어댑터엔 대응
+  블록이 없다 → 이 수정은 `.claude` 어댑터 전용, parity 무관.
+
+**소비자 조치: 없음** (Claude Code FleetView 전용 편의 조정 — 산출물·게이트·문서 규약 영향 없음)
+
 ## 2026-08-01 kickoff-protocol-gh-first-leftover-cleanup
 
 **변경**
