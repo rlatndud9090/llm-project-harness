@@ -6,7 +6,8 @@ raw/wiki, PRD/ADR, 검증, 커밋 규칙을 따르도록 만드는 공용 제어
 
 이 저장소는 제품 앱이 아니며, 소비 프로젝트의 `docs/`를 소유하지 않습니다.
 소비 프로젝트가 자기 `docs/raw/`, `docs/wiki/`, `AGENTS.md`, 제품별 스킬과
-에이전트를 유지하고, 이 저장소는 `.harness` git submodule로 장착됩니다.
+에이전트를 유지하고, 이 저장소는 npm devDependency로 설치되어 `.harness`
+심볼릭 링크로 장착됩니다.
 
 ## 구성
 
@@ -27,13 +28,18 @@ scripts/harness/    장착, raw 생성, wiki ingest, artifact check, gate 스크
 
 ## 소비 프로젝트에 장착하기
 
-소비 프로젝트 루트에서:
+소비 프로젝트 루트에서 실행합니다. 하네스 저장소는 PUBLIC이라 무인증으로
+설치되며, 재현성을 위해 태그(또는 커밋 SHA)로 pin합니다.
 
 ```sh
-git submodule add git@github.com:rlatndud9090/llm-project-harness.git .harness
-node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
+npm i -D github:rlatndud9090/llm-project-harness#<태그 또는 커밋SHA>
+node node_modules/llm-project-harness/scripts/harness/attach-submodule.mjs
 npm run harness:check
 ```
+
+`attach-submodule.mjs`는 먼저 `.harness`를 설치된 `node_modules/llm-project-harness`
+패키지를 가리키는 심볼릭 링크(Windows는 junction)로 만듭니다. `.harness`는
+gitignore되고, 소비 프로젝트의 `postinstall`이 매 설치 후 이 링크를 재생성합니다.
 
 장착 스크립트는 없을 때만 아래 프로젝트 소유 파일을 만듭니다.
 
@@ -66,9 +72,9 @@ package.json
 추가합니다.
 
 ```sh
-git submodule add git@github.com:rlatndud9090/llm-project-harness.git .harness
-node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --retrofit --dry-run
-node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --retrofit --report harness-retrofit-report.md
+npm i -D github:rlatndud9090/llm-project-harness#<태그 또는 커밋SHA>
+node node_modules/llm-project-harness/scripts/harness/attach-submodule.mjs --retrofit --dry-run
+node node_modules/llm-project-harness/scripts/harness/attach-submodule.mjs --retrofit --report harness-retrofit-report.md
 npm run harness:check
 ```
 
@@ -84,6 +90,7 @@ adapter가 있으면 로컬 adapter를 우선하고 하네스 adapter는 `harnes
 ```json
 {
   "scripts": {
+    "postinstall": "node node_modules/llm-project-harness/scripts/harness/link.mjs || true",
     "harness:kickoff": "node .harness/scripts/harness/kickoff.mjs",
     "harness:ingest": "node .harness/scripts/harness/wiki-ingest.mjs",
     "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
@@ -103,20 +110,20 @@ adapter가 있으면 로컬 adapter를 우선하고 하네스 adapter는 `harnes
 
 ## 하네스 업데이트
 
-소비 프로젝트가 이미 구버전 하네스를 달고 있다면, submodule을 올리고 attach를 다시
-실행하면 변경이 반영됩니다. 이름이 바뀌거나 제거된 어댑터의 stale symlink는 attach가
-기본으로 정리합니다.
+소비 프로젝트가 이미 구버전 하네스를 달고 있다면, devDependency 핀을 새 태그(또는
+커밋)로 올리고 attach를 다시 실행하면 변경이 반영됩니다. 이름이 바뀌거나 제거된
+어댑터의 stale symlink는 attach가 기본으로 정리합니다.
 
 ```sh
-git submodule update --remote .harness
-node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness --dry-run
-node .harness/scripts/harness/attach-submodule.mjs --harness-dir .harness
+npm i -D github:rlatndud9090/llm-project-harness#<새 태그>
+node node_modules/llm-project-harness/scripts/harness/attach-submodule.mjs --dry-run
+node node_modules/llm-project-harness/scripts/harness/attach-submodule.mjs
 npm run harness:gate
 ```
 
 attach는 이전 attach가 만든 하네스 symlink 중 타겟이 사라진 것만 지우고, 로컬 파일과
 프로젝트 override는 보존합니다. stale 링크를 일부러 남기려면 `--no-prune`을 씁니다.
-자세한 절차는 [Submodule Attach 프로토콜](harness/protocols/submodule-attach.md)을
+자세한 절차는 [Harness Attach 프로토콜](harness/protocols/submodule-attach.md)을
 따릅니다.
 
 ## 하네스 개발
@@ -134,5 +141,5 @@ npm run build
 npm run test:run
 ```
 
-세부 장착 절차는 [Submodule Attach 프로토콜](harness/protocols/submodule-attach.md)을
+세부 장착 절차는 [Harness Attach 프로토콜](harness/protocols/submodule-attach.md)을
 따릅니다.

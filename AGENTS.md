@@ -1,7 +1,8 @@
 # LLM Project Harness Agent Guide
 
 This repository builds and maintains a reusable cross-agent harness that can be
-mounted into product repositories as a `.harness` git submodule.
+installed into product repositories as an npm devDependency and mounted as a
+devDependency-backed `.harness` symlink.
 
 Answer the user in Korean, using polite honorifics. Refer to the user with a
 neutral term such as `사용자`; do not hard-code a personal nickname. A personal
@@ -13,7 +14,7 @@ shared harness or the documents (PRD/ADR) it produces.
 This repository is the **harness provider**, not a product project.
 
 - It owns shared protocols, role prompts, tool adapters, raw/wiki templates,
-  validation scripts, and submodule attach automation.
+  validation scripts, and harness attach automation (`attach-submodule.mjs`).
 - **Editing this repository means authoring the harness, not running it.** Do
   the work directly on `main` and push to `main`. Do not create `feature/*`,
   `bugfix/*`, or `chore/*` branches, and do not open a pull request, for a
@@ -63,7 +64,7 @@ A consuming project should look like this:
 
 ```txt
 app-project/
-  .harness/           Git submodule pointing to this repository
+  .harness/           Symlink to the installed llm-project-harness devDependency
   docs/raw/           Project-owned raw PRD/ADR/notes
   docs/wiki/          Project-owned thin wiki index
   AGENTS.md           Project-owned guide

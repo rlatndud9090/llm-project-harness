@@ -19,6 +19,9 @@ import {
   fail,
   findWikiAuthoringSentinel,
   shouldProbeFreshness,
+  isNewerSemverTag,
+  latestSemverTagFromLsRemote,
+  parseHarnessDependencySpec,
   isPreAdrStage,
   skeletonAdrBody,
   findHarnessRoot,
@@ -105,11 +108,11 @@ function assertProjectDocsPresent() {
   }
 }
 
-// Consumer reconciliation gate: after updating the `.harness` submodule, the
+// Consumer reconciliation gate: after bumping the harness devDependency, the
 // project must reconcile the new CHANGELOG entries (each carries a required
 // consumer action, e.g. rewriting docs/wiki) and record it with harness:sync.
 // Fails until `.harness-sync` matches the harness CHANGELOG head. Skips in the
-// provider repo and when the submodule predates the changelog.
+// provider repo and when the installed harness predates the changelog.
 function assertHarnessSync() {
   if (harnessRepoMode) return;
 
@@ -129,15 +132,26 @@ function assertHarnessSync() {
   }
 }
 
-// Submodule freshness nudge (consumer mode, warning-only). Compares the pinned
-// `.harness` commit against the remote default branch head; if the submodule is
-// behind, warns so a project can update mid-work. Best-effort: bounded timeouts,
-// throttled to one network probe per window (so it never slows down every commit),
-// and any failure (offline, no remote, detached) is swallowed — it must never fail
+// Harness freshness nudge (consumer mode, warning-only). The harness is a
+// devDependency pinned by tag (`github:<owner>/<repo>#v1.2.3`); this compares the
+// pinned tag against the newest tag upstream and, if behind, nudges the project to
+// bump it — so a stale pin can be noticed mid-work. Best-effort: throttled to one
+// network probe per window (it never slows every commit), bounded, and any failure
+// (offline, unpinned/unparseable spec, git absent) is swallowed — it must never fail
 // the check. Skipped in CI / test / when opted out.
 function assertHarnessFresh() {
   if (harnessRepoMode) return;
   if (process.env.HARNESS_SKIP_REMOTE_CHECK || process.env.CI || process.env.VITEST) return;
+
+  const packagePath = repoPath("package.json");
+  if (!pathExists(packagePath)) return;
+  let spec;
+  try {
+    spec = parseHarnessDependencySpec(JSON.parse(readText(packagePath)));
+  } catch {
+    return; // unreadable/invalid package.json → nothing to compare
+  }
+  if (!spec) return; // harness absent, unpinned, or non-GitHub spec → stay quiet
 
   // Throttle the network probe by an OS-temp marker's mtime (kept out of the repo so
   // it never shows in git status). Touch it before probing so an offline/slow probe
@@ -157,19 +171,18 @@ function assertHarnessFresh() {
   }
 
   try {
-    const local = git(["-C", harnessRoot, "rev-parse", "HEAD"], 2000);
-    const remoteLine = git(["-C", harnessRoot, "ls-remote", "origin", "HEAD"], 5000);
-    const remote = remoteLine.split(/\s+/)[0] ?? "";
-    if (local && remote && local !== remote) {
+    const output = git(["ls-remote", "--tags", `https://github.com/${spec.owner}/${spec.repo}.git`], 5000);
+    const latest = latestSemverTagFromLsRemote(output);
+    if (latest && isNewerSemverTag(latest, spec.tag)) {
       console.warn(
-        `[harness:check] WARNING: .harness 서브모듈이 원격보다 뒤처져 있습니다 (로컬 ${local.slice(0, 9)} → 원격 ${remote.slice(0, 9)}). ` +
-          `편한 시점에 "git submodule update --remote .harness" 후 "npm run harness:sync"로 최신화하세요. ` +
+        `[harness:check] WARNING: 하네스 devDependency가 최신 태그보다 뒤처져 있습니다 (고정 ${spec.tag} → 최신 ${latest}). ` +
+          `편한 시점에 package.json의 llm-project-harness 핀을 ${latest}로 올리고 npm install 후 "npm run harness:sync"로 최신화하세요. ` +
           `이 하네스 정비 커밋은 전용 브랜치 없이 지금 작업 중인 브랜치에 chore 하나로 태워도 됩니다 ` +
           `(.harness/harness/protocols/commit-protocol.md "하네스 정비 ride-along" 참고).`,
       );
     }
   } catch {
-    // best-effort: offline / no origin / detached / git absent → skip silently.
+    // best-effort: offline / no such repo / git absent → skip silently.
   }
 }
 
@@ -1239,7 +1252,8 @@ function assertAdapterLinkIntegrity() {
     `하네스 어댑터 ${standIns.length}개가 symlink가 아니라 링크 경로만 적힌 텍스트 파일입니다(${sample}${rest}). ` +
       `git이 symlink를 만들지 못한 채 clone된 상태입니다(core.symlinks=false). ` +
       `복구: git config --global core.symlinks true → (저장소 .git/config에 값이 박혀 있으면 local이 이기므로) git config --unset core.symlinks → ` +
-      `git submodule update --init --recursive → git ls-files -s | awk '$1 == 120000 { print $4 }' | xargs -r rm -f && git checkout -- .`,
+      `npm ci (하네스 devDependency 설치 + postinstall이 .harness 링크 재생성) → ` +
+      `node node_modules/llm-project-harness/scripts/harness/attach-submodule.mjs (어댑터 symlink 재생성).`,
   );
 }
 

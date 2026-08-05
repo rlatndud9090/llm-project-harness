@@ -20,6 +20,14 @@ describe("attach-submodule", () => {
         "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
         "harness:gate": "node .harness/scripts/harness/gate.mjs",
       });
+      // devDependency mount: postinstall rebuilds the `.harness` symlink, and the
+      // mount + node_modules are gitignored (never committed).
+      expect(readJson(path.join(projectRoot, "package.json")).scripts.postinstall).toBe(
+        "node node_modules/llm-project-harness/scripts/harness/link.mjs || true",
+      );
+      const gitignoreLines = fs.readFileSync(path.join(projectRoot, ".gitignore"), "utf8").split(/\r?\n/);
+      expect(gitignoreLines).toContain(".harness");
+      expect(gitignoreLines).toContain("node_modules");
       expect(pathExists(path.join(projectRoot, "AGENTS.md"))).toBe(true);
       expect(pathExists(path.join(projectRoot, "docs", "raw", "README.md"))).toBe(true);
       expect(pathExists(path.join(projectRoot, "docs", "wiki", "index.md"))).toBe(true);

@@ -44,9 +44,20 @@ export function repoPath(...parts) {
   return path.join(REPO_ROOT, ...parts);
 }
 
+// The npm package name the harness ships under. A consuming project depends on it
+// (devDependency, e.g. `github:<owner>/llm-project-harness#<tag>`); the installed
+// package lives at `node_modules/llm-project-harness` and the `.harness` mount is a
+// symlink into it (see ensureHarnessLink). No longer a git submodule.
+export const HARNESS_PACKAGE_NAME = "llm-project-harness";
+
 export function findHarnessRoot() {
   const candidates = [
+    // The stable `.harness` mount (a symlink into the installed package). Kept first
+    // so every `.harness/...` reference across adapters/protocols resolves fast.
     repoPath(".harness"),
+    // Fall back to the installed package directly, so scripts still locate the
+    // harness when the `.harness` symlink is missing (e.g. postinstall not yet run).
+    repoPath("node_modules", HARNESS_PACKAGE_NAME),
     REPO_ROOT,
     path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."),
   ];
@@ -57,7 +68,67 @@ export function findHarnessRoot() {
     }
   }
 
-  fail("could not locate harness root; run from a harness repo or a project with .harness");
+  fail("could not locate harness root; run from a harness repo or a project with the llm-project-harness devDependency");
+}
+
+// Creates/repairs the `.harness` mount as a symlink into the installed
+// `node_modules/llm-project-harness` package. The harness is distributed as a
+// devDependency, not a git submodule, so a consumer `postinstall` (link.mjs) runs
+// this after every install to (re)create `.harness` — keeping every `.harness/...`
+// reference (adapters, protocols, package scripts) resolvable without a submodule.
+// Idempotent and best-effort; returns a status string the caller reports on:
+//   - "package-absent": the devDependency is not installed (e.g. prod `--omit=dev`
+//     or before the first install) → nothing to link, no-op.
+//   - "ok": `.harness` is already the correct symlink → no-op.
+//   - "occupied": `.harness` is a real directory/file (most likely a not-yet-removed
+//     legacy git submodule) → never clobbered; the caller warns so migration removes
+//     the submodule first.
+//   - "created"/"would-create": the symlink was (or would be) made.
+export function ensureHarnessLink(projectRoot = REPO_ROOT, { dryRun = false } = {}) {
+  const target = path.join(projectRoot, "node_modules", HARNESS_PACKAGE_NAME);
+  const link = path.join(projectRoot, ".harness");
+
+  // Only link when the package is actually installed and looks like the harness.
+  if (!pathExists(path.join(target, "harness", "protocols"))) {
+    return { status: "package-absent", link, target };
+  }
+
+  let existing = null;
+  try {
+    existing = fs.lstatSync(link);
+  } catch {
+    // no `.harness` yet → create below
+  }
+
+  if (existing) {
+    if (existing.isSymbolicLink()) {
+      let current;
+      try {
+        current = fs.readlinkSync(link);
+      } catch {
+        current = null;
+      }
+      if (current && path.resolve(path.dirname(link), current) === path.resolve(target)) {
+        return { status: "ok", link, target };
+      }
+      // A stale/wrong symlink (e.g. an older layout) → replace it.
+      if (!dryRun) fs.rmSync(link, { force: true });
+    } else {
+      // A real directory/file — most likely a git submodule not yet removed. Never
+      // clobber it; migration must `git submodule deinit`/`git rm` first.
+      return { status: "occupied", link, target };
+    }
+  }
+
+  if (dryRun) return { status: "would-create", link, target };
+
+  // Windows: a junction links directories without Developer Mode or core.symlinks,
+  // and needs an ABSOLUTE target. POSIX uses a portable relative dir symlink.
+  const type = process.platform === "win32" ? "junction" : "dir";
+  const linkTarget = type === "junction" ? target : toPosix(path.relative(path.dirname(link), target));
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.symlinkSync(linkTarget, link, type);
+  return { status: "created", link, target };
 }
 
 export function harnessPath(...parts) {
@@ -720,6 +791,74 @@ export const FRESHNESS_THROTTLE_MS = 4 * 60 * 60 * 1000; // 4 hours
 // none). Pure/testable; `lastProbeMs = 0` (no marker) always probes.
 export function shouldProbeFreshness(lastProbeMs, nowMs, throttleMs = FRESHNESS_THROTTLE_MS) {
   return nowMs - lastProbeMs >= throttleMs;
+}
+
+// The harness is a devDependency pinned by tag (`#v1.2.3`). The freshness nudge
+// compares the pinned tag against the newest tag upstream, so these parse and order
+// semver-ish tags. A leading `v` is optional; anything not `MAJOR.MINOR.PATCH`
+// (pre-release, non-numeric) is treated as "not comparable" so the nudge stays quiet
+// rather than guessing.
+export function parseSemverTag(tag) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(tag ?? "").trim());
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+}
+
+// True only when `a` is a strictly newer semver tag than `b`. Either side being
+// non-semver returns false (no nudge).
+export function isNewerSemverTag(a, b) {
+  const left = parseSemverTag(a);
+  const right = parseSemverTag(b);
+  if (!left || !right) return false;
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] > right[index];
+  }
+  return false;
+}
+
+// The newest semver tag in `git ls-remote --tags` output. Each line is
+// "<sha>\trefs/tags/<tag>"; dereferenced tag lines end in "^{}" and are ignored
+// (the annotated tag object and its target share the same tag name). Returns null
+// when no semver-ish tag is present.
+export function latestSemverTagFromLsRemote(output) {
+  let best = null;
+  for (const line of String(output ?? "").split(/\r?\n/)) {
+    const match = /\trefs\/tags\/(.+?)(\^\{\})?$/.exec(line);
+    if (!match || match[2]) continue;
+    const tag = match[1];
+    if (!parseSemverTag(tag)) continue;
+    if (!best || isNewerSemverTag(tag, best)) best = tag;
+  }
+  return best;
+}
+
+// Parses a consuming project's harness devDependency spec into { owner, repo, tag }.
+// Accepts the common npm git-dependency forms that pin a tag:
+//   github:<owner>/<repo>#<tag>
+//   <owner>/<repo>#<tag>
+//   git+https://github.com/<owner>/<repo>.git#<tag>
+//   https://github.com/<owner>/<repo>#<tag>
+// Returns null when the harness is absent, unpinned (no `#<tag>`), or not a
+// recognized GitHub spec — the freshness nudge simply stays quiet in those cases.
+export function parseHarnessDependencySpec(packageJson, packageName = HARNESS_PACKAGE_NAME) {
+  const deps = {
+    ...(packageJson?.devDependencies ?? {}),
+    ...(packageJson?.dependencies ?? {}),
+  };
+  const spec = deps[packageName];
+  if (typeof spec !== "string") return null;
+
+  const hash = spec.lastIndexOf("#");
+  if (hash === -1) return null;
+  const tag = spec.slice(hash + 1).trim();
+  if (!tag) return null;
+
+  const head = spec.slice(0, hash);
+  const match =
+    /^github:([^/]+)\/(.+)$/.exec(head) ||
+    /github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/.exec(head) ||
+    /^([^/:@]+)\/([^/]+?)(?:\.git)?$/.exec(head);
+  if (!match) return null;
+  return { owner: match[1], repo: match[2], tag };
 }
 
 // A unit's `area` frontmatter is a comma-separated list (one work unit may evolve

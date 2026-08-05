@@ -1,18 +1,85 @@
 # 하네스 CHANGELOG
 
-이 하네스를 `.harness` 서브모듈로 쓰는 소비 프로젝트는, 서브모듈을 최신 커밋으로
-업데이트한 뒤 **반드시 정합성을 맞춰야 한다**:
+이 하네스를 `llm-project-harness` devDependency로 쓰는 소비 프로젝트는, 핀(태그/커밋)을
+올린 뒤 **반드시 정합성을 맞춰야 한다**:
 
 1. `npm run harness:sync` — 마지막으로 맞춘 이후의 항목과 **소비자 조치**를 읽는다.
 2. 각 항목의 소비자 조치를 실제로 반영한다(예: 위키 재작성, frontmatter 추가).
 3. `npm run harness:sync --ack` — 반영을 확인한다(`.harness-sync`가 CHANGELOG head로 갱신).
 
-확인 전에는 `harness:check`가 막는다(`.harness-sync` != CHANGELOG head). 이는 서브모듈만
-올리고 정책 변화를 놓치는 drift를 기계로 차단하기 위한 것이다.
+확인 전에는 `harness:check`가 막는다(`.harness-sync` != CHANGELOG head). 이는 devDependency
+핀만 올리고 정책 변화를 놓치는 drift를 기계로 차단하기 위한 것이다.
 
 **작성 규칙**: 하네스의 공용 표면(`harness/`, `scripts/harness/`, `.claude/`, `.codex/`)을
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
+
+## 2026-08-05 devdependency-mount
+
+**변경**
+
+하네스 배포 방식을 **git submodule → npm devDependency**로 전환했다. `.harness`라는 마운트
+이름과 그것을 가리키는 모든 참조(`.harness/harness/...`, `.harness/scripts/...`, 어댑터
+symlink, package script)는 **그대로 유지**되고, `.harness`의 *실체*만 서브모듈에서 설치된
+`node_modules/llm-project-harness` 패키지로의 **심볼릭 링크(Windows는 junction)** 로 바뀐다.
+
+동기: 서브모듈이 소비 프로젝트의 git 워킹트리에 추적되는 소스라서 (1) CF·Vercel 등
+배포 빌드가 `.harness`를 끌어오고, (2) `git worktree remove`가 서브모듈에 걸려 `--force`를
+요구했다. devDependency는 `node_modules`(gitignore) 안에 있고 앱이 import하지 않으므로 배포
+산출물에 안 남고, 서브모듈이 아니므로 워크트리 삭제도 걸리지 않는다. 하네스 레포는 PUBLIC
+이라 `github:` git-dep이 HTTPS tarball로 무인증 설치된다(npm publish 불필요).
+
+- **`.harness` = devDependency로의 심볼릭 링크(`lib.mjs` `ensureHarnessLink`, 신규
+  `link.mjs`).** 소비 프로젝트 `postinstall`이 매 설치 후 `.harness` 링크를 재생성한다
+  (`node node_modules/llm-project-harness/scripts/harness/link.mjs || true`). `|| true`와
+  링크 스크립트의 never-throw 계약으로 프로덕션 `npm ci --omit=dev`(하네스 부재)에서도
+  설치가 실패하지 않는다. `.harness`가 이미 실제 디렉터리(옛 서브모듈)면 절대 덮어쓰지 않고
+  경고한다.
+- **`attach-submodule.mjs`가 devDep 모델로 동작.** 실행 시 `.harness` 링크를 먼저 만들고,
+  `.gitignore`에 `.harness`·`node_modules`를 추가하고, `postinstall`을 배선한다. 어댑터
+  symlink·docs 스캐폴드·`.harness-sync` 시드·`.claude/settings.json`(bgIsolation) 로직은
+  불변. package script는 여전히 `.harness/scripts/...`를 호출한다(링크로 해결).
+- **`artifact-check`의 freshness nudge를 devDep 태그 비교로 재작성.** 서브모듈 커밋 대신
+  package.json의 하네스 핀(`#v1.2.3`)을 원격 최신 태그와 비교해 뒤처지면 경고한다(warning-only,
+  throttle·best-effort 불변). 어댑터 무결성 복구 안내도 `npm ci` + attach 재실행으로 갱신.
+- 정합성 게이트(`.harness-sync` ↔ CHANGELOG head)와 승인 게이트는 그대로. `findHarnessRoot`는
+  `.harness` → `node_modules/llm-project-harness` 순으로 하네스를 찾아 링크가 없어도 스크립트가
+  동작한다.
+
+**소비자 조치 (필수)**
+
+기존 `.harness` 서브모듈 소비 프로젝트는 아래로 devDependency 모델로 이관한다. **레포마다
+한 번**이며, 이 커밋 뒤 CF·Vercel 재배포는 서브모듈 없이 깨끗하게 빌드된다.
+
+```sh
+# 1) 서브모듈 완전 제거
+git submodule deinit -f .harness
+git rm -f .harness
+rm -rf .git/modules/.harness            # git이 남기는 서브모듈 메타 청소
+
+# 2) 하네스를 devDependency로 (PUBLIC 레포 → 무인증). 재현성 위해 태그/커밋으로 핀
+npm i -D github:rlatndud9090/llm-project-harness#<태그 또는 커밋SHA>
+
+# 3) attach 재실행 — .harness 링크 생성 + .gitignore 추가 + postinstall 배선 + 어댑터 재링크
+node node_modules/llm-project-harness/scripts/harness/attach-submodule.mjs
+
+# 4) CI 워크플로에서 submodules: true 제거(있다면). npm ci가 postinstall로 .harness를 만든다
+
+# 5) 이 CHANGELOG 항목 반영 확인 → 게이트 통과
+npm run harness:sync -- --ack
+npm run harness:gate
+
+# 6) 커밋: 서브모듈 제거 + package.json(devDep·postinstall) + .gitignore + .harness-sync + 어댑터
+git add -A && git commit
+```
+
+- 빌드 파이프라인이 하네스 스크립트를 직접 부르면(`prebuild`/`postinstall`에 `harness:*`)
+  경로에 `.harness/`가 남았는지 확인한다 — `.harness` 링크로 그대로 해결되므로 대개 무변경.
+- Windows는 junction이라 개발자 모드·`core.symlinks` 없이도 `.harness`가 만들어진다. 단
+  어댑터 symlink는 종전처럼 `core.symlinks=true`가 필요하다(`submodule-attach.md` 참고).
+- 하네스를 계속 서브모듈로 유지하려면 이 항목은 "서브모듈 제거 없이 그대로 두기"로
+  간주하고 `--ack`만 해도 된다(구 모델도 당분간 동작). 단, 배포·워크트리 문제는 이관해야
+  해소된다.
 
 ## 2026-08-04 make-pr-token-efficiency
 

@@ -1,9 +1,17 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   FORBIDDEN_STATUS_TRANSITIONS,
   adrBodyLooksAuthored,
   changelogEntriesAfter,
   changelogHeadId,
+  ensureHarnessLink,
+  isNewerSemverTag,
+  latestSemverTagFromLsRemote,
+  parseHarnessDependencySpec,
+  parseSemverTag,
   FRESHNESS_THROTTLE_MS,
   WIKI_AUTHORING_SENTINELS,
   datedBulletDate,
@@ -32,6 +40,119 @@ import {
   today,
   toPosix,
 } from "./lib.mjs";
+
+describe("ensureHarnessLink", () => {
+  const made = [];
+  afterEach(() => {
+    for (const dir of made.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  });
+  function project() {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-link-"));
+    made.push(root);
+    return root;
+  }
+  function installPackage(root) {
+    fs.mkdirSync(path.join(root, "node_modules", "llm-project-harness", "harness", "protocols"), { recursive: true });
+  }
+
+  it("creates the .harness symlink into the installed package", () => {
+    const root = project();
+    installPackage(root);
+    expect(ensureHarnessLink(root).status).toBe("created");
+    const link = path.join(root, ".harness");
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(fs.realpathSync(link)).toBe(fs.realpathSync(path.join(root, "node_modules", "llm-project-harness")));
+    // every `.harness/...` reference resolves through the link
+    expect(fs.existsSync(path.join(link, "harness", "protocols"))).toBe(true);
+  });
+
+  it("is idempotent: an already-correct link is left as-is", () => {
+    const root = project();
+    installPackage(root);
+    expect(ensureHarnessLink(root).status).toBe("created");
+    expect(ensureHarnessLink(root).status).toBe("ok");
+  });
+
+  it("no-ops when the package is not installed (prod --omit=dev)", () => {
+    const root = project();
+    expect(ensureHarnessLink(root).status).toBe("package-absent");
+    expect(fs.existsSync(path.join(root, ".harness"))).toBe(false);
+  });
+
+  it("never clobbers a real .harness directory (a not-yet-removed submodule)", () => {
+    const root = project();
+    installPackage(root);
+    fs.mkdirSync(path.join(root, ".harness"));
+    expect(ensureHarnessLink(root).status).toBe("occupied");
+    expect(fs.lstatSync(path.join(root, ".harness")).isDirectory()).toBe(true);
+  });
+
+  it("dry-run reports would-create without touching disk", () => {
+    const root = project();
+    installPackage(root);
+    expect(ensureHarnessLink(root, { dryRun: true }).status).toBe("would-create");
+    expect(fs.existsSync(path.join(root, ".harness"))).toBe(false);
+  });
+});
+
+describe("semver tag helpers", () => {
+  it("parseSemverTag accepts v-prefixed and bare MAJOR.MINOR.PATCH", () => {
+    expect(parseSemverTag("v1.2.3")).toEqual([1, 2, 3]);
+    expect(parseSemverTag("1.2.3")).toEqual([1, 2, 3]);
+    expect(parseSemverTag(" v0.0.0 ")).toEqual([0, 0, 0]);
+  });
+
+  it("parseSemverTag rejects non-semver tags", () => {
+    expect(parseSemverTag("v1.2")).toBeNull();
+    expect(parseSemverTag("main")).toBeNull();
+    expect(parseSemverTag("v1.2.3-rc1")).toBeNull();
+    expect(parseSemverTag(undefined)).toBeNull();
+  });
+
+  it("isNewerSemverTag orders by major, then minor, then patch", () => {
+    expect(isNewerSemverTag("v1.2.4", "v1.2.3")).toBe(true);
+    expect(isNewerSemverTag("v1.3.0", "v1.2.9")).toBe(true);
+    expect(isNewerSemverTag("v2.0.0", "v1.9.9")).toBe(true);
+    expect(isNewerSemverTag("v1.2.3", "v1.2.3")).toBe(false);
+    expect(isNewerSemverTag("v1.2.3", "v2.0.0")).toBe(false);
+    expect(isNewerSemverTag("main", "v1.0.0")).toBe(false);
+  });
+
+  it("latestSemverTagFromLsRemote picks the newest tag, ignoring ^{} and non-semver", () => {
+    const output = [
+      "abc123\trefs/tags/v1.0.0",
+      "def456\trefs/tags/v1.2.0",
+      "def456\trefs/tags/v1.2.0^{}",
+      "aaa000\trefs/tags/nightly",
+      "bbb111\trefs/tags/v1.1.5",
+    ].join("\n");
+    expect(latestSemverTagFromLsRemote(output)).toBe("v1.2.0");
+    expect(latestSemverTagFromLsRemote("")).toBeNull();
+    expect(latestSemverTagFromLsRemote("x\trefs/tags/main")).toBeNull();
+  });
+});
+
+describe("parseHarnessDependencySpec", () => {
+  it("parses github: / owner-repo / git+https forms with a pinned tag", () => {
+    expect(
+      parseHarnessDependencySpec({ devDependencies: { "llm-project-harness": "github:rlatndud9090/llm-project-harness#v1.2.0" } }),
+    ).toEqual({ owner: "rlatndud9090", repo: "llm-project-harness", tag: "v1.2.0" });
+    expect(
+      parseHarnessDependencySpec({ devDependencies: { "llm-project-harness": "rlatndud9090/llm-project-harness#v1.0.0" } }),
+    ).toEqual({ owner: "rlatndud9090", repo: "llm-project-harness", tag: "v1.0.0" });
+    expect(
+      parseHarnessDependencySpec({
+        dependencies: { "llm-project-harness": "git+https://github.com/rlatndud9090/llm-project-harness.git#v1.0.0" },
+      }),
+    ).toEqual({ owner: "rlatndud9090", repo: "llm-project-harness", tag: "v1.0.0" });
+  });
+
+  it("returns null when absent, unpinned, or not a recognized spec", () => {
+    expect(parseHarnessDependencySpec({})).toBeNull();
+    expect(parseHarnessDependencySpec({ devDependencies: { "llm-project-harness": "github:rlatndud9090/llm-project-harness" } })).toBeNull();
+    expect(parseHarnessDependencySpec({ devDependencies: { other: "^1.0.0" } })).toBeNull();
+  });
+});
 
 describe("parseWorkBranch", () => {
   it("parses well-formed work branches", () => {
