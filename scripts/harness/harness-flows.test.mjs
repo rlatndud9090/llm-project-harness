@@ -650,7 +650,7 @@ describe("harness sync reconciliation gate", () => {
     });
   });
 
-  it("fails harness:check when .harness-sync is stale (submodule updated, not reconciled)", () => {
+  it("fails harness:check when .harness-sync is stale (harness updated, not reconciled)", () => {
     withProject((projectRoot) => {
       attach(projectRoot);
       writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
@@ -1966,71 +1966,59 @@ describe("harness backlog fixes", () => {
   });
 });
 
-describe("kickoff branch handling", () => {
-  it("auto-creates and checks out the work branch on main + clean tree", () => {
+describe("kickoff branch handling (worktree-first; main worktree reserved)", () => {
+  it("does not auto-switch the reserved main worktree on a clean main; hints to isolate", () => {
     withGitProject((projectRoot) => {
       attach(projectRoot);
       commitAll(projectRoot); // main is now clean
-      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "auto-branch", "--title", "자동 브랜치"]);
+      // The reserved main worktree is the developer's; kickoff never auto-branches it
+      // in place. Work is expected to run in a dedicated origin/main-based worktree
+      // the agent opened first — so on main the script stays put and only hints.
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "reserved-main", "--title", "예약된 main"]);
       expect(k.status).toBe(0);
-      expect(currentBranch(projectRoot)).toBe("feature/auto-branch");
+      expect(currentBranch(projectRoot)).toBe("main"); // main worktree untouched
+      expect(`${k.stdout}${k.stderr}`).toContain("워크트리"); // isolation hint
+      // The raw skeleton is still materialized regardless of the branch decision.
+      expect(fs.existsSync(path.join(projectRoot, "docs", "raw", "feature", "reserved-main", "prd.md"))).toBe(true);
     });
   });
 
-  it("auto-branches when the only change is the next-feature anchor it will consume", () => {
+  it("consumes the next-feature anchor even though it leaves the main worktree in place", () => {
     withGitProject((projectRoot) => {
       attach(projectRoot);
-      commitAll(projectRoot); // main is clean...
-      // ...except the $next-feature anchor kickoff is about to consume. An untracked
-      // .next-unit must NOT read as WIP that blocks the main+clean auto-checkout.
+      commitAll(projectRoot);
+      // The anchor is consumed as part of skeleton creation, independent of the branch
+      // decision — leaving the reserved main worktree alone must not strand the anchor.
       writeFile(path.join(projectRoot, "docs", "raw", ".next-unit"), "feature/anchored | prd.md | 앵커영역 | \n");
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "anchored", "--title", "앵커"]);
       expect(k.status).toBe(0);
-      expect(currentBranch(projectRoot)).toBe("feature/anchored");
-      // The anchor is still consumed (deleted) even though the branch moved onto it.
+      expect(currentBranch(projectRoot)).toBe("main"); // reserved main worktree untouched
       expect(fs.existsSync(path.join(projectRoot, "docs", "raw", ".next-unit"))).toBe(false);
     });
   });
 
-  it("auto-branches on a re-run when only the target unit's raw dir is untracked", () => {
+  it("leaves an already-checked-out work branch in place (branch-first; the normal in-worktree path)", () => {
     withGitProject((projectRoot) => {
       attach(projectRoot);
       commitAll(projectRoot);
-      // Leftover skeleton from an aborted prior kickoff of the SAME unit: untracked
-      // files under the target raw dir are kickoff's own footprint, not unrelated WIP.
-      writeFile(path.join(projectRoot, "docs", "raw", "feature", "rerun", "notes.md"), "# 잔재\n");
-      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "rerun", "--title", "재실행"]);
+      // Simulates the normal flow: the agent opened a dedicated worktree on the unit's
+      // branch first, then runs kickoff inside it. The script recognizes branch-first
+      // and neither switches nor complains.
+      git(projectRoot, ["checkout", "-q", "-b", "feature/on-branch"]);
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "on-branch", "--title", "브랜치 위"]);
       expect(k.status).toBe(0);
-      expect(currentBranch(projectRoot)).toBe("feature/rerun");
+      expect(currentBranch(projectRoot)).toBe("feature/on-branch");
+      expect(fs.existsSync(path.join(projectRoot, "docs", "raw", "feature", "on-branch", "prd.md"))).toBe(true);
     });
   });
 
-  it("defers (stays on main) when unrelated WIP sits alongside the anchor", () => {
+  it("creates an in-place branch on main only with the explicit --checkout escape hatch", () => {
     withGitProject((projectRoot) => {
       attach(projectRoot);
       commitAll(projectRoot);
-      writeFile(path.join(projectRoot, "docs", "raw", ".next-unit"), "feature/mixed | prd.md | 혼합영역 | \n");
-      writeFile(path.join(projectRoot, "unrelated.txt"), "WIP\n"); // genuine unrelated change
-      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "mixed", "--title", "혼합"]);
+      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "forced", "--title", "강제", "--checkout"]);
       expect(k.status).toBe(0);
-      expect(currentBranch(projectRoot)).toBe("main");
-      expect(`${k.stdout}${k.stderr}`).toContain("자동 브랜치 생성을 건너뜁니다");
-    });
-  });
-
-  it("defers when a prefix-sibling unit dir is untracked (pins the rawPath+'/' guard)", () => {
-    withGitProject((projectRoot) => {
-      attach(projectRoot);
-      commitAll(projectRoot);
-      // Kicking off feature/foo while feature/foobar has untracked WIP. `foobar`
-      // shares the `foo` prefix but is a DIFFERENT unit — it must read as dirty so
-      // kickoff defers. This pins the trailing slash in startsWith(rawPath + "/"):
-      // dropping it would match foobar as owned and wrongly auto-branch over its WIP.
-      writeFile(path.join(projectRoot, "docs", "raw", "feature", "foobar", "notes.md"), "# 남의 WIP\n");
-      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "foo", "--title", "푸"]);
-      expect(k.status).toBe(0);
-      expect(currentBranch(projectRoot)).toBe("main");
-      expect(`${k.stdout}${k.stderr}`).toContain("자동 브랜치 생성을 건너뜁니다");
+      expect(currentBranch(projectRoot)).toBe("feature/forced");
     });
   });
 
@@ -2041,16 +2029,6 @@ describe("kickoff branch handling", () => {
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "stay", "--title", "머무름", "--no-branch"]);
       expect(k.status).toBe(0);
       expect(currentBranch(projectRoot)).toBe("main");
-    });
-  });
-
-  it("does not auto-switch on a dirty tree; prints a skip hint", () => {
-    withGitProject((projectRoot) => {
-      attach(projectRoot); // untracked files -> dirty
-      const k = kickoff(projectRoot, ["--type", "feature", "--slug", "dirty-skip", "--title", "더티"]);
-      expect(k.status).toBe(0);
-      expect(currentBranch(projectRoot)).toBe("main");
-      expect(`${k.stdout}${k.stderr}`).toContain("자동 브랜치 생성을 건너뜁니다");
     });
   });
 
@@ -2500,7 +2478,7 @@ function runCheck(projectRoot) {
   return spawnSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "artifact-check.mjs")], {
     cwd: projectRoot,
     encoding: "utf8",
-    // Disable the best-effort submodule freshness probe in tests: `.harness` here
+    // Disable the best-effort harness freshness probe in tests: `.harness` here
     // points at the provider repo (which has a real origin), so the network
     // ls-remote would add latency and flakiness. The probe is covered by its own
     // pure unit test (shouldProbeFreshness).

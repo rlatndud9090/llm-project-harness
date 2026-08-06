@@ -14,6 +14,11 @@
 npm run harness:kickoff -- $ARGUMENTS
 ```
 
+> 실행 **전** 항상 origin/main 기준 전용 워크트리로 격리한다(`EnterWorktree`, 이름
+> `<type>/<slug>`). 주 워킹트리(main-wt)는 개발자가 직접 쓰는 자리라 kickoff이 자동
+> 전환하지 않는다(base에서 격리 없이 부르면 힌트만). 상세는
+> `.harness/harness/protocols/kickoff.md`의 "브랜치 처리".
+
 ## 실행 (GitHub 이슈로 시작)
 
 `$ARGUMENTS`가 이슈 번호/URL 하나면 스크립트에 그대로 넘기지 말고 먼저 이슈를 조회·분류한다:

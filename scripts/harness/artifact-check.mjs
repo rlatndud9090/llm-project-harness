@@ -250,7 +250,7 @@ function assertWikiShape() {
 // section lineage links), never the "how to write the wiki" guidance. Older
 // attach/kickoff seeds copied the whole template — rules and all — into the wiki;
 // this gate flags any wiki file that still carries that boilerplate so the reform
-// (moving guidance to wiki-ingest.md) is machine-forced on submodule update. One
+// (moving guidance to wiki-ingest.md) is machine-forced on harness update. One
 // error per file; the sentinels live in lib (shared, testable).
 function assertWikiNoAuthoringGuidance() {
   if (harnessRepoMode || !pathExists(repoPath("docs", "wiki", "index.md"))) return;

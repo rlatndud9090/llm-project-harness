@@ -14,6 +14,38 @@
 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
 
+## 2026-08-06 kickoff-worktree-first
+
+**변경**
+
+`$kickoff`을 "워크트리 우선"으로 재정의했다. 주 워킹트리(main-wt)를 개발자가 직접
+작업·확인하는 자리로 **예약**하고, kickoff은 main-wt 상태(clean/dirty·어느 브랜치 위인지)와
+무관하게 항상 origin/main을 베이스로 한 **전용 워크트리** 안에서 돈다.
+
+- **`scripts/harness/kickoff.mjs`: base(main/master)에서의 자동 브랜치 전환을 제거.**
+  이전에는 `main + clean`이면 그 자리(main-wt)에서 `git checkout -b`로 작업 브랜치를 만들어
+  전환했다. 이제는 어떤 경우에도 main-wt를 자동 전환하지 않고, base에서 격리 없이 부르면
+  "origin/main 기준 워크트리로 격리하라"는 힌트만 낸다. branch-first(이미 `<type>/<slug>`
+  위), 목표 브랜치 존재 힌트, `--checkout`(현재 위치 강제 생성), `--no-branch`는 유지.
+  `treeCleanForKickoff`(kickoff 산출물 제외 clean 판정)은 자동 전환과 함께 제거했다.
+- **어댑터·프로토콜에 워크트리 격리 절차 명문화.** `harness/protocols/kickoff.md`의 "브랜치
+  처리"를 워크트리-우선 모델로 재작성하고, `.claude`/`.codex` kickoff 어댑터와 `/kickoff`
+  커맨드에 격리 순서를 추가했다(ClaudeCode: `EnterWorktree` 이름 `<type>/<slug>`; Codex:
+  `git worktree add -b <type>/<slug> <path> origin/main`).
+- **freshness/sync 문구를 devDependency 기준으로 정리.** freshness 로직은 이미 devDep 태그
+  비교로 전환돼 있었고(핀 `#v1.2.3` vs 원격 최신 태그), 남아 있던 "submodule" 표현만
+  `lib.mjs`·`artifact-check.mjs`·`sync.mjs`·`commit-protocol.md`에서 devDependency로 맞췄다.
+  동작 변화는 없다.
+
+**소비자 조치 (필수)**
+
+- kickoff으로 작업을 시작할 때 **항상 origin/main 기준 전용 워크트리로 격리**한다(주 워킹트리
+  main-wt는 건드리지 않는다). ClaudeCode는 `EnterWorktree`(이름 `<type>/<slug>`), Codex는
+  `git worktree add -b <type>/<slug> <path> origin/main`. base에서 격리 없이 kickoff을 부르면
+  이제 브랜치가 자동으로 생기지 않고 힌트만 나온다 — 워크트리로 격리하거나, 정말 현재
+  위치(main-wt)에 파야 하면 `--checkout`을 쓴다.
+- 문구 정리(submodule→devDependency)는 동작 변화가 없어 별도 조치가 필요 없다.
+
 ## 2026-08-05 devdependency-mount
 
 **변경**

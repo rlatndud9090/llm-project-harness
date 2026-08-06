@@ -23,7 +23,6 @@ import {
   toPosix,
   today,
   validateTypeAndSlug,
-  workingTreeChangedPaths,
   writeText,
 } from "./lib.mjs";
 
@@ -76,30 +75,17 @@ const unitDir = rawUnitPath(type, slug);
 const branchName = `${type}/${slug}`;
 const rawPath = `docs/raw/${type}/${slug}`;
 
-// ─── 브랜치 처리 (상황감지) ──────────────────────────────────────────────────
-// raw 골격을 만들기 전에 작업 브랜치를 정리한다. 전역 git 상태를 바꾸는 자동
-// 전환은 "main/master + clean"이라는 안전한 경우로만 제한한다. 단, "clean" 판정은
-// kickoff 자신의 산출물 — $next-feature가 남긴 `docs/raw/.next-unit` 앵커(이번에
-// 소비한다)와 대상 unit의 raw 디렉터리(이번에 만든다/재실행 잔재) — 은 dirty로 세지
-// 않는다. 이 자기 산출물을 dirty로 오인하면 next-feature→kickoff 정상 플로우에서
-// 앵커 하나 때문에 auto-checkout이 막히고 골격 생성까지 블록되기 때문이다. 그 외
-// (무관한 WIP·다른 작업 브랜치·detached·비-git)는 브랜치를 건드리지 않고 힌트만
-// 남겨, 워크트리 격리 vs 현재 위치 checkout 선택을 호출자(에이전트/사용자)에게 맡긴다.
-// --checkout은 현재 위치에서 강제 생성, --no-branch는 브랜치 로직을 완전히 끈다(충돌 시 우선).
+// ─── 브랜치 처리 (워크트리 우선 · 주 워킹트리 예약) ──────────────────────────
+// kickoff은 항상 origin/main 기준의 "전용 워크트리" 안에서 도는 것을 전제한다. 그
+// 워크트리와 작업 브랜치는 진입한 에이전트가 kickoff 실행 "전에" 먼저 만든다
+// (ClaudeCode: EnterWorktree, Codex: git worktree add -b <branch> <path> origin/main).
+// 그래서 정상 경로에서 이 스크립트는 이미 <type>/<slug> 위에 있고(branch-first) 아무
+// 브랜치도 갈아끼우지 않는다. 주 워킹트리(main/master)는 개발자가 직접 쓰는 몫으로
+// 남겨 두므로, 스크립트가 그 자리에서 base 브랜치를 새 브랜치로 자동 전환하는 일은
+// 없다 — 그건 예약된 main-wt를 침범하는 것이기 때문이다. base에서 격리 없이 부르면
+// 전환 대신 "워크트리로 격리하라"는 힌트만 낸다. 명시 탈출구로 --checkout(현재 위치
+// 강제 생성)·--no-branch(브랜치 로직 끄기)가 있고, 겹치면 --no-branch가 우선한다.
 const branchNote = resolveBranch();
-
-// main/master 자동 전환용 clean 판정. kickoff 자신의 산출물만 남은 트리는 "clean"으로
-// 본다: 소비할 `.next-unit` 앵커와, (재실행 시) 대상 unit의 raw 디렉터리. 무관한 변경이
-// 하나라도 섞여 있으면 dirty로 남아 호출자에게 워크트리 vs checkout 선택을 넘긴다.
-// git 오류(null)는 안전하게 dirty로 읽는다.
-function treeCleanForKickoff() {
-  const changed = workingTreeChangedPaths();
-  if (changed === null) return false;
-  return changed.every((entry) => {
-    const p = entry.replace(/\/$/, "");
-    return p === "docs/raw/.next-unit" || p === rawPath || p.startsWith(`${rawPath}/`);
-  });
-}
 
 function resolveBranch() {
   if (args["no-branch"]) return "브랜치 로직 건너뜀 (--no-branch)";
@@ -109,16 +95,17 @@ function resolveBranch() {
 
   const current = getCurrentBranch();
 
-  // 이미 이 유닛의 작업 브랜치 위 → branch-first, 그대로 둔다.
+  // 이미 이 유닛의 작업 브랜치 위 → branch-first, 그대로 둔다. 에이전트가 origin/main
+  // 기준 워크트리를 먼저 파고 그 안에서 kickoff을 부른 정상 경로가 여기로 온다.
   if (current === branchName) return `이미 ${branchName} 위 (그대로 둠)`;
 
   // 목표 브랜치가 이미 있으면 `checkout -b`는 실패한다. 자동 전환 대신 힌트만.
   if (localBranchExists(branchName)) {
-    console.warn(`[kickoff] 브랜치 ${branchName}이(가) 이미 있습니다. 그 브랜치로 옮기려면 "git checkout ${branchName}"를 직접 실행하세요.`);
+    console.warn(`[kickoff] 브랜치 ${branchName}이(가) 이미 있습니다. 그 브랜치의 워크트리로 들어가거나 "git checkout ${branchName}"를 직접 실행하세요.`);
     return `${branchName} 이미 존재 (전환 안 함)`;
   }
 
-  // --checkout: 현재 위치에서 강제로 새 브랜치 생성.
+  // --checkout: 현재 위치에서 강제로 새 브랜치 생성(주 워킹트리를 의도적으로 쓰는 탈출구).
   if (args.checkout) {
     try {
       createAndCheckoutBranch(branchName);
@@ -128,24 +115,22 @@ function resolveBranch() {
     }
   }
 
-  // 자동: main/master + clean 일 때만. 그 외는 건드리지 않고 상황을 알린다.
-  const onBase = BASE_BRANCHES.has(current);
-  if (onBase && treeCleanForKickoff()) {
-    try {
-      createAndCheckoutBranch(branchName);
-      return `${branchName} 자동 생성·전환 (main+clean)`;
-    } catch {
-      console.warn(`[kickoff] ${branchName} 자동 생성에 실패했습니다. 수동으로 "git checkout -b ${branchName}"를 실행하세요.`);
-      return `${branchName} 자동 생성 실패`;
-    }
-  }
-
+  // 자동 전환은 하지 않는다 — 주 워킹트리는 예약돼 있다. 격리된 워크트리를 기대하며
+  // 상황만 알린다(base·다른 브랜치·detached 모두 "워크트리로 격리하라"로 수렴).
   if (current === "HEAD") {
-    console.warn("[kickoff] detached HEAD 상태라 브랜치를 만들지 않습니다. 작업 브랜치를 정한 뒤 다시 실행하거나 --checkout을 쓰세요.");
-  } else if (onBase) {
-    console.warn(`[kickoff] 작업 트리에 커밋 안 된 변경이 있어 자동 브랜치 생성을 건너뜁니다. 정리 후 다시 실행하거나 --checkout(현재 위치 생성)/워크트리 격리를 선택하세요.`);
+    console.warn(`[kickoff] detached HEAD 상태입니다. origin/main 기준 워크트리로 격리한 뒤 다시 실행하거나 --checkout으로 ${branchName}을(를) 만드세요.`);
+  } else if (BASE_BRANCHES.has(current)) {
+    console.warn(
+      `[kickoff] 주 워킹트리(${current})는 그대로 두고 자동 전환하지 않습니다. ` +
+        `origin/main 기준 전용 워크트리로 격리해 ${branchName}에서 작업하세요 ` +
+        `(ClaudeCode: EnterWorktree, Codex: git worktree add -b ${branchName} <path> origin/main). ` +
+        `주 워킹트리에서 바로 파려면 --checkout.`,
+    );
   } else {
-    console.warn(`[kickoff] 다른 브랜치(${current})에서 실행 중입니다. 자동 전환하지 않습니다. 워크트리로 격리할지, --checkout으로 ${branchName}을(를) 만들지 선택하세요.`);
+    console.warn(
+      `[kickoff] 다른 브랜치(${current})에서 실행 중입니다. 자동 전환하지 않습니다. ` +
+        `origin/main 기준 워크트리로 격리하거나 --checkout으로 ${branchName}을(를) 만드세요.`,
+    );
   }
   return `브랜치 미변경 (현재 ${current})`;
 }

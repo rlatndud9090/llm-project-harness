@@ -778,7 +778,7 @@ export function findWikiAuthoringSentinel(text) {
   return WIKI_AUTHORING_SENTINELS.find((sentinel) => text.includes(sentinel)) ?? null;
 }
 
-// ─── Submodule freshness probe throttle ─────────────────────────────────────
+// ─── Harness freshness probe throttle ───────────────────────────────────────
 // The freshness nudge does a live `git ls-remote` (network). Running it on every
 // harness:check would add latency to every commit (pre-commit runs the check). The
 // user asked for an occasional ("한번씩") nudge, so we throttle the network probe to

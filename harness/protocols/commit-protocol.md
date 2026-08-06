@@ -7,7 +7,7 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 
 - 하나의 논리적 작업 단위는 하나의 커밋으로 묶는다.
 - 의미 있는 제품, 아키텍처, 구현 변경은 관련 PRD와 ADR을 가진다.
-- 하네스 submodule 업데이트나 adapter 정리는 제품 기능 변경과 분리한다.
+- 하네스 devDependency 업데이트나 adapter 정리는 제품 기능 변경과 분리한다.
 - 커밋 본문에는 `관련 문서:` 블록을 반드시 둔다.
 - Lore trailer는 커밋의 제약, 검증, 위험, raw unit 연결을 남기는 데 사용한다.
 - 검증하지 않은 내용을 `Tested:`에 쓰지 않는다.
@@ -45,7 +45,7 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 
 아래 변경은 기본적으로 Notes 링크를 사용한다.
 
-- 하네스 submodule 업데이트 또는 프로젝트 adapter 정리
+- 하네스 devDependency 업데이트 또는 프로젝트 adapter 정리
 - Codex/ClaudeCode adapter, skill, command, role prompt 변경
 - 개발자 workflow만 바꾸고 제품/도메인 동작을 바꾸지 않는 운영 변경
 
@@ -73,10 +73,10 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 - 무엇이 바뀌었는가(하네스 관점).
 
 **소비자 조치 (필수)**
-- 이 커밋을 서브모듈로 반영하는 소비 프로젝트가 정합성을 위해 해야 할 일. 없으면 "없음".
+- 이 커밋을 devDependency 핀으로 반영하는 소비 프로젝트가 정합성을 위해 해야 할 일. 없으면 "없음".
 ```
 
-- 소비 프로젝트는 서브모듈 업데이트 후 `npm run harness:sync`로 이 항목을 읽고 반영한 뒤
+- 소비 프로젝트는 devDependency 핀 업데이트 후 `npm run harness:sync`로 이 항목을 읽고 반영한 뒤
   `--ack`로 확인한다. 확인 전에는 소비자의 `harness:check`가 막는다(`.harness-sync` 게이트).
 - `harness:hooks`를 설치한 저장소는 pre-commit의 `verify-changelog`가 공용 표면 변경 커밋에
   CHANGELOG 항목을 강제한다(소비 프로젝트에서는 no-op).
@@ -192,7 +192,7 @@ EOF
 ## 하네스 정비 ride-along (브랜치 규율 예외)
 
 작업 단위는 원칙적으로 자기 브랜치에서 커밋한다(branch-per-unit). **딱 하나의 예외**로,
-**`.harness` 서브모듈 최신화와 그에 부수되는 정합화**(`harness:sync --ack`, 위키 규칙-잔재
+**`.harness` devDependency 핀 최신화와 그에 부수되는 정합화**(`harness:sync --ack`, 위키 규칙-잔재
 제거, frontmatter 마이그레이션 등)는 **전용 브랜치나 워크트리를 새로 파지 않고 지금 작업 중인
 아무 브랜치에 chore 커밋 하나로 태워** 반영해도 된다.
 

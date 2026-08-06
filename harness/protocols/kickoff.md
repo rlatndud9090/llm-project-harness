@@ -48,7 +48,8 @@ chore/work
 npm run harness:kickoff -- --title "데이터 계약"
 ```
 
-`main`에서 미리 만들 때는 명시한다.
+브랜치명으로 유형·slug 추론이 어려우면 명시한다(격리한 워크트리 브랜치가 `<type>/<slug>`와
+다른 경우 등).
 
 ```sh
 npm run harness:kickoff -- --type feature --slug data-contract --title "데이터 계약"
@@ -91,32 +92,35 @@ state 원장에만 남는다). URL을 주면 URL을, 번호를 주면 `#<번호>
 "먼저 이슈를 조회·분류하라"는 힌트를 낸다 — 유형 판정을 건너뛴 채 골격이 생기는 것을
 막기 위해서다.
 
-### 브랜치 처리 (상황감지)
+### 브랜치 처리 (워크트리 우선 · 주 워킹트리는 개발자 몫)
 
-`$kickoff`은 raw 골격을 만들기 **전에** 작업 브랜치를 정리한다. 전역 git 상태를
-바꾸는 자동 전환은 안전한 경우로만 제한한다.
+`$kickoff`은 raw 골격을 만들기 **전에** 작업을 전용 워크트리로 격리한다. **주
+워킹트리(main-wt)는 개발자가 직접 작업하거나 확인하는 자리로 남겨 두고, kickoff이 그
+브랜치를 자동으로 갈아끼우지 않는다.** main-wt 상태(clean/dirty·어느 브랜치 위인지)와
+무관하게 항상 격리하며, 순서는 다음과 같다:
+
+1. `git fetch origin` — origin/main을 최신으로 맞춘다.
+2. **origin/main을 베이스로 전용 워크트리를 만들고 그 안으로 들어간다.**
+   - **ClaudeCode**: `EnterWorktree`(이름 = `<type>/<slug>`). 워크트리는 기본
+     `worktree.baseRef=fresh`로 origin/<기본 브랜치>에서 분기한다.
+   - **Codex**: `git worktree add -b <type>/<slug> <path> origin/main` 후 그 경로로 이동.
+3. 격리된 워크트리 안에서 `harness:kickoff`을 실행한다. 이미 `<type>/<slug>` 위이므로
+   스크립트는 브랜치를 건드리지 않고(branch-first) 골격만 만든다.
 
 | 상황 | 동작 |
 | --- | --- |
-| `main`/`master` + 작업 트리 clean | 작업 브랜치를 **자동 생성·전환**(`git checkout -b <type>/<slug>`) |
-| 이미 이 유닛의 작업 브랜치 위 | 그대로 둔다 (branch-first) |
-| 목표 브랜치가 이미 존재 | 전환하지 않고 힌트만 (`git checkout <branch>`를 직접) |
-| 다른 브랜치 / 무관한 커밋 안 된 변경 / detached HEAD / 비-git | 브랜치를 건드리지 않고 힌트만 |
+| 격리된 워크트리에서 `<type>/<slug>` 위 (정상 경로) | 브랜치 그대로 두고 골격 생성 (branch-first) |
+| `main`/`master` 등 base 위에서 격리 없이 실행 | 전환하지 않고 "워크트리로 격리하라" 힌트만 |
+| 목표 브랜치가 이미 존재 | 전환하지 않고 힌트만 (그 브랜치의 워크트리로 진입) |
+| 다른 브랜치 / detached HEAD / 비-git | 브랜치를 건드리지 않고 힌트만 |
 
-여기서 "clean"은 **kickoff 자신의 산출물을 제외**하고 본다. `$next-feature`가 남긴
-`docs/raw/.next-unit` 앵커(이번 kickoff이 소비한다)와 대상 unit의 raw 디렉터리
-(`docs/raw/<type>/<slug>/`, 이번에 만들거나 재실행 잔재)만 남아 있으면 여전히 자동
-전환한다. 이 자기 산출물을 "커밋 안 된 변경"으로 오인하면 `$next-feature → $kickoff`
-정상 플로우에서 앵커 하나 때문에 auto-checkout이 막히고 raw 골격 생성까지 블록되기
-때문이다. **무관한 WIP가 하나라도 섞이면** dirty로 남아 아래 힌트 경로를 탄다.
+자동 전환은 **어느 경우에도 하지 않는다** — main-wt를 침범하지 않기 위해서다. 주
+워킹트리에서 **의도적으로** 격리 없이 그 자리에 브랜치를 파야 하면 `--checkout`으로
+현재 위치에서 강제 생성한다(탈출구). 브랜치 로직을 완전히 끄려면 `--no-branch`(둘이
+겹치면 `--no-branch`가 우선). 어느 경우든 raw 골격 생성과 `.next-unit` 소비는 브랜치
+결정과 무관하게 그대로 진행된다.
 
-즉 개발자가 `main`에서 (kickoff 산출물 외에) 깨끗한 상태로 kickoff하면 브랜치가 알아서
-생기고, 이미 작업 브랜치를 파 둔 branch-first 습관도 그대로 동작한다. 그 밖의 상황에서는
-kickoff이 자동 전환을 **하지 않고**, 진입한 에이전트가 사용자에게 **워크트리로 격리할지
-(EnterWorktree) 현재 위치에서 브랜치를 팔지(`--checkout`)** 물어본 뒤 진행한다. 어느 쪽을
-고르든 raw 골격 생성과 `.next-unit` 소비는 브랜치 결정과 무관하게 그대로 진행된다.
-
-- `--checkout`: 현재 위치에서 `<type>/<slug>` 브랜치를 강제로 생성·전환한다.
+- `--checkout`: 현재 위치에서 `<type>/<slug>` 브랜치를 강제로 생성·전환한다(주 워킹트리를 의도적으로 쓸 때만).
 - `--no-branch`: 브랜치 로직을 완전히 끈다(둘이 겹치면 `--no-branch`가 우선).
 
 ### `--area` / `--section` (선택): 영역·섹션 시드

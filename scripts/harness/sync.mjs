@@ -11,10 +11,11 @@ import {
   writeText,
 } from "./lib.mjs";
 
-// Consumer reconciliation command. After updating the `.harness` submodule, a
-// consuming project runs this to read the CHANGELOG entries it has not yet
-// reconciled (each with a required consumer action), applies them, then re-runs
-// with --ack to record the reconciliation. `harness:check` blocks until acked.
+// Consumer reconciliation command. After bumping the harness devDependency pin
+// (the `.harness` mount), a consuming project runs this to read the CHANGELOG
+// entries it has not yet reconciled (each with a required consumer action), applies
+// them, then re-runs with --ack to record the reconciliation. `harness:check`
+// blocks until acked.
 
 const args = parseArgs(process.argv.slice(2));
 
