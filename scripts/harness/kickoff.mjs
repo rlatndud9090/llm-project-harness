@@ -78,7 +78,7 @@ const rawPath = `docs/raw/${type}/${slug}`;
 // ─── 브랜치 처리 (워크트리 우선 · 주 워킹트리 예약) ──────────────────────────
 // kickoff은 항상 origin/main 기준의 "전용 워크트리" 안에서 도는 것을 전제한다. 그
 // 워크트리와 작업 브랜치는 진입한 에이전트가 kickoff 실행 "전에" 먼저 만든다
-// (ClaudeCode: EnterWorktree, Codex: git worktree add -b <branch> <path> origin/main).
+// (EnterWorktree로 origin/main 기준 전용 워크트리를 만든다).
 // 그래서 정상 경로에서 이 스크립트는 이미 <type>/<slug> 위에 있고(branch-first) 아무
 // 브랜치도 갈아끼우지 않는다. 주 워킹트리(main/master)는 개발자가 직접 쓰는 몫으로
 // 남겨 두므로, 스크립트가 그 자리에서 base 브랜치를 새 브랜치로 자동 전환하는 일은
@@ -123,7 +123,7 @@ function resolveBranch() {
     console.warn(
       `[kickoff] 주 워킹트리(${current})는 그대로 두고 자동 전환하지 않습니다. ` +
         `origin/main 기준 전용 워크트리로 격리해 ${branchName}에서 작업하세요 ` +
-        `(ClaudeCode: EnterWorktree, Codex: git worktree add -b ${branchName} <path> origin/main). ` +
+        `(EnterWorktree로 origin/main 기준 전용 워크트리를 만드세요). ` +
         `주 워킹트리에서 바로 파려면 --checkout.`,
     );
   } else {

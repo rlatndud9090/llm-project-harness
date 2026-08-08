@@ -101,8 +101,9 @@ function ensureClaudeSettings() {
     const settings = {
       extraKnownMarketplaces: { [MARKETPLACE_NAME]: desiredMarketplace },
       enabledPlugins: { [MARKETPLACE_NAME]: true },
+      worktree: { bgIsolation: "none" },
     };
-    operations.push(`create ${rel} (marketplace + enabledPlugins)`);
+    operations.push(`create ${rel} (marketplace + enabledPlugins + worktree)`);
     if (!dryRun) {
       fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
       writeJsonFile(settingsPath, settings);
@@ -126,10 +127,15 @@ function ensureClaudeSettings() {
 
   const marketplaces = isPlainObject(settings.extraKnownMarketplaces) ? settings.extraKnownMarketplaces : {};
   const enabled = isPlainObject(settings.enabledPlugins) ? settings.enabledPlugins : {};
+  const worktree = isPlainObject(settings.worktree) ? settings.worktree : {};
 
   const marketplaceOk = JSON.stringify(marketplaces[MARKETPLACE_NAME]) === JSON.stringify(desiredMarketplace);
   const enabledOk = enabled[MARKETPLACE_NAME] === true;
-  if (marketplaceOk && enabledOk) {
+  // 하네스 kickoff은 bg 워크트리로 격리하는데, 기본 bg 격리가 그 워크트리의 로컬
+  // 상태를 떼어내면 흐름이 깨질 수 있다. bgIsolation을 "none"으로 보장하되, 이미
+  // 값이 있으면(소비자가 일부러 정한 것) 존중하고 없을 때만 채운다.
+  const worktreeOk = worktree.bgIsolation !== undefined;
+  if (marketplaceOk && enabledOk && worktreeOk) {
     operations.push(`kept ${rel} (already wired)`);
     return;
   }
@@ -138,8 +144,9 @@ function ensureClaudeSettings() {
     ...settings,
     extraKnownMarketplaces: { ...marketplaces, [MARKETPLACE_NAME]: desiredMarketplace },
     enabledPlugins: { ...enabled, [MARKETPLACE_NAME]: true },
+    worktree: { ...worktree, bgIsolation: worktree.bgIsolation ?? "none" },
   };
-  operations.push(`merge ${rel} (marketplace + enabledPlugins)`);
+  operations.push(`merge ${rel} (marketplace + enabledPlugins + worktree)`);
   if (!dryRun) writeJsonFile(settingsPath, next);
 }
 

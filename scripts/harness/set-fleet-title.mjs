@@ -20,7 +20,7 @@
 //
 // --label 은 그대로, --slug 은 하이픈을 공백으로 바꿔 작업명으로 쓴다.
 //
-// Claude/FleetView 전용 편의 기능이므로 Codex 어댑터에는 대응 블록이 없다(parity 무관).
+// Claude Code/FleetView 전용 편의 기능이다.
 
 import fs from "node:fs";
 import os from "node:os";
