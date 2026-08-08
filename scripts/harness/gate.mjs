@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// The harness artifact check ships in the plugin, so a consuming project has no
+// `harness:check` npm script to run. Resolve the sibling engine script and invoke
+// it directly (cwd = the repo under test decides provider vs consumer mode). The
+// other steps (lint/build/test:run) remain the consumer's own package scripts.
+const ARTIFACT_CHECK = path.join(path.dirname(fileURLToPath(import.meta.url)), "artifact-check.mjs");
 
 // Windows에서 `npm`은 실행 파일이 아니라 `npm.cmd` 셸 래퍼다. Node 18.20.2 /
 // 20.12.2 / 21.7.3에서 CVE-2024-27980 대응으로 `.cmd`·`.bat`의 암묵적 실행이
@@ -33,7 +41,7 @@ process.exitCode = runGateSteps();
 
 function runGateSteps() {
   for (const script of steps) {
-    console.log(`[harness:gate] npm run ${script}`);
+    console.log(`[harness:gate] ${script === "harness:check" ? "artifact-check" : `npm run ${script}`}`);
 
     const result = runScript(script, { encoding: "utf8", maxBuffer });
 
@@ -98,6 +106,10 @@ function testSummaryLines(output) {
 }
 
 function runScript(script, options) {
+  // harness:check has no consumer npm script — run the plugin's engine directly.
+  if (script === "harness:check") {
+    return spawnSync(process.execPath, [ARTIFACT_CHECK], options);
+  }
   if (packageManagerCli) {
     return spawnSync(process.execPath, [packageManagerCli, "run", script], options);
   }

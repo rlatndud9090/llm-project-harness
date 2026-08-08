@@ -1,0 +1,23 @@
+name: "LLM Project Harness Gate"
+description: "우회 불가능한 하네스 승인 게이트를 CI에서 실행한다 — 아티팩트/state.md 승인 원장 정합성 검사에 이어 프로젝트의 lint·build·test를 순서대로 돈다. 엔진은 이 플러그인 저장소에서 오고, 소비 저장소에는 엔진 사본이 없다."
+
+# 소비 저장소의 워크플로에서 다음처럼 호출한다(actions/checkout·setup-node 이후):
+#   - uses: rlatndud9090/llm-project-harness@<tag 또는 main>
+# composite 스텝은 기본적으로 소비 저장소 checkout(GITHUB_WORKSPACE)을 cwd로 돌고,
+# 엔진 스크립트는 ${{ github.action_path }}(이 플러그인 저장소 checkout) 아래에서 온다.
+runs:
+  using: composite
+  steps:
+    - name: Install project dependencies
+      shell: bash
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        elif [ -f package.json ]; then
+          npm install
+        else
+          echo "no package.json — skipping dependency install (harness check + declared scripts only)"
+        fi
+    - name: Harness gate (check + lint + build + test)
+      shell: bash
+      run: node "${{ github.action_path }}/scripts/harness/gate.mjs"

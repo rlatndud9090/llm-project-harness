@@ -2396,11 +2396,14 @@ describe("harness:gate condensed output", () => {
   });
 });
 
-// gate 픽스처: 실제 하네스 스텝 대신 즉시 끝나는 스크립트를 둔다. 검증 대상은
-// 스텝의 내용이 아니라 "패키지 매니저를 띄울 수 있는가"이기 때문이다.
+// gate 픽스처: gate.mjs는 첫 스텝(harness:check)을 플러그인 엔진(artifact-check.mjs)으로
+// 직접 돌리므로, 소비자를 유효한 하네스 프로젝트로 초기화해 그 검사가 통과하게 한다
+// (harnessInit이 .harness.json·docs를 깔고, "fresh 소비자는 check 통과"는 별도 테스트가
+// 검증한다). 나머지 lint/build/test:run은 즉시 끝나는 스텁이라 검증 대상은 스텝 내용이
+// 아니라 gate 오케스트레이션(축약출력·실패덤프·요약 표면화)이다.
 function seedGateScripts(projectRoot, overrides = {}) {
+  harnessInit(projectRoot);
   const scripts = {
-    "harness:check": 'node -e "console.log(0)"',
     lint: 'node -e "console.log(0)"',
     build: 'node -e "console.log(0)"',
     "test:run": 'node -e "console.log(0)"',
