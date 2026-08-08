@@ -936,7 +936,7 @@ describe("harness-init (plugin bootstrap)", () => {
     });
   });
 
-  it("migrates an old install: removes the .harness symlink and strips devDep/postinstall", () => {
+  it("migrates an old install: removes the .harness symlink, strips devDep/postinstall/harness scripts, and migrates the CI workflow", () => {
     withProject((projectRoot) => {
       // Simulate a legacy devDependency/submodule consumer.
       fs.symlinkSync(repoRoot, path.join(projectRoot, ".harness"), "dir");
@@ -948,6 +948,8 @@ describe("harness-init (plugin bootstrap)", () => {
             devDependencies: { "llm-project-harness": "github:rlatndud9090/llm-project-harness#v1.0.0" },
             scripts: {
               postinstall: "node node_modules/llm-project-harness/scripts/harness/link.mjs || true",
+              "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
+              "harness:gate": "node .harness/scripts/harness/gate.mjs",
               build: "echo build",
             },
           },
@@ -956,17 +958,28 @@ describe("harness-init (plugin bootstrap)", () => {
         )}\n`,
       );
       writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
+      // Legacy CI workflow that ran the devDep-mounted gate (a now-dead .harness path).
+      writeFile(
+        path.join(projectRoot, ".github", "workflows", "harness.yml"),
+        "name: harness\non:\n  push:\n    branches: [main]\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci\n      - run: npm run harness:gate\n",
+      );
 
       harnessInit(projectRoot);
 
       // the old mount and sync marker are gone
       expect(fs.existsSync(path.join(projectRoot, ".harness"))).toBe(false);
       expect(fs.existsSync(path.join(projectRoot, ".harness-sync"))).toBe(false);
-      // package.json: harness devDep + link.mjs postinstall stripped, other scripts kept
+      // package.json: harness devDep + link.mjs postinstall + dead .harness harness:* scripts stripped, other scripts kept
       const pkg = JSON.parse(read(path.join(projectRoot, "package.json")));
       expect(pkg.devDependencies?.["llm-project-harness"]).toBeUndefined();
       expect(pkg.scripts?.postinstall).toBeUndefined();
+      expect(pkg.scripts?.["harness:check"]).toBeUndefined();
+      expect(pkg.scripts?.["harness:gate"]).toBeUndefined();
       expect(pkg.scripts?.build).toBe("echo build");
+      // the old CI workflow (npm run harness:gate) is migrated to the composite action
+      const wf = read(path.join(projectRoot, ".github", "workflows", "harness.yml"));
+      expect(wf).toContain("rlatndud9090/llm-project-harness");
+      expect(wf).not.toContain("npm run harness:gate");
       // and the freshly migrated consumer passes the check
       expect(runCheck(projectRoot).status).toBe(0);
     });

@@ -1,7 +1,7 @@
 {
   "name": "llm-project-harness",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Reusable cross-agent LLM project harness for product repositories.",
   "type": "module",
   "scripts": {

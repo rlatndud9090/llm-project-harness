@@ -152,14 +152,11 @@ function ensureClaudeSettings() {
 
 // ─── CI 게이트 워크플로 ──────────────────────────────────────────────────────
 // push/PR마다 하네스 게이트를 서버사이드에서 돌려 승인 게이트를 우회 불가능하게 만든다.
-// 소비자 checkout + setup-node + 공용 composite action(rlatndud9090/llm-project-harness@main)
-// 호출까지만 스캐폴드한다. action.yml 자체는 이후 체크포인트에서 이 저장소에 추가된다.
+// 소비자 checkout + setup-node + 공용 composite action(rlatndud9090/llm-project-harness@main,
+// action.yml)만 호출한다 — 엔진은 그 action이 태그로 fetch하므로 소비자엔 사본이 없다.
 function ensureWorkflow() {
   const workflowPath = path.join(projectRoot, ".github", "workflows", "harness.yml");
-  if (pathExists(workflowPath)) {
-    operations.push(`kept ${relative(workflowPath)}`);
-    return;
-  }
+  const rel = relative(workflowPath);
 
   const content = `name: harness
 on:
@@ -179,7 +176,28 @@ jobs:
           node-version: 20
       - uses: ${MARKETPLACE_REPO}@main
 `;
-  operations.push(`create ${relative(workflowPath)}`);
+
+  if (pathExists(workflowPath)) {
+    const existing = readText(workflowPath);
+    if (existing.includes(`${MARKETPLACE_REPO}@`)) {
+      operations.push(`kept ${rel} (already plugin CI)`);
+      return;
+    }
+    // 옛 devDependency 모델 워크플로(`npm run harness:gate`/`.harness/scripts` 참조)는
+    // 삭제된 `.harness` 마운트를 가리켜 CI가 깨진다. 하네스 CI로 식별되면 composite
+    // action 버전으로 교체한다(마이그레이션). 하네스로 안 보이는 커스텀 워크플로는 보존.
+    if (existing.includes("harness:gate") || existing.includes(".harness/scripts")) {
+      operations.push(`migrate ${rel} (old harness CI → composite action)`);
+      migrations.push(`replace old ${rel} (npm run harness:gate → uses: ${MARKETPLACE_REPO})`);
+      if (!dryRun) fs.writeFileSync(workflowPath, content, "utf8");
+      return;
+    }
+    operations.push(`kept ${rel} (non-harness workflow)`);
+    warnings.push(`${rel}이 이미 있고 하네스 CI로 보이지 않습니다. 플러그인 CI가 필요하면 "- uses: ${MARKETPLACE_REPO}@<tag>" 스텝을 직접 추가하세요.`);
+    return;
+  }
+
+  operations.push(`create ${rel}`);
   if (!dryRun) {
     fs.mkdirSync(path.dirname(workflowPath), { recursive: true });
     fs.writeFileSync(workflowPath, content, "utf8");
@@ -341,10 +359,19 @@ function migrateOldInstall() {
           changed = true;
         }
       }
-      if (isPlainObject(pkg.scripts) && typeof pkg.scripts.postinstall === "string" && pkg.scripts.postinstall.includes("link.mjs")) {
-        delete pkg.scripts.postinstall;
-        migrations.push("strip link.mjs postinstall from package.json");
-        changed = true;
+      if (isPlainObject(pkg.scripts)) {
+        // 삭제된 `.harness` 마운트를 가리키던 하네스 스크립트(harness:check/kickoff/gate/…)와
+        // link.mjs postinstall을 걷어낸다. 플러그인 모델에선 소비자가 하네스 npm 스크립트를
+        // 두지 않는다(세션은 플러그인 스킬, CI는 composite action). 그대로 두면 죽은 경로를
+        // 가리켜 실행 시 깨진다.
+        for (const [name, cmd] of Object.entries(pkg.scripts)) {
+          if (typeof cmd !== "string") continue;
+          if (cmd.includes(".harness/scripts/") || (name === "postinstall" && cmd.includes("link.mjs"))) {
+            delete pkg.scripts[name];
+            migrations.push(`strip package.json script "${name}" (삭제된 .harness 마운트 참조)`);
+            changed = true;
+          }
+        }
       }
       if (changed && !dryRun) writeJsonFile(packagePath, pkg);
     }

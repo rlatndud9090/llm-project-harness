@@ -23,6 +23,23 @@
 없으면 "소비자 조치: 없음"으로 명시한다. 배선(git훅·CI 워크플로·`.harness.json`·settings) 형태를
 바꾸는 항목은 소비자 조치에 "`/harness-init` 재실행"을 명시한다.
 
+## 2026-08-08 harness-init-migration-completeness
+
+**변경 (버그픽스 — 옛 설치 이관 완결성)**
+
+`/harness-init`의 옛 devDependency/`.harness` 설치 이관이 두 잔재를 놓쳐 이관 후 CI/스크립트가
+깨지던 것을 고쳤다.
+
+- **옛 CI 워크플로 교체.** `.github/workflows/harness.yml`이 이미 있어도, `npm run harness:gate`나
+  `.harness/scripts`를 참조하는 옛 하네스 워크플로면 composite action(`uses: rlatndud9090/llm-project-harness@…`)
+  버전으로 교체한다(삭제된 `.harness` 마운트를 가리켜 CI가 깨지던 것). 하네스로 안 보이는 커스텀 워크플로는 보존·경고.
+- **죽은 `harness:*` 스크립트 정리.** package.json에서 `.harness/scripts/…`를 가리키는 스크립트
+  (`harness:check`/`harness:gate`/`harness:kickoff` 등)를 걷어낸다. 플러그인 모델에선 소비자가 하네스 npm
+  스크립트를 두지 않는다(세션=플러그인 스킬, CI=composite action).
+
+**소비자 조치**: 신규 이관은 자동. **2.1.1 이전에 이미 `/harness-init`으로 이관한 소비 레포**는 위 두 잔재가
+남아 있을 수 있으니 `/harness-init`을 한 번 다시 실행한다(배선 변경).
+
 ## 2026-08-08 bundle-pr-workflow-skills
 
 **변경**
