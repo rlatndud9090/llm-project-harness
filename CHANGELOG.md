@@ -23,6 +23,21 @@
 없으면 "소비자 조치: 없음"으로 명시한다. 배선(git훅·CI 워크플로·`.harness.json`·settings) 형태를
 바꾸는 항목은 소비자 조치에 "`/harness-init` 재실행"을 명시한다.
 
+## 2026-08-08 bundle-pr-workflow-skills
+
+**변경**
+
+PR/머지 워크플로 스킬 4종을 플러그인에 번들했다(개인 프로필에서 이관, 공유용으로 중립화):
+`merge-and-clean`(PR squash 머지 + 워크트리/브랜치 정리 + base ff 최신화),
+`pr-review-check-loop`·`pr-review-check-once`(Codex 자동 리뷰 수렴 감시·반영),
+`pr-self-loop`(Codex 미가용 시 격리 리뷰어 셀프 루프). 계정 하드코딩·개인 호칭·`env -u
+GITHUB_TOKEN` 우회를 제거하고, 파괴적 쓰기 전 gh 인증 계정·repo 호스트를 확인하는 일반
+가드로 중립화했다(gh 우선 + `mcp__github__*` MCP 폴백, 안전 의도·fail-closed 게이트는 보존).
+번들 helper는 `${CLAUDE_PLUGIN_ROOT}/skills/…`로 해석한다. 플러그인이 활성화된 곳이면
+어디서나 `/llm-project-harness:merge-and-clean` 등으로 호출한다.
+
+**소비자 조치**: 없음(마켓플레이스 업데이트로 자동 반영).
+
 ## 2026-08-08 claude-code-plugin-migration
 
 **변경 (BREAKING — 배포 방식 전환)**
