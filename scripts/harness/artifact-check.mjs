@@ -1,16 +1,12 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import {
   BROAD_FEATURE_CATEGORIES,
   CURRENT_MARKER,
-  FRESHNESS_THROTTLE_MS,
   OPERATIONS_CATEGORIES,
   BUILD_STAGES,
   FINAL_STAGES,
-  changelogHeadId,
   REPO_ROOT,
   STAGE_VALUES,
   adrBodyLooksAuthored,
@@ -18,10 +14,6 @@ import {
   collectDeclaredSections,
   fail,
   findWikiAuthoringSentinel,
-  shouldProbeFreshness,
-  isNewerSemverTag,
-  latestSemverTagFromLsRemote,
-  parseHarnessDependencySpec,
   isPreAdrStage,
   skeletonAdrBody,
   findHarnessRoot,
@@ -70,12 +62,12 @@ function assertHarnessShape() {
   for (const requiredPath of [
     harnessPath("harness", "README.md"),
     harnessPath("harness", "protocols", "session-start.md"),
-    harnessPath("harness", "protocols", "submodule-attach.md"),
+    harnessPath("harness", "protocols", "harness-init.md"),
     harnessPath("harness", "templates", "raw", "feature-prd.md"),
     harnessPath("harness", "templates", "raw", "feature-adr.md"),
     harnessPath("harness", "templates", "raw", "notes.md"),
     harnessPath("harness", "templates", "wiki", "index.md"),
-    harnessPath("scripts", "harness", "attach-submodule.mjs"),
+    harnessPath("scripts", "harness", "init.mjs"),
     harnessPath("scripts", "harness", "kickoff.mjs"),
   ]) {
     if (!pathExists(requiredPath)) {
@@ -108,99 +100,30 @@ function assertProjectDocsPresent() {
   }
 }
 
-// Consumer reconciliation gate: after bumping the harness devDependency, the
-// project must reconcile the new CHANGELOG entries (each carries a required
-// consumer action, e.g. rewriting docs/wiki) and record it with harness:sync.
-// Fails until `.harness-sync` matches the harness CHANGELOG head. Skips in the
-// provider repo and when the installed harness predates the changelog.
-function assertHarnessSync() {
+// Plugin-model adoption marker (consumer mode only). A repo opts into the harness
+// by dropping a `.harness.json` flag at its root (written by `/harness-init`); the
+// plugin's SessionStart hook and every consumer-mode gate key on it. Require it to
+// exist and be valid JSON — a missing or malformed flag means the repo is not (or
+// not cleanly) adopted, so fail loudly. Replaces the old devDependency-era sync
+// reconciliation and remote-freshness gates: the plugin is installed and updated
+// through Claude Code's marketplace, not an npm pin.
+function assertHarnessFlag() {
   if (harnessRepoMode) return;
 
-  const changelogPath = harnessPath("CHANGELOG.md");
-  if (!pathExists(changelogPath)) return;
-
-  const head = changelogHeadId(readText(changelogPath));
-  if (!head) return;
-
-  const syncPath = repoPath(".harness-sync");
-  const acked = pathExists(syncPath) ? readText(syncPath).trim() : "";
-  if (acked !== head) {
+  const flagPath = repoPath(".harness.json");
+  if (!pathExists(flagPath)) {
     addError(
-      `harness updated but not reconciled: .harness-sync "${acked || "(missing)"}" != CHANGELOG head "${head}". ` +
-        `Run "npm run harness:sync" to read the required consumer actions, apply them, then "npm run harness:sync --ack".`,
+      `missing .harness.json flag at the project root — this repo has not adopted the harness plugin. ` +
+        `Run /harness-init to write it (or add {"harness":"llm-project-harness"} manually).`,
     );
-  }
-}
-
-// Harness freshness nudge (consumer mode, warning-only). The harness is a
-// devDependency pinned by tag (`github:<owner>/<repo>#v1.2.3`); this compares the
-// pinned tag against the newest tag upstream and, if behind, nudges the project to
-// bump it — so a stale pin can be noticed mid-work. Best-effort: throttled to one
-// network probe per window (it never slows every commit), bounded, and any failure
-// (offline, unpinned/unparseable spec, git absent) is swallowed — it must never fail
-// the check. Skipped in CI / test / when opted out.
-function assertHarnessFresh() {
-  if (harnessRepoMode) return;
-  if (process.env.HARNESS_SKIP_REMOTE_CHECK || process.env.CI || process.env.VITEST) return;
-
-  const packagePath = repoPath("package.json");
-  if (!pathExists(packagePath)) return;
-  let spec;
-  try {
-    spec = parseHarnessDependencySpec(JSON.parse(readText(packagePath)));
-  } catch {
-    return; // unreadable/invalid package.json → nothing to compare
-  }
-  if (!spec) return; // harness absent, unpinned, or non-GitHub spec → stay quiet
-
-  // Throttle the network probe by an OS-temp marker's mtime (kept out of the repo so
-  // it never shows in git status). Touch it before probing so an offline/slow probe
-  // also counts against the window and never repeats its timeout on the next check.
-  const marker = path.join(os.tmpdir(), `harness-freshness-${REPO_ROOT.replace(/[^a-zA-Z0-9]+/g, "-")}`);
-  let lastProbeMs = 0;
-  try {
-    lastProbeMs = fs.statSync(marker).mtimeMs;
-  } catch {
-    // no marker yet → probe now
-  }
-  if (!shouldProbeFreshness(lastProbeMs, Date.now(), FRESHNESS_THROTTLE_MS)) return;
-  try {
-    fs.writeFileSync(marker, "");
-  } catch {
-    // temp not writable → proceed without throttling; the probe is still bounded
+    return;
   }
 
   try {
-    const output = git(["ls-remote", "--tags", `https://github.com/${spec.owner}/${spec.repo}.git`], 5000);
-    const latest = latestSemverTagFromLsRemote(output);
-    if (latest && isNewerSemverTag(latest, spec.tag)) {
-      console.warn(
-        `[harness:check] WARNING: 하네스 devDependency가 최신 태그보다 뒤처져 있습니다 (고정 ${spec.tag} → 최신 ${latest}). ` +
-          `편한 시점에 package.json의 llm-project-harness 핀을 ${latest}로 올리고 npm install 후 "npm run harness:sync"로 최신화하세요. ` +
-          `이 하네스 정비 커밋은 전용 브랜치 없이 지금 작업 중인 브랜치에 chore 하나로 태워도 됩니다 ` +
-          `(.harness/harness/protocols/commit-protocol.md "하네스 정비 ride-along" 참고).`,
-      );
-    }
+    JSON.parse(readText(flagPath));
   } catch {
-    // best-effort: offline / no such repo / git absent → skip silently.
+    addError(`.harness.json is not valid JSON: ${toPosix(path.relative(process.cwd(), flagPath))}`);
   }
-}
-
-function git(args, timeout) {
-  return execFileSync("git", args, {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-    timeout,
-    killSignal: "SIGKILL",
-    // Never let a network op stall on an interactive prompt (credentials, host-key,
-    // passphrase). BatchMode + bounded ConnectTimeout make ls-remote fail fast when
-    // unreachable, so the freshness probe can never hang the check.
-    env: {
-      ...process.env,
-      GIT_TERMINAL_PROMPT: "0",
-      GIT_SSH_COMMAND: `${process.env.GIT_SSH_COMMAND ?? "ssh"} -o BatchMode=yes -o ConnectTimeout=5`,
-    },
-  }).trim();
 }
 
 // The wiki is index.md plus (when the project declares >=2 sections) one file per
@@ -1108,7 +1031,13 @@ function assertImmutableAdrBody() {
   }
 }
 
+// Provider-mode only. In the plugin model a consumer repo carries no adapters at
+// all — the commands/agents/skills live in the globally installed plugin — so
+// there is nothing local to validate there. The provider repo owns the adapter
+// sources and is the only place their completeness is checked.
 function assertHarnessAdapters() {
+  if (!harnessRepoMode) return;
+
   const roleDir = harnessPath("harness", "roles");
   const roleFiles = fs
     .readdirSync(roleDir)
@@ -1116,224 +1045,44 @@ function assertHarnessAdapters() {
     .map((entry) => path.basename(entry, ".md"));
 
   for (const roleName of roleFiles) {
-    // Codex loads the .toml at runtime and the .md is the readable mirror; both
-    // are required so a half-deleted or stale pair cannot pass silently.
-    for (const codexAdapter of [
-      rootAdapterPath(".codex", "agents", `${roleName}.md`),
-      rootAdapterPath(".codex", "agents", `${roleName}.toml`),
-    ]) {
-      if (!pathExists(codexAdapter)) {
-        addError(`missing Codex agent adapter: ${toPosix(path.relative(process.cwd(), codexAdapter))}`);
-      }
-    }
-
-    const claudeAdapter = rootAdapterPath(".claude", "agents", `${roleName}.md`);
-    if (!pathExists(claudeAdapter)) {
-      addError(`missing ClaudeCode agent adapter for harness role: ${roleName}`);
+    const agentAdapter = rootAdapterPath("agents", `${roleName}.md`);
+    if (!pathExists(agentAdapter)) {
+      addError(`missing agent adapter for harness role: ${roleName}`);
     }
   }
 
   const requiredSurfaces = [
-    {
-      name: "next feature",
-      codex: [rootAdapterPath(".codex", "skills", "next-feature", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "next-feature", "SKILL.md")],
-    },
-    {
-      name: "one shot",
-      codex: [rootAdapterPath(".codex", "skills", "one-shot", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "one-shot", "SKILL.md")],
-    },
+    { name: "next feature", paths: [rootAdapterPath("skills", "next-feature", "SKILL.md")] },
+    { name: "one shot", paths: [rootAdapterPath("skills", "one-shot", "SKILL.md")] },
     {
       name: "artifact validation",
-      codex: [rootAdapterPath(".codex", "skills", "artifact-validation", "SKILL.md")],
-      claude: [
-        rootAdapterPath(".claude", "skills", "artifact-validation", "SKILL.md"),
-        rootAdapterPath(".claude", "commands", "artifact-check.md"),
+      paths: [
+        rootAdapterPath("skills", "artifact-validation", "SKILL.md"),
+        rootAdapterPath("commands", "artifact-check.md"),
       ],
     },
-    {
-      name: "commit protocol",
-      codex: [rootAdapterPath(".codex", "skills", "commit-protocol", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "commit-protocol", "SKILL.md")],
-    },
-    {
-      name: "feature develop",
-      codex: [rootAdapterPath(".codex", "skills", "feature-develop", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "feature-develop", "SKILL.md")],
-    },
-    {
-      name: "make pr",
-      codex: [rootAdapterPath(".codex", "skills", "make-pr", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "make-pr", "SKILL.md")],
-    },
-    {
-      name: "prd helper",
-      codex: [rootAdapterPath(".codex", "skills", "prd-helper", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "prd-helper", "SKILL.md")],
-    },
-    {
-      name: "adr helper",
-      codex: [rootAdapterPath(".codex", "skills", "adr-helper", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "adr-helper", "SKILL.md")],
-    },
+    { name: "commit protocol", paths: [rootAdapterPath("skills", "commit-protocol", "SKILL.md")] },
+    { name: "feature develop", paths: [rootAdapterPath("skills", "feature-develop", "SKILL.md")] },
+    { name: "make pr", paths: [rootAdapterPath("skills", "make-pr", "SKILL.md")] },
+    { name: "prd helper", paths: [rootAdapterPath("skills", "prd-helper", "SKILL.md")] },
+    { name: "adr helper", paths: [rootAdapterPath("skills", "adr-helper", "SKILL.md")] },
     {
       name: "kickoff",
-      codex: [rootAdapterPath(".codex", "skills", "kickoff", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "kickoff", "SKILL.md"), rootAdapterPath(".claude", "commands", "kickoff.md")],
+      paths: [rootAdapterPath("skills", "kickoff", "SKILL.md"), rootAdapterPath("commands", "kickoff.md")],
     },
-    {
-      name: "submodule attach",
-      codex: [rootAdapterPath(".codex", "skills", "submodule-attach", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "submodule-attach", "SKILL.md")],
-    },
-    {
-      name: "ui verification",
-      codex: [rootAdapterPath(".codex", "skills", "ui-verification", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "ui-verification", "SKILL.md")],
-    },
+    { name: "harness init", paths: [rootAdapterPath("skills", "harness-init", "SKILL.md")] },
+    { name: "ui verification", paths: [rootAdapterPath("skills", "ui-verification", "SKILL.md")] },
     {
       name: "wiki ingest",
-      codex: [rootAdapterPath(".codex", "skills", "wiki-ingest", "SKILL.md")],
-      claude: [rootAdapterPath(".claude", "skills", "wiki-ingest", "SKILL.md"), rootAdapterPath(".claude", "commands", "wiki-ingest.md")],
+      paths: [rootAdapterPath("skills", "wiki-ingest", "SKILL.md"), rootAdapterPath("commands", "wiki-ingest.md")],
     },
   ];
 
   // Each listed entry is a distinct runtime entrypoint (e.g. a skill and a
   // command are not interchangeable), so require every one rather than any.
   for (const surface of requiredSurfaces) {
-    for (const codexPath of surface.codex) {
-      if (!pathExists(codexPath)) addError(`missing Codex adapter for ${surface.name}: ${toPosix(path.relative(process.cwd(), codexPath))}`);
-    }
-    for (const claudePath of surface.claude) {
-      if (!pathExists(claudePath)) addError(`missing ClaudeCode adapter for ${surface.name}: ${toPosix(path.relative(process.cwd(), claudePath))}`);
-    }
-  }
-}
-
-// 어댑터는 소비 프로젝트에서 `.harness` 안을 가리키는 symlink다. git이 symlink를
-// 만들지 못하는 환경(`core.symlinks=false` — Git for Windows의 시스템 기본값)에서
-// clone하면, git은 링크 대신 **타겟 경로가 적힌 한 줄짜리 텍스트 파일**을 체크아웃
-// 한다. 내용이 인덱스와 일치하므로 `git status`는 깨끗하고 어디에서도 경고가 뜨지
-// 않는다. 스킬/에이전트는 전부 죽어 있는데 신호가 하나도 없는 상태다.
-//
-// 존재 검사(assertHarnessAdapters)는 이걸 못 잡는다. 파일은 "있기" 때문이다.
-// 스킬 디렉터리가 통째로 파일이 된 경우만 간접적으로 드러난다. 그래서 어댑터
-// 표면을 직접 훑어 "링크여야 할 자리에 링크 stand-in 텍스트 파일이 있는지"를 본다.
-//
-// 하네스 제공 저장소 자신의 `.claude/**`·`.codex/**`는 symlink가 아니라 실제
-// 파일이므로(원본이다) 소비 프로젝트 모드에서만 검사한다.
-function assertAdapterLinkIntegrity() {
-  if (harnessRepoMode) return;
-
-  const standIns = [];
-  for (const [toolDir, childDir] of [
-    [".codex", "agents"],
-    [".codex", "skills"],
-    [".claude", "agents"],
-    [".claude", "commands"],
-    [".claude", "skills"],
-  ]) {
-    const adapterDir = rootAdapterPath(toolDir, childDir);
-    if (!pathExists(adapterDir)) continue;
-
-    for (const entry of fs.readdirSync(adapterDir)) {
-      if (entry.startsWith(".")) continue;
-      const entryPath = path.join(adapterDir, entry);
-      if (looksLikeSymlinkStandIn(entryPath)) standIns.push(`${toolDir}/${childDir}/${entry}`);
-    }
-  }
-
-  if (standIns.length === 0) return;
-
-  const sample = standIns.slice(0, 3).join(", ");
-  const rest = standIns.length > 3 ? ` 외 ${standIns.length - 3}개` : "";
-  addError(
-    `하네스 어댑터 ${standIns.length}개가 symlink가 아니라 링크 경로만 적힌 텍스트 파일입니다(${sample}${rest}). ` +
-      `git이 symlink를 만들지 못한 채 clone된 상태입니다(core.symlinks=false). ` +
-      `복구: git config --global core.symlinks true → (저장소 .git/config에 값이 박혀 있으면 local이 이기므로) git config --unset core.symlinks → ` +
-      `npm ci (하네스 devDependency 설치 + postinstall이 .harness 링크 재생성) → ` +
-      `node node_modules/llm-project-harness/scripts/harness/attach-submodule.mjs (어댑터 symlink 재생성).`,
-  );
-}
-
-// stand-in 판별은 보수적으로 한다. 정상 어댑터 파일(예: .claude/commands/kickoff.md)은
-// frontmatter와 여러 줄을 가진 마크다운이므로, "개행 없는 한 줄"이면서 그 한 줄을
-// 자기 위치 기준으로 풀었을 때 하네스 루트 안을 가리키는 경우만 stand-in으로 본다.
-// 프로젝트가 직접 둔 로컬 어댑터는 하네스 밖을 가리키므로 걸리지 않는다.
-function looksLikeSymlinkStandIn(entryPath) {
-  let stats;
-  try {
-    stats = fs.lstatSync(entryPath);
-  } catch {
-    return false;
-  }
-  if (!stats.isFile() || stats.size === 0 || stats.size > 512) return false;
-
-  let content;
-  try {
-    content = fs.readFileSync(entryPath, "utf8");
-  } catch {
-    return false;
-  }
-
-  const target = content.trim();
-  if (!target || /[\r\n]/.test(target)) return false;
-
-  const resolved = path.resolve(path.dirname(entryPath), target);
-  const harnessAbsolute = path.resolve(harnessRoot);
-  return resolved === harnessAbsolute || resolved.startsWith(`${harnessAbsolute}${path.sep}`);
-}
-
-function tomlDeveloperInstructions(content) {
-  const match = /developer_instructions\s*=\s*"""\r?\n?([\s\S]*?)"""/.exec(content);
-  return match ? match[1] : null;
-}
-
-// Adapters are hand-maintained mirrors; verify the Codex and ClaudeCode copies
-// have not drifted apart (and that a Codex .toml still matches its .md). Runs in
-// harness-provider mode only, so a consumer project's local override adapters
-// are never compared.
-function assertAdapterParity() {
-  if (!harnessRepoMode) return;
-
-  const roleNames = fs
-    .readdirSync(harnessPath("harness", "roles"))
-    .filter((entry) => entry.endsWith(".md"))
-    .map((entry) => path.basename(entry, ".md"));
-
-  for (const roleName of roleNames) {
-    const codexMd = rootAdapterPath(".codex", "agents", `${roleName}.md`);
-    const claudeMd = rootAdapterPath(".claude", "agents", `${roleName}.md`);
-    if (pathExists(codexMd) && pathExists(claudeMd) && readText(codexMd).trim() !== readText(claudeMd).trim()) {
-      addError(`Codex and ClaudeCode agent adapters diverged: ${roleName}`);
-    }
-
-    const tomlPath = rootAdapterPath(".codex", "agents", `${roleName}.toml`);
-    if (pathExists(tomlPath) && pathExists(codexMd)) {
-      const tomlBody = tomlDeveloperInstructions(readText(tomlPath));
-      if (tomlBody !== null && tomlBody.trim() !== bodyAfterFrontmatter(readText(codexMd)).trim()) {
-        addError(`Codex .toml developer_instructions diverged from the .md adapter: ${roleName}`);
-      }
-    }
-  }
-
-  const codexSkillsDir = rootAdapterPath(".codex", "skills");
-  if (!pathExists(codexSkillsDir)) return;
-
-  for (const skillName of fs.readdirSync(codexSkillsDir)) {
-    const codexSkill = path.join(codexSkillsDir, skillName, "SKILL.md");
-    const claudeSkill = rootAdapterPath(".claude", "skills", skillName, "SKILL.md");
-    if (!pathExists(codexSkill) || !pathExists(claudeSkill)) continue;
-
-    // The ClaudeCode skill may append an optional "## Claude Code ..." section
-    // (Claude-native execution notes); the rest must match the Codex skill
-    // (modulo trailing whitespace).
-    const claudeContent = readText(claudeSkill);
-    const accelIndex = claudeContent.indexOf("## Claude Code");
-    const claudeBase = accelIndex === -1 ? claudeContent : claudeContent.slice(0, accelIndex);
-    if (claudeBase.trim() !== readText(codexSkill).trim()) {
-      addError(`Codex and ClaudeCode skill adapters diverged: ${skillName}`);
+    for (const adapterPath of surface.paths) {
+      if (!pathExists(adapterPath)) addError(`missing adapter for ${surface.name}: ${toPosix(path.relative(process.cwd(), adapterPath))}`);
     }
   }
 }
@@ -1341,8 +1090,7 @@ function assertAdapterParity() {
 assertHarnessShape();
 assertNoHarnessDocsNamespace();
 assertProjectDocsPresent();
-assertHarnessSync();
-assertHarnessFresh();
+assertHarnessFlag();
 assertWikiShape();
 assertWikiNoAuthoringGuidance();
 assertWikiLinks();
@@ -1366,8 +1114,6 @@ assertAdrReferences();
 assertImmutableAdrBody();
 assertPublicSafeDocs();
 assertHarnessAdapters();
-assertAdapterLinkIntegrity();
-assertAdapterParity();
 
 if (errors.length > 0) {
   for (const error of errors) {

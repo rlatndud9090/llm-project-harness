@@ -45,7 +45,7 @@ npm run harness:check
 - 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
 - Codex/ClaudeCode는 `next-feature`, `kickoff`, `prd-helper`, `adr-helper` skill adapter를 가진다.
 - Codex/ClaudeCode는 `feature-develop`, `make-pr` skill adapter를 가진다.
-- Codex/ClaudeCode는 `submodule-attach` skill adapter를 가진다.
+- ClaudeCode는 `harness-init` skill/command adapter를 가진다.
 
 ## 수동 검토 항목
 
@@ -58,7 +58,7 @@ npm run harness:check
 - wiki가 합성 문서처럼 길어지지 않았는가?
 - 새 의존성을 추가했다면 사용자가 동의했는가?
 - 제품/도메인 구조 변경인데 notes-only 예외를 사용하지 않았는가?
-- 하네스 submodule 업데이트나 adapter 정리가 제품 기능 변경과 섞이지 않았는가?
+- 하네스 플러그인 업데이트나 adapter 정리가 제품 기능 변경과 섞이지 않았는가?
 - 커밋할 작업에 PRD/ADR이 필요하다면 raw unit에 두 문서가 있는가?
 - 커밋 본문에 넣을 `관련 문서:` 블록 경로가 실제 파일을 가리키는가?
 - PRD `approved`나 ADR `accepted` 전환이 사용자 승인 없이 이루어지지 않았는가?

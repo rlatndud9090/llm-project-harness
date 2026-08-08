@@ -1,24 +1,12 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   FORBIDDEN_STATUS_TRANSITIONS,
   adrBodyLooksAuthored,
-  changelogEntriesAfter,
-  changelogHeadId,
-  ensureHarnessLink,
-  isNewerSemverTag,
-  latestSemverTagFromLsRemote,
-  parseHarnessDependencySpec,
-  parseSemverTag,
-  FRESHNESS_THROTTLE_MS,
   WIKI_AUTHORING_SENTINELS,
   datedBulletDate,
   extractH1,
   findWikiAuthoringSentinel,
   formatApprovalEvent,
-  shouldProbeFreshness,
   isForbiddenStageTransition,
   isForbiddenTransition,
   isPreAdrStage,
@@ -40,119 +28,6 @@ import {
   today,
   toPosix,
 } from "./lib.mjs";
-
-describe("ensureHarnessLink", () => {
-  const made = [];
-  afterEach(() => {
-    for (const dir of made.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
-  });
-  function project() {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-link-"));
-    made.push(root);
-    return root;
-  }
-  function installPackage(root) {
-    fs.mkdirSync(path.join(root, "node_modules", "llm-project-harness", "harness", "protocols"), { recursive: true });
-  }
-
-  it("creates the .harness symlink into the installed package", () => {
-    const root = project();
-    installPackage(root);
-    expect(ensureHarnessLink(root).status).toBe("created");
-    const link = path.join(root, ".harness");
-    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
-    expect(fs.realpathSync(link)).toBe(fs.realpathSync(path.join(root, "node_modules", "llm-project-harness")));
-    // every `.harness/...` reference resolves through the link
-    expect(fs.existsSync(path.join(link, "harness", "protocols"))).toBe(true);
-  });
-
-  it("is idempotent: an already-correct link is left as-is", () => {
-    const root = project();
-    installPackage(root);
-    expect(ensureHarnessLink(root).status).toBe("created");
-    expect(ensureHarnessLink(root).status).toBe("ok");
-  });
-
-  it("no-ops when the package is not installed (prod --omit=dev)", () => {
-    const root = project();
-    expect(ensureHarnessLink(root).status).toBe("package-absent");
-    expect(fs.existsSync(path.join(root, ".harness"))).toBe(false);
-  });
-
-  it("never clobbers a real .harness directory (a not-yet-removed submodule)", () => {
-    const root = project();
-    installPackage(root);
-    fs.mkdirSync(path.join(root, ".harness"));
-    expect(ensureHarnessLink(root).status).toBe("occupied");
-    expect(fs.lstatSync(path.join(root, ".harness")).isDirectory()).toBe(true);
-  });
-
-  it("dry-run reports would-create without touching disk", () => {
-    const root = project();
-    installPackage(root);
-    expect(ensureHarnessLink(root, { dryRun: true }).status).toBe("would-create");
-    expect(fs.existsSync(path.join(root, ".harness"))).toBe(false);
-  });
-});
-
-describe("semver tag helpers", () => {
-  it("parseSemverTag accepts v-prefixed and bare MAJOR.MINOR.PATCH", () => {
-    expect(parseSemverTag("v1.2.3")).toEqual([1, 2, 3]);
-    expect(parseSemverTag("1.2.3")).toEqual([1, 2, 3]);
-    expect(parseSemverTag(" v0.0.0 ")).toEqual([0, 0, 0]);
-  });
-
-  it("parseSemverTag rejects non-semver tags", () => {
-    expect(parseSemverTag("v1.2")).toBeNull();
-    expect(parseSemverTag("main")).toBeNull();
-    expect(parseSemverTag("v1.2.3-rc1")).toBeNull();
-    expect(parseSemverTag(undefined)).toBeNull();
-  });
-
-  it("isNewerSemverTag orders by major, then minor, then patch", () => {
-    expect(isNewerSemverTag("v1.2.4", "v1.2.3")).toBe(true);
-    expect(isNewerSemverTag("v1.3.0", "v1.2.9")).toBe(true);
-    expect(isNewerSemverTag("v2.0.0", "v1.9.9")).toBe(true);
-    expect(isNewerSemverTag("v1.2.3", "v1.2.3")).toBe(false);
-    expect(isNewerSemverTag("v1.2.3", "v2.0.0")).toBe(false);
-    expect(isNewerSemverTag("main", "v1.0.0")).toBe(false);
-  });
-
-  it("latestSemverTagFromLsRemote picks the newest tag, ignoring ^{} and non-semver", () => {
-    const output = [
-      "abc123\trefs/tags/v1.0.0",
-      "def456\trefs/tags/v1.2.0",
-      "def456\trefs/tags/v1.2.0^{}",
-      "aaa000\trefs/tags/nightly",
-      "bbb111\trefs/tags/v1.1.5",
-    ].join("\n");
-    expect(latestSemverTagFromLsRemote(output)).toBe("v1.2.0");
-    expect(latestSemverTagFromLsRemote("")).toBeNull();
-    expect(latestSemverTagFromLsRemote("x\trefs/tags/main")).toBeNull();
-  });
-});
-
-describe("parseHarnessDependencySpec", () => {
-  it("parses github: / owner-repo / git+https forms with a pinned tag", () => {
-    expect(
-      parseHarnessDependencySpec({ devDependencies: { "llm-project-harness": "github:rlatndud9090/llm-project-harness#v1.2.0" } }),
-    ).toEqual({ owner: "rlatndud9090", repo: "llm-project-harness", tag: "v1.2.0" });
-    expect(
-      parseHarnessDependencySpec({ devDependencies: { "llm-project-harness": "rlatndud9090/llm-project-harness#v1.0.0" } }),
-    ).toEqual({ owner: "rlatndud9090", repo: "llm-project-harness", tag: "v1.0.0" });
-    expect(
-      parseHarnessDependencySpec({
-        dependencies: { "llm-project-harness": "git+https://github.com/rlatndud9090/llm-project-harness.git#v1.0.0" },
-      }),
-    ).toEqual({ owner: "rlatndud9090", repo: "llm-project-harness", tag: "v1.0.0" });
-  });
-
-  it("returns null when absent, unpinned, or not a recognized spec", () => {
-    expect(parseHarnessDependencySpec({})).toBeNull();
-    expect(parseHarnessDependencySpec({ devDependencies: { "llm-project-harness": "github:rlatndud9090/llm-project-harness" } })).toBeNull();
-    expect(parseHarnessDependencySpec({ devDependencies: { other: "^1.0.0" } })).toBeNull();
-  });
-});
 
 describe("parseWorkBranch", () => {
   it("parses well-formed work branches", () => {
@@ -465,27 +340,6 @@ describe("adrBodyLooksAuthored (ADR phase gate)", () => {
   });
 });
 
-describe("changelog head / delta", () => {
-  const content = ["# CHANGELOG", "", "intro line", "", "## 2026-07-06 b", "b1", "", "## 2026-01-01 a", "a1", ""].join("\n");
-
-  it("reads the newest entry id as head, or null when there are none", () => {
-    expect(changelogHeadId(content)).toBe("2026-07-06 b");
-    expect(changelogHeadId("# 제목만 있고 항목 없음")).toBeNull();
-  });
-
-  it("returns only entries newer than the acked id", () => {
-    const after = changelogEntriesAfter(content, "2026-01-01 a");
-    expect(after).toContain("## 2026-07-06 b");
-    expect(after).not.toContain("## 2026-01-01 a");
-  });
-
-  it("returns all entries when the acked id is empty/unknown", () => {
-    const after = changelogEntriesAfter(content, "");
-    expect(after).toContain("## 2026-07-06 b");
-    expect(after).toContain("## 2026-01-01 a");
-  });
-});
-
 describe("parseAreaList", () => {
   it("splits a comma list, trims, and drops empties", () => {
     expect(parseAreaList("A화면, 인증 플로우")).toEqual(["A화면", "인증 플로우"]);
@@ -637,27 +491,6 @@ describe("findWikiAuthoringSentinel", () => {
     // copying any rule prose — it must not read as a sentinel.
     const pointer = "authoring_rules: 위키 구조·영역(area)/섹션(section) 작성 규칙은 .harness/harness/protocols/wiki-ingest.md 참고.";
     expect(findWikiAuthoringSentinel(pointer)).toBeNull();
-  });
-});
-
-describe("shouldProbeFreshness", () => {
-  it("probes when there is no prior marker (lastProbeMs 0 vs a real now)", () => {
-    // In real use nowMs is Date.now() (~1.7e12), far past the throttle from epoch,
-    // so a missing marker (0) always probes. Use a now >= the window to prove it.
-    expect(shouldProbeFreshness(0, FRESHNESS_THROTTLE_MS)).toBe(true);
-    expect(shouldProbeFreshness(0, 2 * FRESHNESS_THROTTLE_MS)).toBe(true);
-  });
-
-  it("skips within the throttle window and probes once it elapses", () => {
-    const now = 10 * FRESHNESS_THROTTLE_MS;
-    expect(shouldProbeFreshness(now - 1, now)).toBe(false); // just probed
-    expect(shouldProbeFreshness(now - (FRESHNESS_THROTTLE_MS - 1), now)).toBe(false); // still inside
-    expect(shouldProbeFreshness(now - FRESHNESS_THROTTLE_MS, now)).toBe(true); // window elapsed
-  });
-
-  it("honors a custom throttle window", () => {
-    expect(shouldProbeFreshness(1000, 1500, 1000)).toBe(false);
-    expect(shouldProbeFreshness(1000, 2000, 1000)).toBe(true);
   });
 });
 

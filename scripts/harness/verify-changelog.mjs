@@ -19,12 +19,12 @@ try {
   process.exit(0); // not a git repo, or nothing staged
 }
 
-const SHARED_SURFACE = /^(harness\/|scripts\/harness\/|\.claude\/|\.codex\/)/;
+const SHARED_SURFACE = /^(harness\/|scripts\/harness\/|commands\/|agents\/|skills\/|hooks\/|\.claude-plugin\/)/;
 const touchesShared = staged.some((file) => SHARED_SURFACE.test(file) && file !== "CHANGELOG.md");
 if (!touchesShared) process.exit(0);
 
 if (!staged.includes("CHANGELOG.md")) {
-  console.error("[verify-changelog] 공용 하네스 표면(harness/, scripts/harness/, .claude/, .codex/)을 바꾸는 커밋은 CHANGELOG.md 항목이 필요합니다.");
+  console.error("[verify-changelog] 공용 하네스 표면(harness/, scripts/harness/, commands/, agents/, skills/, hooks/, .claude-plugin/)을 바꾸는 커밋은 CHANGELOG.md 항목이 필요합니다.");
   console.error("[verify-changelog] CHANGELOG.md 맨 위에 `## <YYYY-MM-DD> <slug>` 항목(변경 + 소비자 조치)을 추가하고 stage 하세요.");
   process.exit(1);
 }

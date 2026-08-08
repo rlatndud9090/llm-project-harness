@@ -1,0 +1,18 @@
+{
+  "name": "llm-project-harness",
+  "owner": {
+    "name": "LLM Project Harness",
+    "url": "https://github.com/rlatndud9090"
+  },
+  "description": "Single-plugin marketplace for the LLM Project Harness. The plugin lives at this repository root.",
+  "version": "1.1.0",
+  "plugins": [
+    {
+      "name": "llm-project-harness",
+      "source": ".",
+      "description": "Shared PRD/ADR, raw/wiki, approval-gate, and commit workflow for product repositories. Run /harness-init inside a repo to adopt it.",
+      "category": "workflow",
+      "keywords": ["harness", "prd", "adr", "workflow", "approval-gate"]
+    }
+  ]
+}

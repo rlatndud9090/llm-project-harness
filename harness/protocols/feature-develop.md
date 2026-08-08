@@ -106,7 +106,7 @@ domain-engineer/ui-engineer/test-engineer → integrator` role 체인으로 펼�
 있다(선택). 설치돼 있지 않아도 위 role 체인으로 동일하게 진행하며, 둘의 부재를
 이유로 구현을 멈추지 않는다.
 
-하네스 submodule 업데이트나 adapter 정리는 이 PRD/ADR 기반 기능 개발 레일의
+하네스 플러그인 업데이트나 adapter 정리는 이 PRD/ADR 기반 기능 개발 레일의
 대상이 아니다. 제품 기능 변경과 분리해 작은 프로젝트 운영 작업으로 처리한다.
 
 ## 실행 레인: 자율 fan-out과 인간 게이트 분리

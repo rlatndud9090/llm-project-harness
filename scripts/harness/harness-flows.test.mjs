@@ -4,14 +4,17 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { changelogHeadId } from "./lib.mjs";
 
+// The harness engine lives ONLY in this repo (the plugin). Tests spawn each engine
+// script straight from here with cwd = a temp consumer, so REPO_ROOT resolves to the
+// consumer and findHarnessRoot() resolves back to this repo — exactly the plugin
+// runtime split. There is no `.harness` mount to create.
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 describe("wiki-ingest", () => {
   it("does not duplicate a unit link when ingested twice", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "feature", "sample-unit", "prd.md"),
         `${frontmatter({ title: "Sample Unit", status: "draft", unit_type: "feature" })}\n# Sample Unit\n`,
@@ -28,7 +31,7 @@ describe("wiki-ingest", () => {
 
   it("requires --category for feature units", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "feature", "needs-category", "prd.md"),
         `${frontmatter({ title: "Needs Category", status: "draft", unit_type: "feature" })}\n# Needs Category\n`,
@@ -36,7 +39,7 @@ describe("wiki-ingest", () => {
 
       const result = spawnSync(
         process.execPath,
-        [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/needs-category"],
+        [path.join(repoRoot, "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/needs-category"],
         { cwd: projectRoot, encoding: "utf8" },
       );
 
@@ -47,7 +50,7 @@ describe("wiki-ingest", () => {
 
   it("rejects broad feature categories", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "feature", "broad-category", "prd.md"),
         `${frontmatter({ title: "Broad Category", status: "draft", unit_type: "feature" })}\n# Broad Category\n`,
@@ -56,7 +59,7 @@ describe("wiki-ingest", () => {
       const result = spawnSync(
         process.execPath,
         [
-          path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"),
+          path.join(repoRoot, "scripts", "harness", "wiki-ingest.mjs"),
           "docs/raw/feature/broad-category",
           "--category",
           "Product & Architecture",
@@ -71,7 +74,7 @@ describe("wiki-ingest", () => {
 
   it("creates a new feature category when the requested category does not exist yet", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "feature", "new-category", "prd.md"),
         `${frontmatter({ title: "New Category", status: "draft", unit_type: "feature" })}\n# New Category\n`,
@@ -89,7 +92,7 @@ describe("wiki-ingest", () => {
 describe("wiki-ingest area lineage", () => {
   it("groups by prd.md frontmatter area with a dated line (no --area needed)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "feature", "a-screen", "prd.md"),
         `${frontmatter({ title: "A화면 최초 구축", status: "review", unit_type: "feature", area: "A화면" })}\n# A화면 최초 구축\n`,
@@ -105,7 +108,7 @@ describe("wiki-ingest area lineage", () => {
 
   it("inserts bullets in ascending date order regardless of ingest order", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "feature", "later", "prd.md"),
         `${frontmatter({ title: "고도화", status: "review", unit_type: "feature", area: "A화면", date: "2026-06-20" })}\n# 고도화\n`,
@@ -126,7 +129,7 @@ describe("wiki-ingest area lineage", () => {
 
   it("links a multi-area unit under each area and stays idempotent per area", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "feature", "multi", "prd.md"),
         `${frontmatter({ title: "교차 작업", status: "review", unit_type: "feature", area: "A화면, 인증 플로우" })}\n# 교차 작업\n`,
@@ -145,7 +148,7 @@ describe("wiki-ingest area lineage", () => {
 
   it("prefers frontmatter area over --category and warns", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "feature", "conflict", "prd.md"),
         `${frontmatter({ title: "충돌", status: "review", unit_type: "feature", area: "진짜영역" })}\n# 충돌\n`,
@@ -153,7 +156,7 @@ describe("wiki-ingest area lineage", () => {
 
       const result = spawnSync(
         process.execPath,
-        [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/conflict", "--category", "가짜영역"],
+        [path.join(repoRoot, "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/conflict", "--category", "가짜영역"],
         { cwd: projectRoot, encoding: "utf8" },
       );
 
@@ -167,7 +170,7 @@ describe("wiki-ingest area lineage", () => {
 
   it("preserves non-bullet content in an area section on re-ingest", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "note-a", { status: "review", area: "노트영역", date: "2024-01-01" });
       ingestArea(projectRoot, "docs/raw/feature/note-a");
 
@@ -183,7 +186,7 @@ describe("wiki-ingest area lineage", () => {
 
   it("re-syncs a drifted timeline date on re-ingest (self-heal)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "resync", { status: "review", area: "리싱크영역", date: "2026-01-01" });
       ingestArea(projectRoot, "docs/raw/feature/resync");
 
@@ -199,13 +202,13 @@ describe("wiki-ingest area lineage", () => {
 
   it("re-ingesting an area-less legacy unit with no args is a no-op, not a failure", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "legacy-unit", { status: "review" }); // no area
       ingest(projectRoot, "docs/raw/feature/legacy-unit", "레거시축"); // legacy --category
 
       const result = spawnSync(
         process.execPath,
-        [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/legacy-unit"],
+        [path.join(repoRoot, "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/legacy-unit"],
         { cwd: projectRoot, encoding: "utf8" },
       );
 
@@ -220,7 +223,7 @@ describe("wiki-ingest sections", () => {
 
   it("keeps a single declared section in index.md with no section files", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
       seedAreaFeature(projectRoot, "grid", { section: "대시보드", area: "그리드", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -239,7 +242,7 @@ describe("wiki-ingest sections", () => {
 
   it("splits into per-section files when a 2nd section appears, migrating the first section", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯", date: "2026-01-10" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-15" });
@@ -264,7 +267,7 @@ describe("wiki-ingest sections", () => {
 
   it("preserves navigation labels (현재/superseded) through the split migration", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯", date: "2026-01-10" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
       // Hand-add a current marker before the split.
@@ -280,7 +283,7 @@ describe("wiki-ingest sections", () => {
 
   it("stays idempotent after a split (no duplicate links)", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -295,7 +298,7 @@ describe("wiki-ingest sections", () => {
 
   it("adds a 3rd section file and hub link", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -310,7 +313,7 @@ describe("wiki-ingest sections", () => {
 
   it("passes harness:check on a split project", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -322,7 +325,7 @@ describe("wiki-ingest sections", () => {
 
   it("refuses to ingest a section-less feature in a split project", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -337,7 +340,7 @@ describe("wiki-ingest sections", () => {
 
   it("routes a section-less operations bugfix to index.md even when split", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -357,7 +360,7 @@ describe("wiki-ingest sections", () => {
 
   it("check flags a unit linked in the wrong section file", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -373,7 +376,7 @@ describe("wiki-ingest sections", () => {
 
   it("check flags a stray wiki file", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "대시보드", area: "위젯" });
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -388,7 +391,7 @@ describe("wiki-ingest sections", () => {
 
   it("check flags a broad section name", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "widget", { section: "기능", area: "위젯" });
       seedAreaFeature(projectRoot, "profile", { section: "설정", area: "프로필", date: "2026-02-01" });
       ingestUnit(projectRoot, "docs/raw/feature/widget");
@@ -404,7 +407,7 @@ describe("wiki-ingest sections", () => {
 describe("kickoff-window link gates (settled-gating)", () => {
   it("is green right after kickoff of a feature with a seeded area+section", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "battle-selection", "--title", "배틀 선출", "--area", "배틀 진행 · 선출 UX", "--section", "배틀"]);
       expect(k.status).toBe(0);
       // area is durably seeded into the draft prd.md ...
@@ -417,7 +420,7 @@ describe("kickoff-window link gates (settled-gating)", () => {
 
   it("still fails a review PRD that was not ingested (link requirement is intact)", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "foo", { status: "review", area: "포영역" });
       const result = runCheck(projectRoot);
       expect(result.status).toBe(1);
@@ -427,7 +430,7 @@ describe("kickoff-window link gates (settled-gating)", () => {
 
   it("is green once the review PRD has its first ingest", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "foo", { status: "review", area: "포영역" });
       ingestUnit(projectRoot, "docs/raw/feature/foo");
       expect(runCheck(projectRoot).status).toBe(0);
@@ -436,7 +439,7 @@ describe("kickoff-window link gates (settled-gating)", () => {
 
   it("auto-links a chore at kickoff and stays green", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "chore", "--slug", "dep-bump", "--title", "Dep bump"]);
       expect(k.status).toBe(0);
       const index = read(path.join(projectRoot, "docs", "wiki", "index.md"));
@@ -447,7 +450,7 @@ describe("kickoff-window link gates (settled-gating)", () => {
 
   it("does not phantom-split on two draft features declaring different sections", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       kickoff(projectRoot, ["--type", "feature", "--slug", "a-feat", "--title", "A", "--area", "A영역", "--section", "대시보드"]);
       kickoff(projectRoot, ["--type", "feature", "--slug", "b-feat", "--title", "B", "--area", "B영역", "--section", "설정"]);
       expect(runCheck(projectRoot).status).toBe(0);
@@ -460,7 +463,7 @@ describe("kickoff-window link gates (settled-gating)", () => {
 describe("artifact-check area gates", () => {
   it("fails when a declared area does not match the linked heading", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "mismatch", { status: "review" }); // no area yet
       ingest(projectRoot, "docs/raw/feature/mismatch", "카테고리A"); // legacy category
       declareArea(projectRoot, "mismatch", "다른영역"); // now declares a different area
@@ -473,7 +476,7 @@ describe("artifact-check area gates", () => {
 
   it("fails a declared broad feature area", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "broad", { status: "review" });
       ingest(projectRoot, "docs/raw/feature/broad", "정상영역");
       declareArea(projectRoot, "broad", "아키텍처");
@@ -486,7 +489,7 @@ describe("artifact-check area gates", () => {
 
   it("hard-requires an area on the active feature branch at review", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "active", { status: "review" }); // no area
       ingest(projectRoot, "docs/raw/feature/active", "활성영역");
       git(projectRoot, ["checkout", "-q", "-b", "feature/active"]);
@@ -499,7 +502,7 @@ describe("artifact-check area gates", () => {
 
   it("passes the active-branch unit once it declares an area", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "active", { status: "review", area: "활성영역" });
       ingestArea(projectRoot, "docs/raw/feature/active");
       git(projectRoot, ["checkout", "-q", "-b", "feature/active"]);
@@ -511,7 +514,7 @@ describe("artifact-check area gates", () => {
 
   it("does not require an area on main (current-branch scope)", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "onmain", { status: "review" }); // no area, stays on main
       ingest(projectRoot, "docs/raw/feature/onmain", "메인영역");
 
@@ -522,7 +525,7 @@ describe("artifact-check area gates", () => {
 
   it("fails when the wiki date does not match the raw frontmatter date", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "drift", { status: "review", area: "드리프트영역" });
       ingestArea(projectRoot, "docs/raw/feature/drift");
 
@@ -537,7 +540,7 @@ describe("artifact-check area gates", () => {
 
   it("fails when a section marks more than one current decision", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "old", { status: "review", area: "커런시영역", date: "2024-01-01" });
       seedAreaFeature(projectRoot, "new", { status: "review", area: "커런시영역", date: "2026-01-01" });
       ingestArea(projectRoot, "docs/raw/feature/old");
@@ -558,7 +561,7 @@ describe("artifact-check area gates", () => {
 
   it("passes a multi-area unit linked under each declared area", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "cross", { status: "review", area: "A화면, 인증 플로우" });
       ingestArea(projectRoot, "docs/raw/feature/cross");
 
@@ -569,7 +572,7 @@ describe("artifact-check area gates", () => {
 
   it("fails a multi-area unit missing a link under one declared area", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "partial", { status: "review", area: "A화면, 인증 플로우" });
       ingestArea(projectRoot, "docs/raw/feature/partial", "A화면"); // only the first area
 
@@ -581,7 +584,7 @@ describe("artifact-check area gates", () => {
 
   it("does not mis-attribute a `## ` section's raw link to the preceding area", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "shipping", { status: "review", area: "배송" });
       ingestArea(projectRoot, "docs/raw/feature/shipping");
       seedAreaFeature(projectRoot, "paid", { status: "review", area: "결제" });
@@ -600,7 +603,7 @@ describe("artifact-check area gates", () => {
 
   it("does not hard-require an area on a bugfix branch (bugfix area is optional)", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "raw", "bugfix", "leak-fix", "bugfix.md"),
         `${frontmatter({ title: "누수 수정", status: "review", unit_type: "bugfix" })}\n# Bugfix\n\n## 증상\n\nx\n\n## 원인\n\nx\n\n## 수정\n\nx\n\n## 회귀 방지\n\n- [ ] 회귀 테스트\n`,
@@ -614,7 +617,7 @@ describe("artifact-check area gates", () => {
 
   it("passes a legacy project with no area and dateless wiki lines", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "legacy", { status: "review" });
       writeFile(
         path.join(projectRoot, "docs", "wiki", "index.md"),
@@ -640,49 +643,36 @@ describe("artifact-check area gates", () => {
   });
 });
 
-describe("harness sync reconciliation gate", () => {
-  it("attach seeds .harness-sync and a fresh consumer is in sync", () => {
+describe("harness plugin adoption flag", () => {
+  it("harness-init writes a valid .harness.json flag and a fresh consumer passes the check", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
-      const head = changelogHeadId(read(path.join(projectRoot, ".harness", "CHANGELOG.md")));
-      expect(read(path.join(projectRoot, ".harness-sync")).trim()).toBe(head);
+      harnessInit(projectRoot);
+      const flag = JSON.parse(read(path.join(projectRoot, ".harness.json")));
+      expect(flag.harness).toBe("llm-project-harness");
+      expect(typeof flag.version).toBe("string");
       expect(runCheck(projectRoot).status).toBe(0);
     });
   });
 
-  it("fails harness:check when .harness-sync is stale (harness updated, not reconciled)", () => {
+  it("fails harness:check when the .harness.json flag is missing", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
-      writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
+      harnessInit(projectRoot);
+      fs.rmSync(path.join(projectRoot, ".harness.json"), { force: true });
 
       const result = runCheck(projectRoot);
       expect(result.status).not.toBe(0);
-      expect(`${result.stdout}${result.stderr}`).toContain("not reconciled");
+      expect(`${result.stdout}${result.stderr}`).toContain(".harness.json");
     });
   });
 
-  it("harness:sync shows the pending entries but leaves the marker until --ack", () => {
+  it("fails harness:check when the .harness.json flag is malformed JSON", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
-      writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
+      harnessInit(projectRoot);
+      writeFile(path.join(projectRoot, ".harness.json"), "{ not valid json");
 
-      const sync = runSync(projectRoot);
-      expect(`${sync.stdout}${sync.stderr}`).toContain("반영 필요");
-      expect(read(path.join(projectRoot, ".harness-sync")).trim()).toBe("2020-01-01 old-entry");
-      expect(runCheck(projectRoot).status).not.toBe(0);
-    });
-  });
-
-  it("harness:sync --ack reconciles the marker and unblocks the check", () => {
-    withProject((projectRoot) => {
-      attach(projectRoot);
-      writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
-
-      const head = changelogHeadId(read(path.join(projectRoot, ".harness", "CHANGELOG.md")));
-      const sync = runSync(projectRoot, ["--ack"]);
-      expect(sync.status).toBe(0);
-      expect(read(path.join(projectRoot, ".harness-sync")).trim()).toBe(head);
-      expect(runCheck(projectRoot).status).toBe(0);
+      const result = runCheck(projectRoot);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain("not valid JSON");
     });
   });
 });
@@ -714,7 +704,7 @@ describe("artifact-check status transitions", () => {
 describe("artifact-check placeholder detection", () => {
   it("fails a review PRD that still contains template placeholders", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "ph-unit");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -734,7 +724,7 @@ describe("artifact-check placeholder detection", () => {
 
   it("passes a review PRD whose template placeholders are filled in", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "filled-unit");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -753,7 +743,7 @@ describe("artifact-check placeholder detection", () => {
 
   it("fails an accepted ADR that still has an unsubstituted {이름} token", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "adr-ph");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -773,7 +763,7 @@ describe("artifact-check placeholder detection", () => {
 
   it("ignores placeholders while the unit is still a draft", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "draft-unit");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -794,7 +784,7 @@ describe("artifact-check placeholder detection", () => {
 describe("artifact-check adr references", () => {
   it("fails when adr related_prd points to a missing file", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "ref-unit");
       writeFile(path.join(unitDir, "prd.md"), `${frontmatter({ title: "Ref", status: "draft", unit_type: "feature" })}\n# PRD\n`);
       writeFile(
@@ -811,7 +801,7 @@ describe("artifact-check adr references", () => {
 
   it("passes when adr related_prd resolves to an existing file", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "ok-ref");
       writeFile(path.join(unitDir, "prd.md"), `${frontmatter({ title: "Ok", status: "draft", unit_type: "feature" })}\n# PRD\n`);
       writeFile(
@@ -856,7 +846,7 @@ describe("artifact-check adr body immutability", () => {
 describe("verify-commit-msg", () => {
   it("rejects a commit message without a 관련 문서 block", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const msgPath = path.join(projectRoot, "COMMIT_MSG.txt");
       writeFile(msgPath, "feat: do a thing\n\n맥락 설명.\n");
       const result = runVerifyMsg(projectRoot, msgPath);
@@ -867,7 +857,7 @@ describe("verify-commit-msg", () => {
 
   it("accepts a commit message with a 관련 문서 block and link", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const msgPath = path.join(projectRoot, "COMMIT_MSG.txt");
       writeFile(msgPath, "feat: do a thing\n\n맥락.\n\n관련 문서:\n[PRD](docs/raw/feature/x/prd.md)\n");
       const result = runVerifyMsg(projectRoot, msgPath);
@@ -877,7 +867,7 @@ describe("verify-commit-msg", () => {
 
   it("skips auto-generated merge commits", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const msgPath = path.join(projectRoot, "COMMIT_MSG.txt");
       writeFile(msgPath, "Merge branch 'main' into feature/x\n");
       const result = runVerifyMsg(projectRoot, msgPath);
@@ -889,8 +879,8 @@ describe("verify-commit-msg", () => {
 describe("install-hooks", () => {
   it("installs pre-commit and commit-msg hooks", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
-      execFileSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "install-hooks.mjs")], {
+      harnessInit(projectRoot);
+      execFileSync(process.execPath, [path.join(repoRoot, "scripts", "harness", "install-hooks.mjs")], {
         cwd: projectRoot,
         encoding: "utf8",
       });
@@ -902,10 +892,106 @@ describe("install-hooks", () => {
   });
 });
 
+describe("harness-init (plugin bootstrap)", () => {
+  it("merges .claude/settings.json additively, preserving unrelated keys", () => {
+    withProject((projectRoot) => {
+      writeFile(
+        path.join(projectRoot, ".claude", "settings.json"),
+        `${JSON.stringify({ model: "opus", permissions: { allow: ["Bash"] } }, null, 2)}\n`,
+      );
+
+      harnessInit(projectRoot);
+
+      const settings = JSON.parse(read(path.join(projectRoot, ".claude", "settings.json")));
+      // pre-existing keys preserved
+      expect(settings.model).toBe("opus");
+      expect(settings.permissions).toEqual({ allow: ["Bash"] });
+      // plugin wiring added
+      expect(settings.enabledPlugins["llm-project-harness"]).toBe(true);
+      expect(settings.extraKnownMarketplaces["llm-project-harness"]).toEqual({
+        source: { source: "github", repo: "rlatndud9090/llm-project-harness" },
+      });
+    });
+  });
+
+  it("scaffolds docs only when absent (retrofit preserves a local AGENTS.md)", () => {
+    withProject((projectRoot) => {
+      writeFile(path.join(projectRoot, "AGENTS.md"), "# 우리 프로젝트\n\n로컬 내용 보존.\n");
+
+      harnessInit(projectRoot);
+
+      const agents = read(path.join(projectRoot, "AGENTS.md"));
+      expect(agents).toContain("로컬 내용 보존.");
+      // absent docs are still scaffolded
+      expect(fs.existsSync(path.join(projectRoot, "docs", "wiki", "index.md"))).toBe(true);
+      expect(fs.existsSync(path.join(projectRoot, "docs", "raw", "README.md"))).toBe(true);
+    });
+  });
+
+  it("is idempotent: a second run keeps a passing check", () => {
+    withProject((projectRoot) => {
+      harnessInit(projectRoot);
+      harnessInit(projectRoot);
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("migrates an old install: removes the .harness symlink and strips devDep/postinstall", () => {
+    withProject((projectRoot) => {
+      // Simulate a legacy devDependency/submodule consumer.
+      fs.symlinkSync(repoRoot, path.join(projectRoot, ".harness"), "dir");
+      writeFile(
+        path.join(projectRoot, "package.json"),
+        `${JSON.stringify(
+          {
+            name: "legacy-consumer",
+            devDependencies: { "llm-project-harness": "github:rlatndud9090/llm-project-harness#v1.0.0" },
+            scripts: {
+              postinstall: "node node_modules/llm-project-harness/scripts/harness/link.mjs || true",
+              build: "echo build",
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      writeFile(path.join(projectRoot, ".harness-sync"), "2020-01-01 old-entry\n");
+
+      harnessInit(projectRoot);
+
+      // the old mount and sync marker are gone
+      expect(fs.existsSync(path.join(projectRoot, ".harness"))).toBe(false);
+      expect(fs.existsSync(path.join(projectRoot, ".harness-sync"))).toBe(false);
+      // package.json: harness devDep + link.mjs postinstall stripped, other scripts kept
+      const pkg = JSON.parse(read(path.join(projectRoot, "package.json")));
+      expect(pkg.devDependencies?.["llm-project-harness"]).toBeUndefined();
+      expect(pkg.scripts?.postinstall).toBeUndefined();
+      expect(pkg.scripts?.build).toBe("echo build");
+      // and the freshly migrated consumer passes the check
+      expect(runCheck(projectRoot).status).toBe(0);
+    });
+  });
+
+  it("installs git hooks baking the plugin's absolute engine path (no CLAUDE_PLUGIN_ROOT needed)", () => {
+    withGitProject((projectRoot) => {
+      harnessInit(projectRoot, []); // enable hooks
+
+      const preCommit = path.join(projectRoot, ".git", "hooks", "pre-commit");
+      const commitMsg = path.join(projectRoot, ".git", "hooks", "commit-msg");
+      expect(fs.existsSync(preCommit)).toBe(true);
+      expect(fs.existsSync(commitMsg)).toBe(true);
+      // the hook body must carry the resolved plugin path, not an unresolved token
+      expect(read(preCommit)).toContain(path.join(repoRoot, "scripts", "harness", "artifact-check.mjs"));
+      expect(read(commitMsg)).toContain("verify-commit-msg.mjs");
+      expect(read(preCommit)).not.toContain("CLAUDE_PLUGIN_ROOT");
+    });
+  });
+});
+
 describe("artifact-check required sections", () => {
   it("fails a review PRD missing required sections", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "sec-prd");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -922,7 +1008,7 @@ describe("artifact-check required sections", () => {
 
   it("passes a review PRD with all required sections", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "full-prd");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -938,7 +1024,7 @@ describe("artifact-check required sections", () => {
 
   it("fails an accepted ADR missing required sections", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "sec-adr");
       writeFile(path.join(unitDir, "prd.md"), `${frontmatter({ title: "SecAdr", status: "draft", unit_type: "feature" })}\n# PRD\n`);
       writeFile(
@@ -957,7 +1043,7 @@ describe("artifact-check required sections", () => {
 describe("artifact-check wiki taxonomy", () => {
   it("fails when feature wiki taxonomy uses a broad bucket", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "wiki", "index.md"),
         `# Project Wiki Index
@@ -992,7 +1078,7 @@ describe("artifact-check wiki taxonomy", () => {
 describe("artifact-check wiki authoring-guidance leak", () => {
   it("passes the thin attached template (only direction + Raw Units heading)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       // The freshly attached wiki is the thin template — no authoring guidance.
       expect(runCheck(projectRoot).status).toBe(0);
     });
@@ -1000,7 +1086,7 @@ describe("artifact-check wiki authoring-guidance leak", () => {
 
   it("fails when the wiki still carries the old Maintenance rules block", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "wiki", "index.md"),
         [
@@ -1027,7 +1113,7 @@ describe("artifact-check wiki authoring-guidance leak", () => {
 
   it("fails when the wiki still carries the top authoring blockquote", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       writeFile(
         path.join(projectRoot, "docs", "wiki", "index.md"),
         [
@@ -1052,7 +1138,7 @@ describe("artifact-check wiki authoring-guidance leak", () => {
 
   it("passes a clean project wiki that keeps direction and lineage only", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "clean", { status: "review", area: "깨끗한영역" });
       ingestArea(projectRoot, "docs/raw/feature/clean");
 
@@ -1066,7 +1152,7 @@ describe("artifact-check wiki authoring-guidance leak", () => {
 describe("artifact-check bugfix required sections", () => {
   it("fails a review bugfix.md missing required sections", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "bugfix", "sec-bug");
       writeFile(
         path.join(unitDir, "bugfix.md"),
@@ -1082,7 +1168,7 @@ describe("artifact-check bugfix required sections", () => {
 
   it("passes a review bugfix.md with symptom/cause/fix/regression sections", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "bugfix", "ok-bug");
       writeFile(
         path.join(unitDir, "bugfix.md"),
@@ -1097,7 +1183,7 @@ describe("artifact-check bugfix required sections", () => {
 
   it("fails a fixed bugfix.md that still has the template regression placeholder", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "bugfix", "ph-bug");
       writeFile(
         path.join(unitDir, "bugfix.md"),
@@ -1115,7 +1201,7 @@ describe("artifact-check bugfix required sections", () => {
 describe("artifact-check chore is notes-only", () => {
   it("does not status-check a chore unit (notes.md carries no lifecycle)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       // A chore unit's notes.md can hold arbitrary frontmatter; it is not gated.
       writeFile(
         path.join(projectRoot, "docs", "raw", "chore", "tidy", "notes.md"),
@@ -1132,7 +1218,7 @@ describe("artifact-check chore is notes-only", () => {
 describe("state ledger approval gate", () => {
   it("kickoff creates a state.md checkpoint at stage kickoff", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       runKickoff(projectRoot, "feature", "ledger-init", "원장 초기화");
       const state = read(path.join(projectRoot, "docs", "raw", "feature", "ledger-init", "state.md"));
       expect(state).toContain("stage: kickoff");
@@ -1143,7 +1229,7 @@ describe("state ledger approval gate", () => {
 
   it("harness:approve pre-approves a review PRD (and ADR), then --final approves; both pass harness:check", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "share");
       runKickoff(projectRoot, "feature", "share", "결과 공유");
       writeFile(
@@ -1192,7 +1278,7 @@ describe("state ledger approval gate", () => {
 
   it("harness:approve refuses a PRD that is not in review", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       runKickoff(projectRoot, "feature", "early", "이른 승인");
       const approve = runApprove(projectRoot, "docs/raw/feature/early", ["--quote", "승인"]);
       expect(approve.status).not.toBe(0);
@@ -1202,7 +1288,7 @@ describe("state ledger approval gate", () => {
 
   it("harness:approve refuses --transport make-pr without --final (final-only label)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "mptransport");
       runKickoff(projectRoot, "feature", "mptransport", "make-pr transport 가드");
       writeFile(
@@ -1217,7 +1303,7 @@ describe("state ledger approval gate", () => {
 
   it("harness:approve refuses without a --quote", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "noquote");
       runKickoff(projectRoot, "feature", "noquote", "인용 없음");
       writeFile(
@@ -1232,7 +1318,7 @@ describe("state ledger approval gate", () => {
 
   it("harness:approve refuses the canned example quote", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "canned");
       runKickoff(projectRoot, "feature", "canned", "예시 인용");
       writeFile(
@@ -1247,7 +1333,7 @@ describe("state ledger approval gate", () => {
 
   it("harness:approve refuses a future --date", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "future");
       runKickoff(projectRoot, "feature", "future", "미래 날짜");
       writeFile(
@@ -1262,7 +1348,7 @@ describe("state ledger approval gate", () => {
 
   it("fails harness:check when a PRD is approved with no approval event in state.md", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "forged");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1284,7 +1370,7 @@ describe("state ledger approval gate", () => {
 
   it("fails harness:check when prd.md is approved but state.md was left behind (mirror mismatch)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "mismatch");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1305,7 +1391,7 @@ describe("state ledger approval gate", () => {
 
   it("requires a state.md ledger for an approved PRD", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "no-state");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1322,7 +1408,7 @@ describe("state ledger approval gate", () => {
 
   it("blocks a backward stage regression recorded in git history", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "regress");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1352,7 +1438,7 @@ describe("state ledger approval gate", () => {
 describe("artifact-check ADR phase gate (step separation)", () => {
   it("fails when adr.md is authored while the unit is still in the PRD phase", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "leak");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1376,7 +1462,7 @@ describe("artifact-check ADR phase gate (step separation)", () => {
 
   it("passes when adr.md is left exactly as the real kickoff skeleton during the PRD phase", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       // Use the REAL kickoff output so the gate is anchored to the actual template,
       // not a hand-built stand-in (guards against template/heuristic drift).
       runKickoff(projectRoot, "feature", "skeleton", "스켈레톤");
@@ -1397,7 +1483,7 @@ describe("artifact-check ADR phase gate (step separation)", () => {
 
   it("allows authoring adr.md once the unit has entered the ADR phase (stage adr-draft)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "adr-phase");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1422,7 +1508,7 @@ describe("artifact-check ADR phase gate (step separation)", () => {
 describe("two-tier approval gate (pre-approval / --final)", () => {
   it("harness:approve --final refuses a PRD that was never pre-approved", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "skipfinal");
       runKickoff(projectRoot, "feature", "skipfinal", "사전 없이 최종");
       writeFile(
@@ -1437,7 +1523,7 @@ describe("two-tier approval gate (pre-approval / --final)", () => {
 
   it("harness:check fails a pre-approved PRD with no PREAPPROVAL event", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "forgedpre");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1459,7 +1545,7 @@ describe("two-tier approval gate (pre-approval / --final)", () => {
 
   it("harness:check passes a pre-approved PRD at stage implementing (build tier)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "buildok");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1483,7 +1569,7 @@ describe("two-tier approval gate (pre-approval / --final)", () => {
 
   it("harness:check fails when stage is approved but the PRD is only pre-approved", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "finalstage");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1509,7 +1595,7 @@ describe("two-tier approval gate (pre-approval / --final)", () => {
 
   it("harness:check fails when a final stage ships an ADR still at pre-accepted", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "strandedadr");
       writeFile(
         path.join(unitDir, "prd.md"),
@@ -1708,7 +1794,7 @@ describe("claude-approval-guard", () => {
 });
 
 function seedDecisionUnit(projectRoot, adrStatus, adrApproval) {
-  attach(projectRoot);
+  harnessInit(projectRoot);
   const unitDir = path.join(projectRoot, "docs", "raw", "feature", "decision");
   writeFile(path.join(unitDir, "prd.md"), `${frontmatter({ title: "Decision", status: "draft", unit_type: "feature" })}\n# Decision\n`);
   writeFile(
@@ -1833,7 +1919,7 @@ function fullAdrBody() {
 function runKickoff(projectRoot, type, slug, title) {
   return execFileSync(
     process.execPath,
-    [path.join(projectRoot, ".harness", "scripts", "harness", "kickoff.mjs"), "--type", type, "--slug", slug, "--title", title],
+    [path.join(repoRoot, "scripts", "harness", "kickoff.mjs"), "--type", type, "--slug", slug, "--title", title],
     { cwd: projectRoot, encoding: "utf8" },
   );
 }
@@ -1841,7 +1927,7 @@ function runKickoff(projectRoot, type, slug, title) {
 function runApprove(projectRoot, unitPath, extraArgs = []) {
   return spawnSync(
     process.execPath,
-    [path.join(projectRoot, ".harness", "scripts", "harness", "approve.mjs"), "--unit", unitPath, ...extraArgs],
+    [path.join(repoRoot, "scripts", "harness", "approve.mjs"), "--unit", unitPath, ...extraArgs],
     { cwd: projectRoot, encoding: "utf8" },
   );
 }
@@ -1856,7 +1942,7 @@ function runGuard(payload) {
 describe("harness backlog fixes", () => {
   it("approve places the stage log under the real heading, not the rules prose (backtick literal)", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       runKickoff(projectRoot, "feature", "approve-log", "승인 로그");
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "approve-log");
       writeFile(
@@ -1879,7 +1965,7 @@ describe("harness backlog fixes", () => {
 
   it("assertNoPlaceholders ignores code braces but still catches a real prose token", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const codeDir = path.join(projectRoot, "docs", "raw", "feature", "codeok");
       writeFile(
         path.join(codeDir, "prd.md"),
@@ -1904,7 +1990,7 @@ describe("harness backlog fixes", () => {
 
   it("assertPrdReferences fails a parent_prd that points to a missing file", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "child", { status: "review", area: "자식영역" });
       const prdPath = path.join(projectRoot, "docs", "raw", "feature", "child", "prd.md");
       writeFile(prdPath, read(prdPath).replace("unit_type: feature", "unit_type: feature\nparent_prd: ../missing-parent/prd.md"));
@@ -1918,7 +2004,7 @@ describe("harness backlog fixes", () => {
 
   it("assertPrdReferences passes a parent_prd that resolves", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "parent", { status: "review", area: "부모영역" });
       seedAreaFeature(projectRoot, "child", { status: "review", area: "자식영역" });
       const childPrd = path.join(projectRoot, "docs", "raw", "feature", "child", "prd.md");
@@ -1932,14 +2018,14 @@ describe("harness backlog fixes", () => {
 
   it("wiki-ingest warns when creating a new area while other areas exist (typo guard)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       seedAreaFeature(projectRoot, "first", { status: "review", area: "A화면" });
       ingestArea(projectRoot, "docs/raw/feature/first");
       seedAreaFeature(projectRoot, "second", { status: "review", area: "A 화면" }); // typo: extra space
 
       const result = spawnSync(
         process.execPath,
-        [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/second"],
+        [path.join(repoRoot, "scripts", "harness", "wiki-ingest.mjs"), "docs/raw/feature/second"],
         { cwd: projectRoot, encoding: "utf8" },
       );
       expect(`${result.stdout}${result.stderr}`).toContain("새 영역 생성");
@@ -1949,7 +2035,7 @@ describe("harness backlog fixes", () => {
 
   it("ingest renders the real H1 title, not a frontmatter `#` comment line (extractH1 fix)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       // The REAL kickoff template keeps `# section(…)`/`# area(…)` hint lines in the
       // prd.md frontmatter — the exact shape that used to be mistaken for the H1.
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "title-render", "--title", "제목 렌더", "--area", "렌더 영역"]);
@@ -1969,7 +2055,7 @@ describe("harness backlog fixes", () => {
 describe("kickoff branch handling (worktree-first; main worktree reserved)", () => {
   it("does not auto-switch the reserved main worktree on a clean main; hints to isolate", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       commitAll(projectRoot); // main is now clean
       // The reserved main worktree is the developer's; kickoff never auto-branches it
       // in place. Work is expected to run in a dedicated origin/main-based worktree
@@ -1985,7 +2071,7 @@ describe("kickoff branch handling (worktree-first; main worktree reserved)", () 
 
   it("consumes the next-feature anchor even though it leaves the main worktree in place", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       commitAll(projectRoot);
       // The anchor is consumed as part of skeleton creation, independent of the branch
       // decision — leaving the reserved main worktree alone must not strand the anchor.
@@ -1999,7 +2085,7 @@ describe("kickoff branch handling (worktree-first; main worktree reserved)", () 
 
   it("leaves an already-checked-out work branch in place (branch-first; the normal in-worktree path)", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       commitAll(projectRoot);
       // Simulates the normal flow: the agent opened a dedicated worktree on the unit's
       // branch first, then runs kickoff inside it. The script recognizes branch-first
@@ -2014,7 +2100,7 @@ describe("kickoff branch handling (worktree-first; main worktree reserved)", () 
 
   it("creates an in-place branch on main only with the explicit --checkout escape hatch", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       commitAll(projectRoot);
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "forced", "--title", "강제", "--checkout"]);
       expect(k.status).toBe(0);
@@ -2024,7 +2110,7 @@ describe("kickoff branch handling (worktree-first; main worktree reserved)", () 
 
   it("stays put when --no-branch is passed, even on a clean main", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       commitAll(projectRoot);
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "stay", "--title", "머무름", "--no-branch"]);
       expect(k.status).toBe(0);
@@ -2034,7 +2120,7 @@ describe("kickoff branch handling (worktree-first; main worktree reserved)", () 
 
   it("hints instead of failing when the target branch already exists", () => {
     withGitProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       commitAll(projectRoot);
       git(projectRoot, ["branch", "feature/dup"]); // pre-create the target
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "dup", "--title", "중복"]);
@@ -2046,7 +2132,7 @@ describe("kickoff branch handling (worktree-first; main worktree reserved)", () 
 
   it("is a no-op in a non-git project (kickoff still succeeds)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "nogit", "--title", "노깃"]);
       expect(k.status).toBe(0);
       expect(fs.existsSync(path.join(projectRoot, "docs", "raw", "feature", "nogit", "prd.md"))).toBe(true);
@@ -2057,7 +2143,7 @@ describe("kickoff branch handling (worktree-first; main worktree reserved)", () 
 describe("kickoff --issue provenance", () => {
   it("records a bare issue number on a feature (prd frontmatter + state log)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "issue-feat", "--title", "이슈 기능", "--issue", "42"]);
       expect(k.status).toBe(0);
       expect(k.stdout).toContain("- issue: #42");
@@ -2069,7 +2155,7 @@ describe("kickoff --issue provenance", () => {
 
   it("keeps a full issue URL as the recorded ref", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const url = "https://github.com/o/r/issues/42";
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "issue-url", "--title", "이슈 URL", "--issue", url]);
       expect(k.status).toBe(0);
@@ -2083,7 +2169,7 @@ describe("kickoff --issue provenance", () => {
 
   it("records the issue on a bugfix's bugfix.md frontmatter and state ledger", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "bugfix", "--slug", "issue-bug", "--title", "이슈 버그", "--issue", "#7"]);
       expect(k.status).toBe(0);
       const unitDir = path.join(projectRoot, "docs", "raw", "bugfix", "issue-bug");
@@ -2094,7 +2180,7 @@ describe("kickoff --issue provenance", () => {
 
   it("records a chore's issue only in the state ledger (no primary artifact)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "chore", "--slug", "issue-chore", "--title", "이슈 정리", "--issue", "9"]);
       expect(k.status).toBe(0);
       const unitDir = path.join(projectRoot, "docs", "raw", "chore", "issue-chore");
@@ -2106,7 +2192,7 @@ describe("kickoff --issue provenance", () => {
 
   it("omits the issue line and note when no --issue is passed", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "feature", "--slug", "no-issue", "--title", "이슈 없음"]);
       expect(k.status).toBe(0);
       expect(k.stdout).not.toContain("- issue:");
@@ -2118,7 +2204,7 @@ describe("kickoff --issue provenance", () => {
 
   it("rejects a bare issue-number positional (must resolve the issue first)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["42"]);
       expect(k.status).not.toBe(0);
       expect(`${k.stdout}${k.stderr}`).toContain("직접 넘길 수 없습니다");
@@ -2128,7 +2214,7 @@ describe("kickoff --issue provenance", () => {
 
   it("rejects a value that is not an issue reference", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "chore", "--slug", "bad-issue", "--title", "나쁨", "--issue", "not-an-issue"]);
       expect(k.status).not.toBe(0);
       expect(`${k.stdout}${k.stderr}`).toContain("이슈 참조로 해석할 수 없습니다");
@@ -2137,7 +2223,7 @@ describe("kickoff --issue provenance", () => {
 
   it("rejects --issue with no value", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const k = kickoff(projectRoot, ["--type", "chore", "--slug", "no-val", "--title", "값없음", "--issue"]);
       expect(k.status).not.toBe(0);
       expect(`${k.stdout}${k.stderr}`).toContain("값이 필요합니다");
@@ -2176,7 +2262,7 @@ describe("Windows failure modes", () => {
 
   it("harness:approve updates a CRLF worktree in place instead of stacking frontmatter blocks", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "crlf-unit");
       runKickoff(projectRoot, "feature", "crlf-unit", "CRLF 단위");
       writeFile(
@@ -2205,7 +2291,7 @@ describe("Windows failure modes", () => {
 
   it("harness:check passes on a CRLF worktree (frontmatter is present, not missing)", () => {
     withProject((projectRoot) => {
-      attach(projectRoot);
+      harnessInit(projectRoot);
       const unitDir = path.join(projectRoot, "docs", "raw", "feature", "crlf-check");
       runKickoff(projectRoot, "feature", "crlf-check", "CRLF 검사");
       writeFile(
@@ -2222,25 +2308,6 @@ describe("Windows failure modes", () => {
     });
   });
 
-  it("harness:check reports adapters that were checked out as text files instead of symlinks", () => {
-    withProject((projectRoot) => {
-      attach(projectRoot);
-      const adapter = path.join(projectRoot, ".claude", "skills", "next-feature");
-      fs.rmSync(adapter, { recursive: true, force: true });
-      writeFile(adapter, "../../.harness/.claude/skills/next-feature");
-
-      // 프로젝트가 직접 둔 로컬 어댑터는 오탐 대상이 아니다.
-      writeFile(path.join(projectRoot, ".claude", "commands", "project-note.md"), "# 프로젝트 전용\n\n본문\n");
-
-      const result = runCheck(projectRoot);
-      const output = `${result.stdout}${result.stderr}`;
-      expect(result.status).not.toBe(0);
-      expect(output).toContain("텍스트 파일");
-      expect(output).toContain("core.symlinks=false");
-      expect(output).toContain(".claude/skills/next-feature");
-      expect(output).not.toContain("project-note.md");
-    });
-  });
 });
 
 // 성공 스텝 로그는 에이전트 컨텍스트로 흘러드는 순수 노이즈라 gate가 요약하고,
@@ -2348,7 +2415,7 @@ function runGate(projectRoot, envOverrides = {}) {
     if (value === undefined) delete env[key];
     else env[key] = value;
   }
-  return spawnSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "gate.mjs")], {
+  return spawnSync(process.execPath, [path.join(repoRoot, "scripts", "harness", "gate.mjs")], {
     cwd: projectRoot,
     encoding: "utf8",
     env,
@@ -2377,7 +2444,8 @@ function frontmatter(fields) {
 function withProject(callback) {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "llm-harness-flows-"));
   try {
-    fs.symlinkSync(repoRoot, path.join(projectRoot, ".harness"), "dir");
+    // No `.harness` mount in the plugin model: the consumer is an empty temp dir and
+    // every engine script is spawned from `repoRoot` (this plugin) with cwd here.
     callback(projectRoot);
   } finally {
     fs.rmSync(projectRoot, { recursive: true, force: true });
@@ -2392,23 +2460,19 @@ function withGitProject(callback) {
   });
 }
 
-function attach(projectRoot) {
+// Bootstraps a temp consumer into the harness plugin model: writes `.harness.json`,
+// merges `.claude/settings.json`, scaffolds docs. `--no-git-hooks` so a non-git
+// temp dir does not try to install hooks (a hooks-targeted test opts back in).
+function harnessInit(projectRoot, extraArgs = ["--no-git-hooks"]) {
   execFileSync(
     process.execPath,
-    [path.join(projectRoot, ".harness", "scripts", "harness", "attach-submodule.mjs"), "--harness-dir", ".harness"],
-    {
-      cwd: projectRoot,
-      encoding: "utf8",
-      // 픽스처는 호스트의 git 전역/시스템 설정을 상속한다. Git for Windows는
-      // core.symlinks=false가 시스템 기본값이라, 진단을 끄지 않으면 이 파일의 모든
-      // 플로우 테스트가 실행 머신 설정에 좌우된다(진단 자체는 attach-submodule.test.mjs에서 검증).
-      env: { ...process.env, HARNESS_SKIP_ENV_CHECK: "1" },
-    },
+    [path.join(repoRoot, "scripts", "harness", "init.mjs"), ...extraArgs],
+    { cwd: projectRoot, encoding: "utf8" },
   );
 }
 
 function ingest(projectRoot, unitPath, category = defaultCategoryFor(unitPath)) {
-  const args = [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath];
+  const args = [path.join(repoRoot, "scripts", "harness", "wiki-ingest.mjs"), unitPath];
   if (category) args.push("--category", category);
   execFileSync(
     process.execPath,
@@ -2424,7 +2488,7 @@ function defaultCategoryFor(unitPath) {
 // Ingests using the area path (frontmatter `area` when no explicit --area is
 // passed), mirroring how ingest resolves the durable axis in real usage.
 function ingestArea(projectRoot, unitPath, area) {
-  const args = [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath];
+  const args = [path.join(repoRoot, "scripts", "harness", "wiki-ingest.mjs"), unitPath];
   if (area) args.push("--area", area);
   execFileSync(process.execPath, args, { cwd: projectRoot, encoding: "utf8" });
 }
@@ -2446,7 +2510,7 @@ function seedAreaFeature(projectRoot, slug, { status = "review", area, section, 
 function ingestUnit(projectRoot, unitPath) {
   return spawnSync(
     process.execPath,
-    [path.join(projectRoot, ".harness", "scripts", "harness", "wiki-ingest.mjs"), unitPath],
+    [path.join(repoRoot, "scripts", "harness", "wiki-ingest.mjs"), unitPath],
     { cwd: projectRoot, encoding: "utf8" },
   );
 }
@@ -2454,7 +2518,7 @@ function ingestUnit(projectRoot, unitPath) {
 function kickoff(projectRoot, args) {
   return spawnSync(
     process.execPath,
-    [path.join(projectRoot, ".harness", "scripts", "harness", "kickoff.mjs"), ...args],
+    [path.join(repoRoot, "scripts", "harness", "kickoff.mjs"), ...args],
     { cwd: projectRoot, encoding: "utf8" },
   );
 }
@@ -2469,25 +2533,13 @@ function declareArea(projectRoot, slug, area) {
 function runVerifyMsg(projectRoot, msgPath) {
   return spawnSync(
     process.execPath,
-    [path.join(projectRoot, ".harness", "scripts", "harness", "verify-commit-msg.mjs"), msgPath],
+    [path.join(repoRoot, "scripts", "harness", "verify-commit-msg.mjs"), msgPath],
     { cwd: projectRoot, encoding: "utf8" },
   );
 }
 
 function runCheck(projectRoot) {
-  return spawnSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "artifact-check.mjs")], {
-    cwd: projectRoot,
-    encoding: "utf8",
-    // Disable the best-effort harness freshness probe in tests: `.harness` here
-    // points at the provider repo (which has a real origin), so the network
-    // ls-remote would add latency and flakiness. The probe is covered by its own
-    // pure unit test (shouldProbeFreshness).
-    env: { ...process.env, HARNESS_SKIP_REMOTE_CHECK: "1" },
-  });
-}
-
-function runSync(projectRoot, extraArgs = []) {
-  return spawnSync(process.execPath, [path.join(projectRoot, ".harness", "scripts", "harness", "sync.mjs"), ...extraArgs], {
+  return spawnSync(process.execPath, [path.join(repoRoot, "scripts", "harness", "artifact-check.mjs")], {
     cwd: projectRoot,
     encoding: "utf8",
   });

@@ -23,11 +23,10 @@
 //
 // This is NOT a complete runtime gate: Bash writes (sed/tee/redirect), file
 // renames, and MCP/remote writers are out of a PreToolUse matcher's reach. The
-// load-bearing, non-bypassable gate is `npm run harness:check` run in CI (see
-// harness/protocols/submodule-attach.md). Wire it in .claude/settings.json:
-//   { "hooks": { "PreToolUse": [ { "matcher": "Edit|Write|MultiEdit",
-//       "hooks": [ { "type": "command",
-//         "command": "node .harness/scripts/harness/claude-approval-guard.mjs" } ] } ] } }
+// load-bearing, non-bypassable gate is the harness check run in CI (see
+// harness/protocols/harness-init.md). The plugin wires this guard as a PreToolUse
+// (Edit|Write|MultiEdit) hook in hooks/hooks.json via
+// `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/claude-approval-guard.mjs"`.
 //
 // Contract: reads the PreToolUse JSON on stdin; exit 2 + stderr blocks the call
 // (works even under bypassPermissions). Any parse/read error fails open (exit 0)

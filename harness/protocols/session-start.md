@@ -43,7 +43,7 @@
 | 작업 단위 초기세팅(raw 생성 + 브랜치 정리) | `kickoff.md` |
 | PRD 작성/보강 | `prd-helper.md` |
 | ADR 작성/보강 (필요 시) | `adr-helper.md` |
-| 하네스 submodule 장착/업데이트 | `submodule-attach.md` |
+| 하네스 플러그인 적용/이관 | `harness-init.md` |
 | 사전 승인된(pre-approved) PRD/ADR 기반 기능 구현 | `feature-develop.md` |
 | 최종 확정 + 커밋 + PR 생성 | `make-pr.md` |
 | 검증/커밋 | `integration-gate.md`, `commit-protocol.md` |

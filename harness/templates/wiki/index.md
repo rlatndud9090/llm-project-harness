@@ -1,7 +1,7 @@
 ---
 kind: wiki-index
 summary: 이 프로젝트의 방향성과 raw work unit 네비게이션 인덱스. 상세는 링크된 raw 문서에 있다.
-authoring_rules: 위키 구조·영역(area)/섹션(section) 작성 규칙은 .harness/harness/protocols/wiki-ingest.md 참고.
+authoring_rules: 위키 구조·영역(area)/섹션(section) 작성 규칙은 하네스 플러그인의 harness/protocols/wiki-ingest.md 참고.
 ---
 
 # 프로젝트 Wiki — 방향성 & 네비게이션
