@@ -5,12 +5,12 @@ description: "확정된 작업 단위의 브랜치와 raw directory, 템플릿�
 
 # Kickoff 어댑터
 
-공용 기준은 `.harness/harness/protocols/kickoff.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/kickoff.md`다.
 
 ## 실행
 
 ```sh
-npm run harness:kickoff -- --title "<한국어 제목>"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs" --title "<한국어 제목>"
 ```
 
 현재 브랜치가 `main`이거나 유효한 work branch가 아니면 `--type`, `--slug`를
@@ -39,7 +39,7 @@ raw 골격이 생기면 `$prd-helper`로 PRD 작성을 잇는다.
 
 격리 없이 base(main)에서 부르면 kickoff은 전환하지 않고 "워크트리로 격리하라" 힌트만 낸다.
 정말 현재 위치(main-wt)에 브랜치를 파야 할 때만 `--checkout`을 쓴다. 공용 기준은
-`.harness/harness/protocols/kickoff.md`의 "브랜치 처리".
+`${CLAUDE_PLUGIN_ROOT}/harness/protocols/kickoff.md`의 "브랜치 처리".
 
 ## GitHub 이슈로 시작 (이슈 번호 인자)
 
@@ -56,19 +56,19 @@ raw 골격이 생기면 `$prd-helper`로 PRD 작성을 잇는다.
 5. 도출한 값으로 실행하고 원본 이슈를 `--issue`로 남긴다:
 
    ```sh
-   npm run harness:kickoff -- --type bugfix --slug session-restore --title "세션 복원 실패" --issue 42
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs" --type bugfix --slug session-restore --title "세션 복원 실패" --issue 42
    ```
 
 `--issue`는 provenance를 기록한다(feature/bugfix frontmatter `issue:`, 모든 유형 `state.md`
 kickoff 로그 줄). 이슈 번호를 스크립트에 직접 넘기면 실패하며 먼저 조회·분류하라고 알린다.
-상세는 `.harness/harness/protocols/kickoff.md`의 "GitHub 이슈로 시작".
+상세는 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/kickoff.md`의 "GitHub 이슈로 시작".
 
 `$kickoff`는 각 단위에 단계 체크포인트 원장 `state.md`도 만든다(승인 게이트·세션
 인수인계용). 새 세션은 이 파일을 가장 먼저 읽어 현재 단계와 승인 여부를 판단한다.
 
 ## Claude Code — agents 화면 세션 제목 (필수)
 
-`npm run harness:kickoff`으로 브랜치·raw 골격을 만든 직후 **즉시** 현재 세션의 agents
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs"`으로 브랜치·raw 골격을 만든 직후 **즉시** 현재 세션의 agents
 화면(FleetView) 제목을 확정된 `<작업명>`으로 바꾼다(대화형·background 세션 모두 항상).
 next-feature 단계에서 붙였던 `next-feature` 제목을 확정된 작업 단위 이름으로 교체하는
 것이다. 제목엔 프로젝트 약어 prefix를 붙이지 않는다(작업내역 요약만 남긴다 — agents 화면을
@@ -84,8 +84,8 @@ next-feature 단계에서 붙였던 `next-feature` 제목을 확정된 작업 �
 ```bash
 # 아래 "do-next-thing"을 실제 작업 단위 slug로 바꿔 실행한다(브랜치 {type}/{slug}의 {slug}).
 # 헬퍼가 하이픈→공백 변환을 한다.
-[ -f .harness/scripts/harness/set-fleet-title.mjs ] \
-  && node .harness/scripts/harness/set-fleet-title.mjs --slug "do-next-thing" 2>/dev/null || true
+[ -f "${CLAUDE_PLUGIN_ROOT}/scripts/harness/set-fleet-title.mjs" ] \
+  && node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/set-fleet-title.mjs" --slug "do-next-thing" 2>/dev/null || true
 ```
 
 ## Claude Code — Background 세션 result 형식 (필수)

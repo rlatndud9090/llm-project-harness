@@ -5,13 +5,13 @@ description: "다음 작업 단위 후보를 추천하고 하나를 선택할 �
 
 # Next Feature 어댑터
 
-공용 기준은 `.harness/harness/protocols/next-feature.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/next-feature.md`다.
 
 ## 실행 순서
 
-1. `.harness/harness/protocols/next-feature.md`를 읽는다.
+1. `${CLAUDE_PLUGIN_ROOT}/harness/protocols/next-feature.md`를 읽는다.
 2. 목표/비목표/결정 경계를 확정한다(`$deep-interview`가 있으면 그 스킬을 우선 사용하고, 없으면 현재 런타임의 구조화 질문 도구를 우선 사용하며 그마저 없을 때만 명시 질문).
-3. `.harness/harness/roles/intake-helper.md`, `unit-planner.md`로 후보 3~5개를 만든다.
+3. `${CLAUDE_PLUGIN_ROOT}/harness/roles/intake-helper.md`, `unit-planner.md`로 후보 3~5개를 만든다.
 4. 1순위 추천과 이유를 제시하고 사용자가 하나를 선택하게 한다.
 
 후보 필드·우선순위·`area`/`section` 판정 규칙은 프로토콜을 정본으로 따른다. 확정된 단위만
@@ -46,8 +46,8 @@ ClaudeCode에서는 자기 도구로 더 자연스럽게 진행한다(공용 절
 
 ```bash
 # provider 레포/미부착 소비 프로젝트엔 .harness가 없을 수 있으므로 파일 존재를 먼저 본다.
-[ -f .harness/scripts/harness/set-fleet-title.mjs ] \
-  && node .harness/scripts/harness/set-fleet-title.mjs --label "next-feature" 2>/dev/null || true
+[ -f "${CLAUDE_PLUGIN_ROOT}/scripts/harness/set-fleet-title.mjs" ] \
+  && node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/set-fleet-title.mjs" --label "next-feature" 2>/dev/null || true
 ```
 
 - 작업 단위를 확정해 `$kickoff`로 넘어가면 kickoff이 제목의 `next-feature`를 확정된

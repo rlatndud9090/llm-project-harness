@@ -5,7 +5,7 @@ description: "넓은 아이디어를 branch-sized 후보 작업 단위와 PRD �
 
 # Intake Helper 어댑터
 
-공용 기준은 `.harness/harness/roles/intake-helper.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/roles/intake-helper.md`다.
 
 필수:
 

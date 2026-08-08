@@ -5,7 +5,7 @@ description: "후보를 feature/bugfix/chore branch와 raw path 단위로 자르
 
 # Unit Planner 어댑터
 
-공용 기준은 `.harness/harness/roles/unit-planner.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/roles/unit-planner.md`다.
 
 필수:
 

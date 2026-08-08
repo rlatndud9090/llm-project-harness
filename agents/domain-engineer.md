@@ -5,7 +5,7 @@ description: "앱 핵심 상태, 규칙, 데이터 계약, 테스트 가능한 �
 
 # Domain Engineer 어댑터
 
-공용 기준은 `.harness/harness/roles/domain-engineer.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/roles/domain-engineer.md`다.
 
 필수:
 

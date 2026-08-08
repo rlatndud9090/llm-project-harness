@@ -5,12 +5,12 @@ description: "raw work unit을 docs/wiki에 섹션·영역별 시간순으로 �
 
 # Wiki Ingest 어댑터
 
-공용 기준은 `.harness/harness/protocols/wiki-ingest.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/wiki-ingest.md`다.
 
 ## 실행
 
 ```sh
-npm run harness:ingest -- docs/raw/<type>/<slug> --area "<영역>"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/wiki-ingest.mjs" docs/raw/<type>/<slug> --area "<영역>"
 ```
 
 wiki에는 raw 내용을 요약하지 않고 링크 한 줄만 둔다. 영역(area)은 앱의 좁은 기능/구조

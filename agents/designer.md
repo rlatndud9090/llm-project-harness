@@ -5,7 +5,7 @@ description: "화면 레이아웃·구성 대안을 제안하고 디자인 결�
 
 # Designer 어댑터
 
-공용 기준은 `.harness/harness/roles/designer.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/roles/designer.md`다.
 
 필수:
 

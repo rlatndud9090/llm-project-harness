@@ -6,11 +6,11 @@ description: "확정된 작은 작업 단위를 kickoff부터 PR 리뷰 수렴�
 # One-Shot 어댑터
 
 각 도구는 독자 규칙을 만들지 않고 공용 하네스를 따른다. 절차의 정본은
-`.harness/harness/protocols/one-shot.md`이며, 이 어댑터는 그 위의 표면 배선만 남긴다.
+`${CLAUDE_PLUGIN_ROOT}/harness/protocols/one-shot.md`이며, 이 어댑터는 그 위의 표면 배선만 남긴다.
 
 ## 필수 로딩
 
-1. `.harness/harness/protocols/one-shot.md` — 무인 오케스트레이션 규율의 정본.
+1. `${CLAUDE_PLUGIN_ROOT}/harness/protocols/one-shot.md` — 무인 오케스트레이션 규율의 정본.
 2. 각 단계 절차는 해당 스킬이 로드한다: `$kickoff`, `$prd-helper`, `$adr-helper`,
    `$feature-develop`, `$make-pr`. one-shot은 이들을 순차 호출하는 오케스트레이터다.
 3. 현재 raw unit의 `state.md`(가장 먼저) → 단계·승인 상태.
@@ -26,7 +26,7 @@ description: "확정된 작은 작업 단위를 kickoff부터 PR 리뷰 수렴�
    작성하고 **사전 승인을 자동 부여**한다. 사용자에게 묻는 대신 포괄 위임 quote로 전환한다:
 
    ```sh
-   npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의 포괄 위임 발화 verbatim>" --transport one-shot [--adr]
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/approve.mjs" --unit docs/raw/feature/<slug> --quote "<사용자의 포괄 위임 발화 verbatim>" --transport one-shot [--adr]
    ```
 
 4. **구현**: `$feature-develop`로 진행한다(자율 fan-out 구간 그대로). 요구·결정을 뒤집는
@@ -34,7 +34,7 @@ description: "확정된 작은 작업 단위를 kickoff부터 PR 리뷰 수렴�
 5. **make-pr**: `$make-pr`로 **최종 확정을 자동 부여**하고 커밋·PR을 만든다:
 
    ```sh
-   npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의 포괄 위임 발화 verbatim>" --transport one-shot --final [--adr]
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/approve.mjs" --unit docs/raw/feature/<slug> --quote "<사용자의 포괄 위임 발화 verbatim>" --transport one-shot --final [--adr]
    ```
 
 6. **PR 리뷰 수렴 (스킬 있으면)**: PR 리뷰를 검증·반영·수렴하는 스킬이 설치돼 있으면 그걸로
@@ -65,8 +65,8 @@ description: "확정된 작은 작업 단위를 kickoff부터 PR 리뷰 수렴�
 
 ```bash
 # provider 레포/미부착 소비 프로젝트엔 .harness가 없을 수 있으므로 파일 존재를 먼저 본다.
-[ -f .harness/scripts/harness/set-fleet-title.mjs ] \
-  && node .harness/scripts/harness/set-fleet-title.mjs --label "one-shot" 2>/dev/null || true
+[ -f "${CLAUDE_PLUGIN_ROOT}/scripts/harness/set-fleet-title.mjs" ] \
+  && node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/set-fleet-title.mjs" --label "one-shot" 2>/dev/null || true
 ```
 
 ## Claude Code — Background 세션 result 형식 (필수)

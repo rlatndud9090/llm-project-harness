@@ -5,7 +5,7 @@ description: "작성 중인 PRD/ADR을 지속 검토해 모호함, 누락, 모�
 
 # Reviewer 어댑터
 
-공용 기준은 `.harness/harness/roles/reviewer.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/roles/reviewer.md`다.
 
 필수:
 

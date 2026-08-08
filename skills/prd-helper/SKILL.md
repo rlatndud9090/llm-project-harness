@@ -5,15 +5,15 @@ description: "PRD를 인터뷰·리서치·리뷰로 함께 작성할 때 사용
 
 # PRD Helper 어댑터
 
-공용 기준은 `.harness/harness/protocols/prd-helper.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/prd-helper.md`다.
 
 ## 실행 순서
 
-1. `.harness/harness/protocols/prd-helper.md`를 읽는다.
+1. `${CLAUDE_PLUGIN_ROOT}/harness/protocols/prd-helper.md`를 읽는다.
 2. 사용자 의견과 결정 경계를 수집한다(`$deep-interview`가 있으면 그 스킬을 우선 사용하고, 없으면 현재 런타임의 구조화 질문 도구를 우선 사용하며 그마저 없을 때만 명시 질문).
-3. `.harness/harness/roles/researcher.md`로 레퍼런스/선행 사례를 모은다(출처는 notes에).
-4. `.harness/harness/roles/prd-writer.md`로 PRD 초안을 작성한다.
-5. `.harness/harness/roles/reviewer.md`로 수용 기준/누락/모순을 지속 검토하고 다듬는다.
+3. `${CLAUDE_PLUGIN_ROOT}/harness/roles/researcher.md`로 레퍼런스/선행 사례를 모은다(출처는 notes에).
+4. `${CLAUDE_PLUGIN_ROOT}/harness/roles/prd-writer.md`로 PRD 초안을 작성한다.
+5. `${CLAUDE_PLUGIN_ROOT}/harness/roles/reviewer.md`로 수용 기준/누락/모순을 지속 검토하고 다듬는다.
 6. `## ADR 필요 여부`를 PRD에 판단해 적는다. **이 단계는 `prd.md`만 편집하고 `adr.md`는
    건드리지 않는다.** 필요하면 PRD 사전 승인을 미루고 `$adr-helper`로 넘기고, 불필요하면 PRD
    단독 사전 승인으로 진행한다.
@@ -31,7 +31,7 @@ PRD는 한국어로 작성하고 `review` 상태로 둔다. **`adr.md`는 절대
 최종 `approved` 확정은 `$make-pr`에서 한다. ADR이 필요하면 여기서 사전 승인을 요청하지 않고 PRD를
 `review`로 둔 채 `$adr-helper`로 넘긴다(PRD·ADR 통합 사전 승인은 `$adr-helper`가 담당). ADR이
 불필요할 때만 여기서 PRD 단독 사전 승인을 요청한다: 사용자의 명시 사전 승인 뒤
-`npm run harness:approve -- --unit docs/raw/<type>/<slug> --quote "<사용자 발화 verbatim>"`로만
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/approve.mjs" --unit docs/raw/<type>/<slug> --quote "<사용자 발화 verbatim>"`로만
 전환한다(`--adr` 없이 PRD만; 직접 frontmatter 편집 금지 — 런타임 훅과 `harness:check`가 막는다).
 "이렇게 하려고 했어" 같은 의도·아이디어 발화는 사전 승인이 아니다. 모호하면 `review`로 둔 채 다시
 확인한다. `review`로 올릴 때 `state.md`의 `stage`/`prd_status`를 갱신한다.

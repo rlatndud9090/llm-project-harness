@@ -11,13 +11,13 @@
 ## 실행 (일반)
 
 ```sh
-npm run harness:kickoff -- $ARGUMENTS
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs" $ARGUMENTS
 ```
 
 > 실행 **전** 항상 origin/main 기준 전용 워크트리로 격리한다(`EnterWorktree`, 이름
 > `<type>/<slug>`). 주 워킹트리(main-wt)는 개발자가 직접 쓰는 자리라 kickoff이 자동
 > 전환하지 않는다(base에서 격리 없이 부르면 힌트만). 상세는
-> `.harness/harness/protocols/kickoff.md`의 "브랜치 처리".
+> `${CLAUDE_PLUGIN_ROOT}/harness/protocols/kickoff.md`의 "브랜치 처리".
 
 ## 실행 (GitHub 이슈로 시작)
 
@@ -34,15 +34,15 @@ npm run harness:kickoff -- $ARGUMENTS
 5. 도출한 값으로 실행하고 원본 이슈를 `--issue`로 남긴다:
 
    ```sh
-   npm run harness:kickoff -- --type <feature|bugfix|chore> --slug <slug> --title "<제목>" --issue <번호|URL>
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs" --type <feature|bugfix|chore> --slug <slug> --title "<제목>" --issue <번호|URL>
    ```
 
 ## 예시
 
 ```sh
-npm run harness:kickoff -- --type feature --slug data-contract --title "데이터 계약"
-npm run harness:kickoff -- --title "메인 레이아웃" --area "메인 레이아웃"
-npm run harness:kickoff -- --type bugfix --slug session-restore --title "세션 복원 실패" --issue 42
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs" --type feature --slug data-contract --title "데이터 계약"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs" --title "메인 레이아웃" --area "메인 레이아웃"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs" --type bugfix --slug session-restore --title "세션 복원 실패" --issue 42
 ```
 
 `--area "<영역>"`(선택)는 이 unit이 발전시키는 기능/구조 영역을 `prd.md`/`bugfix.md`
@@ -50,7 +50,7 @@ frontmatter에 시드한다(여러 개는 콤마). `--section "<섹션>"`(선택
 `section:`에 시드한다(단일 값; 프로젝트에 섹션이 2개 이상이면 wiki가 섹션별 파일로 분리됨).
 `$next-feature` 앵커에 영역·섹션이 있으면 자동 시드된다.
 
-공용 기준은 `.harness/harness/protocols/kickoff.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/kickoff.md`다.
 
 무엇을 할지 아직 정하지 못했으면 먼저 `$next-feature`를 사용한다. raw 골격이
 생기면 `$prd-helper`로 PRD 작성을 잇는다.

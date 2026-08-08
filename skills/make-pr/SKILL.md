@@ -6,12 +6,12 @@ description: "사전 승인·구현이 끝난 작업 단위를 최종 확정(app
 # Make PR 어댑터
 
 각 도구는 독자 규칙을 만들지 않고 공용 하네스를 따른다. 절차의 정본은
-`.harness/harness/protocols/make-pr.md`이며, 이 어댑터는 그 위의 표면 배선만 남긴다.
+`${CLAUDE_PLUGIN_ROOT}/harness/protocols/make-pr.md`이며, 이 어댑터는 그 위의 표면 배선만 남긴다.
 
 ## 필수 로딩
 
-1. `.harness/harness/protocols/make-pr.md` — 최종 확정·커밋·PR 절차의 정본.
-2. `.harness/harness/protocols/commit-protocol.md` — 이 컨텍스트에 아직 로드돼 있지 않을 때만
+1. `${CLAUDE_PLUGIN_ROOT}/harness/protocols/make-pr.md` — 최종 확정·커밋·PR 절차의 정본.
+2. `${CLAUDE_PLUGIN_ROOT}/harness/protocols/commit-protocol.md` — 이 컨텍스트에 아직 로드돼 있지 않을 때만
    (이미 읽었으면 재판독하지 않는다).
 3. 현재 raw unit의 `state.md`(가장 먼저) — 승인 상태의 원장. PRD/ADR **전문**은 이 컨텍스트에서
    이미 읽었고 이후 개정이 없으면 재판독하지 않는다.
@@ -26,10 +26,10 @@ description: "사전 승인·구현이 끝난 작업 단위를 최종 확정(app
    편집 금지 — 런타임 훅과 `harness:check`가 막는다. bugfix/chore는 승인 축이 없어 스킵).
 
    ```sh
-   npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의 make-pr 호출 발화 verbatim>" --transport make-pr --final [--adr]
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/approve.mjs" --unit docs/raw/feature/<slug> --quote "<사용자의 make-pr 호출 발화 verbatim>" --transport make-pr --final [--adr]
    ```
 
-3. **게이트**: `npm run harness:ingest -- docs/raw/<type>/<slug>` → `npm run harness:gate`.
+3. **게이트**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/wiki-ingest.mjs" docs/raw/<type>/<slug>` → `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"`.
    실패하면 커밋하지 않고 원인을 고쳐 처음부터 다시 실행한다.
 4. **커밋**: `commit-protocol`로 확정 커밋을 만든다(`관련 문서:` 블록·명시적 stage·HEREDOC) —
    `approved`/`accepted`로 올라간 PRD/ADR과 구현을 함께 담는다.

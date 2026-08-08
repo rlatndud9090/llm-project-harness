@@ -5,7 +5,7 @@ description: "PRD/ADR을 뒷받침할 레퍼런스, 선행 사례, 표준, 제�
 
 # Researcher 어댑터
 
-공용 기준은 `.harness/harness/roles/researcher.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/roles/researcher.md`다.
 
 필수:
 

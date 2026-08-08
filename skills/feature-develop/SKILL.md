@@ -6,24 +6,24 @@ description: "PRD/ADR 기반 기능 구현, 재작업, 부분 수정을 진행�
 # Feature Develop 어댑터
 
 각 도구는 독자 규칙을 만들지 않고 공용 하네스를 따른다. 절차·게이트·실행 레일의 정본은
-`.harness/harness/protocols/feature-develop.md`이며, 이 어댑터는 그 위의 표면 배선만 남긴다.
+`${CLAUDE_PLUGIN_ROOT}/harness/protocols/feature-develop.md`이며, 이 어댑터는 그 위의 표면 배선만 남긴다.
 
 ## 필수 로딩
 
-1. `.harness/harness/protocols/feature-develop.md` — 절차·게이트·레일의 정본.
+1. `${CLAUDE_PLUGIN_ROOT}/harness/protocols/feature-develop.md` — 절차·게이트·레일의 정본.
 2. 현재 raw unit의 `state.md`(가장 먼저) → 필요한 만큼 PRD/ADR/notes.
-3. 디스패치할 role 문서: `.harness/harness/roles/`.
+3. 디스패치할 role 문서: `${CLAUDE_PLUGIN_ROOT}/harness/roles/`.
 4. `AGENTS.md`·`docs/wiki/index.md`는 이 컨텍스트에 아직 로드돼 있지 않을 때만
    (`session-start`에서 이미 읽었으면 재판독하지 않는다).
-5. 작업 표면에 해당하는 `.harness/harness/guides/implementation-guidelines.md` 섹션 —
+5. 작업 표면에 해당하는 `${CLAUDE_PLUGIN_ROOT}/harness/guides/implementation-guidelines.md` 섹션 —
    §0 코어 원칙 + 표면 인덱스로 선택해 구현 브리핑에 발췌한다(전체 로드 금지).
 
 ## 사전 승인 게이트 (구현 전 하드 차단)
 
-`state.md`의 `stage`와 `## 승인 이벤트`가 승인 여부의 단일 진실원이다. `npm run harness:check`로
+`state.md`의 `stage`와 `## 승인 이벤트`가 승인 여부의 단일 진실원이다. `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/artifact-check.mjs"`로
 승인 정합성을 확인하고, PRD가 `pre-approved`가 아니거나 사전 승인 이벤트(`PREAPPROVAL`)가 없으면
 **구현하지 않는다** — `$prd-helper`/`$adr-helper`로 되돌아가 구조화 질문으로 명시 사전 승인을 받는다.
-전환은 오직 `npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자 발화 verbatim>" [--adr]`
+전환은 오직 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/approve.mjs" --unit docs/raw/feature/<slug> --quote "<사용자 발화 verbatim>" [--adr]`
 로만 한다(에이전트가 status를 직접 고치거나 승인을 만들어내지 않는다; "이렇게 하려고 했어" 같은
 의도·아이디어 발화는 사전 승인이 아니다). 게이트 통과 후 `stage`를 `implementing`으로 올려 시작한다.
 빌드 중 사용자가 확인한 PRD/ADR 개정은 본문만 고쳐 `pre-approved`로 두고 `state.md` 단계 로그에
@@ -39,7 +39,7 @@ description: "PRD/ADR 기반 기능 구현, 재작업, 부분 수정을 진행�
   커밋하지 않고, 모든 인간 승인 게이트와 커밋은 오케스트레이터가 처리한다. domain/UI/test 경계를 분리한다.
 - 질문·승인은 현재 런타임의 구조화 질문 도구를 우선 사용한다.
 - 하네스 submodule 업데이트·adapter 정리는 기능 개발 레일과 분리한다.
-- 완료 전 `npm run harness:gate`, 최종 확정·커밋·PR은 `$make-pr`(`commit-protocol` 사용)로 넘어간다.
+- 완료 전 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"`, 최종 확정·커밋·PR은 `$make-pr`(`commit-protocol` 사용)로 넘어간다.
 
 규칙 변경은 `.claude`가 아니라 `.harness/harness`를 먼저 수정한다. 프로젝트 문서는 한국어로 작성한다.
 
@@ -75,7 +75,7 @@ ClaudeCode에서는 role 체인을 자기 도구로 실행한다(공용 절차�
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "node .harness/scripts/harness/claude-approval-guard.mjs" }
+          { "type": "command", "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/harness/claude-approval-guard.mjs" }
         ]
       }
     ]
@@ -102,7 +102,7 @@ rename, MCP/원격 쓰기는 PreToolUse 매처가 못 잡는다. 우회 불가�
 - 5개 role은 `Workflow` 내부에서 `agentType`(`architect`/`domain-engineer`/`ui-engineer`/
   `test-engineer`/`integrator`)으로 디스패치한다.
 - `Workflow`는 구현·테스트·검증 결과만 반환한다. 메인 루프가 그 결과로
-  `npm run harness:gate`를 판정하고, 통과 시에만 `commit-protocol`로 커밋한다.
+  `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"`를 판정하고, 통과 시에만 `commit-protocol`로 커밋한다.
 
 ### Workflow 골격 (대표 형태 — plan.md에 맞춰 동적 구성)
 

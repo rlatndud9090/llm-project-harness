@@ -5,7 +5,7 @@ description: "PRD를 분석해 ADR, 인터페이스 계약, domain/UI/test 경�
 
 # Architect 어댑터
 
-공용 기준은 `.harness/harness/roles/architect.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/roles/architect.md`다.
 
 필수:
 

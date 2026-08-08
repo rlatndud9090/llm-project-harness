@@ -7,15 +7,15 @@ description: "검증, 명시적 스테이징, 관련 문서 PRD/ADR 링크, Lore
 
 공용 기준:
 
-1. `.harness/harness/protocols/commit-protocol.md`
-2. `.harness/harness/roles/integrator.md`
+1. `${CLAUDE_PLUGIN_ROOT}/harness/protocols/commit-protocol.md`
+2. `${CLAUDE_PLUGIN_ROOT}/harness/roles/integrator.md`
 3. `AGENTS.md`의 Lore Commit Protocol
 
 ## 필수 순서
 
 ```sh
 git status --short --branch
-npm run harness:gate
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"
 git diff --stat
 git add <관련 파일만>
 git diff --cached --check

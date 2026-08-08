@@ -5,7 +5,7 @@ raw unit을 `docs/wiki/index.md`에 영역별 시간순 한 줄로 연결한다.
 ## 실행
 
 ```sh
-npm run harness:ingest -- $ARGUMENTS --area "<영역>"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/wiki-ingest.mjs" $ARGUMENTS --area "<영역>"
 ```
 
 규칙:
@@ -26,4 +26,4 @@ npm run harness:ingest -- $ARGUMENTS --area "<영역>"
   `_(superseded by …)_`, 현재 최신은 `_(현재)_`로 표시한다.
 - PRD/ADR이 있는 raw unit은 둘 다 링크되었는지 확인한다.
 
-공용 기준은 `.harness/harness/protocols/wiki-ingest.md`다.
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/wiki-ingest.md`다.
