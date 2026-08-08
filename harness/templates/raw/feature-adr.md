@@ -14,7 +14,7 @@ supersedes:
 
 > 작성 고도: ADR은 "어떤 구조를 왜 골랐나"의 근거 저널이다. 코드 스니펫·전체 설계문서를 본문에
 > 넣지 않는다(과대 ADR) — 상세 구현은 코드·별도 설계문서로 내린다. 사람은 중립 역할어로만
-> 지칭하고 개인 호칭·별명은 넣지 않는다. 참고: `.harness/harness/templates/examples/README.md`.
+> 지칭하고 개인 호칭·별명은 넣지 않는다. 참고: `harness/templates/examples/README.md`.
 
 ## 컨텍스트
 

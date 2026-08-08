@@ -1,7 +1,7 @@
 # 아티팩트 검증 프로토콜
 
 raw/wiki/harness 문서가 프로젝트 규칙을 지키는지 확인한다. 소비 프로젝트의
-자동 검증은 `.harness/scripts/harness/artifact-check.mjs`가 수행하고, 에이전트는
+자동 검증은 `scripts/harness/artifact-check.mjs`가 수행하고, 에이전트는
 실패 원인을 읽고 수정해야 한다.
 
 ## 명령

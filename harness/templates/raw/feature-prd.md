@@ -43,7 +43,7 @@ raw_path: "docs/raw/feature/{slug}"
 > 타입명·필드명을 지웠을 때 요구가 무너지면 구현 누수다 — 그 이름은 다투는 결정이면 ADR로,
 > 아니면 구현으로 내린다(구현을 빼되 모호해지지 않는다). 사람은 중립 역할어(`사용자`/`개발자`/
 > `검증자`)로만 지칭하고, 개인 호칭·별명(운영자 설정이 그렇게 부르라 해도)은 넣지 않는다.
-> 상세 루브릭·부검·예시·지칭 규칙: `.harness/harness/templates/examples/README.md`.
+> 상세 루브릭·부검·예시·지칭 규칙: `harness/templates/examples/README.md`.
 
 ### 기능 요구사항
 

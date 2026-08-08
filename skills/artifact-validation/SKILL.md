@@ -17,7 +17,7 @@ description: "PRD/ADR/notes, raw/wiki 링크, branch/raw 매핑, 도구별 어�
 
 자동 검증만으로 충분하다고 주장하지 않는다. placeholder ADR, 승인 근거 없는
 approved PRD/accepted ADR, 검증 불가능한 수용 기준, 영어로 작성된 프로젝트 문서, 제품/도메인 PRD/ADR이 필요한
-notes-only 작업, 제품 기능 변경과 섞인 하네스 submodule 업데이트나 adapter 정리이 있으면
+notes-only 작업, 제품 기능 변경과 섞인 하네스 플러그인 업데이트나 adapter 정리이 있으면
 보정한다.
 
 `harness:check`는 feature 단위 `state.md` 원장의 정합성도 강제한다: approved/accepted에는

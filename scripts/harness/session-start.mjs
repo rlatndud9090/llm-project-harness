@@ -12,6 +12,7 @@
 // SessionStart hook must never wedge a session. Any error fails open (silent).
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 try {
@@ -60,7 +61,46 @@ function main() {
     "사전 승인된 구현은 feature-develop, PR 차례면 make-pr로 진입합니다.",
   );
 
+  // 배선 신선도 넛지. 플러그인(엔진·스킬·훅)은 마켓플레이스로 자동 갱신되지만,
+  // /harness-init이 소비 레포에 직접 커밋한 "배선"(git훅의 baked 절대경로·CI 워크플로·
+  // .harness.json·settings)은 자동으로 안 바뀐다. 설치된 플러그인 버전이 이 저장소에
+  // 마지막으로 새긴 배선 버전(.harness.json version)보다 새로우면, 재실행을 권한다.
+  // 재실행하면 flag version이 올라가 넛지가 저절로 사라진다. 로컬 비교라 네트워크 없음.
+  const pluginVersion = readPluginVersion();
+  if (pluginVersion && typeof flag.version === "string" && isNewerVersion(pluginVersion, flag.version)) {
+    lines.push(
+      `※ 플러그인이 v${pluginVersion}로 업데이트됐습니다(이 저장소 배선은 v${flag.version}). ` +
+        "배선(git훅·CI·.harness.json)이 뒤처졌을 수 있으니 /harness-init을 다시 실행해 갱신하세요(먼저 --dry-run으로 확인).",
+    );
+  }
+
   process.stdout.write(lines.join("\n") + "\n");
+}
+
+// 이 훅 스크립트는 플러그인 안에 있으므로, 두 단계 위가 플러그인 루트다.
+function readPluginVersion() {
+  try {
+    const manifest = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", ".claude-plugin", "plugin.json");
+    const v = JSON.parse(fs.readFileSync(manifest, "utf8")).version;
+    return typeof v === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+// 순수 숫자 dotted 버전만 비교한다(2.0.0 > 1.1.0). 파싱 불가(프리릴리스 태그 등)면
+// 조용히 비교를 포기해(false) 애매한 넛지를 내지 않는다.
+function isNewerVersion(a, b) {
+  const pa = String(a).split(".").map(Number);
+  const pb = String(b).split(".").map(Number);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (Number.isNaN(x) || Number.isNaN(y)) return false;
+    if (x !== y) return x > y;
+  }
+  return false;
 }
 
 function currentBranch(cwd) {

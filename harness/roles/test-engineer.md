@@ -23,7 +23,7 @@
     - ADR이 있으면, 거기 기록된 결정이 실제 구현/구조에 반영됐는지(결정↔구현 정합성) 확인한다.
     - 브리핑에 포함된 구현 지침 발췌의 검증 항목(극단 케이스: 최장 입력·최소 뷰포트·타
       로케일·직접 URL 진입·복원 왕복·경계 입력)을 테스트 항목에 반영한다. 발췌가 없을
-      때만 단일 출처 `.harness/harness/guides/implementation-guidelines.md`에서 해당
+      때만 단일 출처 `harness/guides/implementation-guidelines.md`에서 해당
       표면 섹션을 직접 선택 로드한다.
   </Success_Criteria>
 

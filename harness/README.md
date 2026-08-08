@@ -1,22 +1,21 @@
-# 크로스 에이전트 하네스
+# 하네스 공용 제어면
 
-이 디렉터리는 Codex, ClaudeCode, 그리고 다른 LLM 에이전트가 소비 프로젝트에서
-같은 방식으로 작업하도록 만드는 공용 제어면이다. 하네스 저장소 안에서는
-`harness/`가 source of truth이고, 소비 프로젝트에서는 `.harness/harness/`로
-접근한다.
+이 디렉터리는 Claude Code 에이전트가 소비 프로젝트에서 같은 방식으로 작업하도록
+만드는 공용 제어면이다. 하네스는 **Claude Code 플러그인**으로 배포되고, `harness/`가
+source of truth다. 세션 안에서는 `${CLAUDE_PLUGIN_ROOT}/harness/...`로, CI에서는 공용
+composite action으로 소비된다 — 소비 저장소에 `.harness` 심볼릭 링크나 엔진 사본은 없다.
 
 ## 핵심 원칙
 
 - 소비 프로젝트의 `docs/raw/`, `docs/wiki/`, `AGENTS.md`는 프로젝트 소유다.
 - 하네스는 소비 프로젝트의 `docs/` 아래에 공유 파일이나 symlink를 만들지 않는다.
 - 하네스는 raw/wiki/PRD/ADR/검증/커밋 절차와 템플릿을 제공한다.
-- 프로젝트 루트의 `.codex/`, `.claude/`는 프로젝트 소유 adapter surface다.
-- 하네스 제공 adapter는 개별 symlink로 추가하고, 같은 경로의 로컬 adapter는
-  프로젝트 override로 보존한다.
+- 스킬·커맨드·에이전트는 플러그인이 namespace(`/llm-project-harness:<name>`)로 제공한다.
+- 같은 이름의 로컬 스킬/커맨드를 소비 프로젝트 `.claude/`에 두면 그 로컬 정의가 override로 우선한다.
 - 작업 단위, 브랜치 정책, PRD/ADR 승인 정책은 소비 프로젝트가 하네스를 사용할 때
   적용한다. 하네스 저장소 자체에 같은 정책을 강제하지 않는다.
-- 프로토콜 본문의 `$skill-name`은 "그 하네스 skill을 호출하라"는 표시다(ClaudeCode는
-  Skill 도구나 `/skill-name`, Codex는 skill 프롬프트). `$deep-interview`, `$ralph`,
+- 프로토콜 본문의 `$skill-name`은 "그 하네스 skill을 호출하라"는 표시다(플러그인에서는
+  namespace `/llm-project-harness:skill-name` 또는 Skill 도구). `$deep-interview`, `$ralph`,
   `$ralplan`, `/team`은 하네스가 배포하지 않는 선택적 외부 가속기다. 프로토콜이
   `$deep-interview`를 명시할 때는 그 스킬을 최우선으로 사용하고, 질문 transport는
   deep-interview 내부에서 현재 surface에 맞게 선택한다. `$deep-interview`가 없을
@@ -47,7 +46,7 @@
 
 1. `AGENTS.md`
 2. `docs/wiki/index.md`
-3. `.harness/harness/protocols/session-start.md`
+3. `harness/protocols/session-start.md`
 4. 현재 요청과 관련된 raw unit
 
 ### 2. 작업 정의 (단계별 진입)
@@ -56,15 +55,15 @@
 2부터, PRD만 쓰면 3부터 들어간다.
 
 확정된 **작은** 작업 단위를 kickoff→(prd/adr)→feature-develop→make-pr→PR 리뷰 수렴까지
-**사용자 개입 없이 한 번에** 진행하려면 `.harness/harness/protocols/one-shot.md`를 쓴다. 호출
+**사용자 개입 없이 한 번에** 진행하려면 `harness/protocols/one-shot.md`를 쓴다. 호출
 자체가 사용자의 포괄 사전위임이 되어 각 승인 게이트를 `harness:approve --transport one-shot`
 으로 자동 부여·기록하고(quote는 위임 발화 verbatim), 리뷰 clean에서 정지한다(머지는 수동).
 열린 아이디어는 대상이 아니다 — 먼저 1(next-feature)로 작업을 확정한다.
 
-1. `.harness/harness/protocols/next-feature.md` — 다음 작업 단위 추천/선택
-2. `.harness/harness/protocols/kickoff.md` — 브랜치 + raw 골격 생성
-3. `.harness/harness/protocols/prd-helper.md` — PRD 작성 보조(interview/research/review)
-4. `.harness/harness/protocols/adr-helper.md` — ADR 작성 보조(선택)
+1. `harness/protocols/next-feature.md` — 다음 작업 단위 추천/선택
+2. `harness/protocols/kickoff.md` — 브랜치 + raw 골격 생성
+3. `harness/protocols/prd-helper.md` — PRD 작성 보조(interview/research/review)
+4. `harness/protocols/adr-helper.md` — ADR 작성 보조(선택)
 
 각 단계는 PRD/ADR을 `review`/`proposed`로만 만든다. 구현과 `approved`/`accepted`
 전환은 사용자 명시 승인 이후 별도로 진행한다. `$kickoff`는 각 단위에 단계 체크포인트
@@ -76,10 +75,10 @@ verbatim을 원장에 기록), 에이전트가 직접 frontmatter status를 `app
 
 승인된 PRD/ADR 기반 구현 요청이면:
 
-1. `.harness/harness/protocols/feature-develop.md`
+1. `harness/protocols/feature-develop.md`
 2. 관련 raw PRD/ADR/notes
 3. 필요한 role 문서
-4. 작업 표면에 해당하는 `.harness/harness/guides/implementation-guidelines.md` 섹션
+4. 작업 표면에 해당하는 `harness/guides/implementation-guidelines.md` 섹션
    (§0 코어 원칙 + 표면 인덱스로 선택 — 전체 로드 금지)
 
 구조, 데이터, engine, dependency, 다중 모듈 변경은 설계를 먼저 확정한 뒤 구현한다
@@ -92,10 +91,10 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 
 완료 직전에는:
 
-1. `.harness/harness/protocols/wiki-ingest.md`
-2. `.harness/harness/protocols/artifact-validation.md`
-3. `.harness/harness/protocols/integration-gate.md`
-4. `.harness/harness/protocols/commit-protocol.md`
+1. `harness/protocols/wiki-ingest.md`
+2. `harness/protocols/artifact-validation.md`
+3. `harness/protocols/integration-gate.md`
+4. `harness/protocols/commit-protocol.md`
 
 ## 프로토콜
 
@@ -105,7 +104,7 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 - [Kickoff](protocols/kickoff.md)
 - [PRD Helper](protocols/prd-helper.md)
 - [ADR Helper](protocols/adr-helper.md)
-- [Harness attach](protocols/submodule-attach.md)
+- [Harness Init](protocols/harness-init.md)
 - [기능 개발](protocols/feature-develop.md)
 - [Wiki ingest](protocols/wiki-ingest.md)
 - [아티팩트 검증](protocols/artifact-validation.md)
@@ -129,27 +128,28 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 
 ## 명령
 
-소비 프로젝트의 package scripts는 `.harness/scripts/harness/*.mjs`를 직접 호출한다.
+소비 프로젝트는 하네스 npm 스크립트를 갖지 않는다. 각 단계는 플러그인 스킬·커맨드
+(`/llm-project-harness:<name>`)로 부르고, 스킬 어댑터는 엔진을 세션 안에서
+`${CLAUDE_PLUGIN_ROOT}/scripts/harness/*.mjs`로 실행한다. CI에서는 공용 composite
+action이 게이트를 돌린다.
 
 ```sh
-npm run harness:kickoff -- --type feature --slug main-layout --title "메인 레이아웃" --area "메인 레이아웃"
-npm run harness:approve -- --unit docs/raw/feature/main-layout --quote "<사용자 승인 발화>" --adr
-npm run harness:ingest -- docs/raw/feature/main-layout --area "메인 레이아웃"
-npm run harness:check
-npm run harness:sync         # devDependency 핀 업데이트 후 CHANGELOG 정합성(소비 프로젝트)
-npm run harness:gate
-npm run harness:hooks   # 선택: 현재 git 저장소에 pre-commit + commit-msg 훅 설치
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/kickoff.mjs" --type feature --slug main-layout --title "메인 레이아웃" --area "메인 레이아웃"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/approve.mjs" --unit docs/raw/feature/main-layout --quote "<사용자 승인 발화>" --adr
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/wiki-ingest.mjs" docs/raw/feature/main-layout --area "메인 레이아웃"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/artifact-check.mjs"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"
 ```
 
-`harness:ingest`는 raw unit을 `docs/wiki/index.md`의 **영역(area)별 시간순 계보**에
+`wiki-ingest`는 raw unit을 `docs/wiki/index.md`의 **영역(area)별 시간순 계보**에
 연결한다(area는 `prd.md`/`bugfix.md` frontmatter에 선언). 하네스 공용 표면을 바꾸는
-커밋은 `CHANGELOG.md`에 항목을 남기고, 소비 프로젝트는 devDependency 핀 업데이트 후
-`harness:sync`로 정합성을 맞춘다(맞추기 전 `harness:check`가 막는다).
+커밋은 `CHANGELOG.md`에 항목을 남기고, 소비 프로젝트는 플러그인 갱신 후 `/harness-init`을
+다시 실행해 정합성을 맞춘다.
 
-`harness:approve`는 PRD를 `review`→`approved`(및 `--adr`로 ADR `proposed`→`accepted`)로
+`approve`는 PRD를 `review`→`approved`(및 `--adr`로 ADR `proposed`→`accepted`)로
 전환하는 **유일한 정규 경로**다. 사용자의 명시 승인 발화 없이는 실행하지 않는다.
-ClaudeCode는 추가로 승인 상태 직접 편집을 런타임에서 차단하는 PreToolUse 가드 훅을
-배선할 수 있다(`scripts/harness/claude-approval-guard.mjs`, `.claude` 어댑터 참고).
+추가로 승인 상태 직접 편집을 런타임에서 차단하는 PreToolUse 가드 훅
+(`scripts/harness/claude-approval-guard.mjs`)을 `/harness-init`이 opt-in으로 배선할 수 있다.
 
-`harness:gate`는 `harness:check`, `lint`, `build`, `test:run`을 순서대로 실행한다.
+`gate`는 `artifact-check`, `lint`, `build`, `test:run`을 순서대로 실행한다.
 실패하면 다음 단계로 넘어가지 않는다.

@@ -1,6 +1,7 @@
 # LLM Project Harness ClaudeCode Guide
 
-ClaudeCode uses the same project contract as Codex.
+ClaudeCode follows the shared project contract defined in `AGENTS.md`. This
+harness is distributed as a Claude Code plugin (Claude-Code-only).
 
 ## 이 저장소를 고칠 때는 하네스를 "쓰지" 말고 "정의"만 한다 (필독)
 
@@ -26,7 +27,7 @@ ClaudeCode uses the same project contract as Codex.
 1. Read `AGENTS.md`.
 2. Treat this repository as the harness provider, not as a consumer project.
 3. Use `harness/` as the shared source of truth.
-4. Use `.claude/commands`, `.claude/skills`, and `.claude/agents` only as thin
+4. Use the plugin-root `commands/`, `skills/`, and `agents/` only as thin
    adapters over that shared harness.
 
 Do not create Claude-only process rules that conflict with `AGENTS.md` or

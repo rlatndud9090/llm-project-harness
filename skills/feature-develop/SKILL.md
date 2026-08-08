@@ -38,10 +38,10 @@ description: "PRD/ADR 기반 기능 구현, 재작업, 부분 수정을 진행�
 - 구현·테스트·검증 자율 실행은 병렬 fan-out 할 수 있다. 단 자율 구간 안에서는 사용자에게 묻거나
   커밋하지 않고, 모든 인간 승인 게이트와 커밋은 오케스트레이터가 처리한다. domain/UI/test 경계를 분리한다.
 - 질문·승인은 현재 런타임의 구조화 질문 도구를 우선 사용한다.
-- 하네스 submodule 업데이트·adapter 정리는 기능 개발 레일과 분리한다.
+- 하네스 플러그인 업데이트·프로젝트 어댑터 정리는 기능 개발 레일과 분리한다.
 - 완료 전 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"`, 최종 확정·커밋·PR은 `$make-pr`(`commit-protocol` 사용)로 넘어간다.
 
-규칙 변경은 `.claude`가 아니라 `.harness/harness`를 먼저 수정한다. 프로젝트 문서는 한국어로 작성한다.
+하네스 규칙 자체는 이 프로젝트가 아니라 플러그인 저장소에서 바뀐다. 프로젝트 문서는 한국어로 작성한다.
 
 ## Claude Code 실행 (선택)
 
@@ -89,7 +89,7 @@ ClaudeCode에서는 role 체인을 자기 도구로 실행한다(공용 절차�
 모드에서도, 값만 바꾸는 편집·대소문자 변형 파일명 포함). 사전 승인된 문서의 본문 편집(빌드 중
 개정)은 막지 않는다. 단 이건 **편의 트립와이어**다 — Bash 직접 쓰기(`sed`/redirect), 파일
 rename, MCP/원격 쓰기는 PreToolUse 매처가 못 잡는다. 우회 불가능한 최종 강제는 CI에서
-도는 `harness:check`다(submodule-attach의 "CI 강제" 참고).
+도는 `harness:check`다(harness-init의 "CI 강제" 참고).
 
 ### 자율 레인의 제약 (중요)
 
@@ -139,7 +139,7 @@ return { results: results.filter(Boolean) }
   검증 에이전트가 "반증 시도")로 굳힐 수 있다.
 - 게이트 판정과 커밋은 이 스크립트가 아니라 메인 루프에서 한다(위 "자율 레인의 제약").
 
-규칙 변경은 `.claude`가 아니라 `.harness/harness`를 먼저 수정한다.
+하네스 규칙 자체는 이 프로젝트가 아니라 플러그인 저장소에서 바뀐다.
 
 ## Claude Code — Background 세션 result 형식 (필수)
 

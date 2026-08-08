@@ -69,7 +69,7 @@ npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의
 - **bugfix/chore 단위**: PRD/ADR 승인 축이 없으므로 최종 확정 플립을 건너뛴다(bugfix는 `bugfix.md`
   `fixed`, chore는 notes-only). 곧바로 아래 Phase 2로 간다.
 - **`$one-shot`이 구동하는 경우**: 최종 확정은 one-shot의 포괄 위임으로 자동 부여되며 transport는
-  `one-shot`으로 찍는다(정본은 `.harness/harness/protocols/one-shot.md`). 이때는 위 make-pr
+  `one-shot`으로 찍는다(정본은 `harness/protocols/one-shot.md`). 이때는 위 make-pr
   transport 대신 one-shot transport를 쓴다.
 
 ## Phase 2: 통합 게이트

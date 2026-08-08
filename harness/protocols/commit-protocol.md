@@ -7,7 +7,7 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 
 - 하나의 논리적 작업 단위는 하나의 커밋으로 묶는다.
 - 의미 있는 제품, 아키텍처, 구현 변경은 관련 PRD와 ADR을 가진다.
-- 하네스 devDependency 업데이트나 adapter 정리는 제품 기능 변경과 분리한다.
+- 하네스 플러그인 업데이트나 프로젝트 어댑터 정리는 제품 기능 변경과 분리한다.
 - 커밋 본문에는 `관련 문서:` 블록을 반드시 둔다.
 - Lore trailer는 커밋의 제약, 검증, 위험, raw unit 연결을 남기는 데 사용한다.
 - 검증하지 않은 내용을 `Tested:`에 쓰지 않는다.
@@ -45,8 +45,8 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 
 아래 변경은 기본적으로 Notes 링크를 사용한다.
 
-- 하네스 devDependency 업데이트 또는 프로젝트 adapter 정리
-- Codex/ClaudeCode adapter, skill, command, role prompt 변경
+- 하네스 플러그인 업데이트 또는 프로젝트 adapter 정리
+- ClaudeCode adapter, skill, command, role prompt 변경
 - 개발자 workflow만 바꾸고 제품/도메인 동작을 바꾸지 않는 운영 변경
 
 작고 결정이 없는 chore/bugfix는 notes-only로 허용한다. 이 경우에도
@@ -63,8 +63,9 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 
 ## CHANGELOG (하네스 provider 저장소)
 
-하네스 저장소에서 **공용 표면**(`harness/`, `scripts/harness/`, `.claude/`, `.codex/`)을
-바꾸는 커밋은 루트 `CHANGELOG.md` 맨 위에 항목을 추가한다(newest-first).
+하네스 저장소에서 **공용 표면**(`harness/`, `scripts/harness/`, `commands/`, `agents/`,
+`skills/`, `hooks/`, `.claude-plugin/`)을 바꾸는 커밋은 루트 `CHANGELOG.md` 맨 위에 항목을
+추가한다(newest-first).
 
 ```md
 ## <YYYY-MM-DD> <slug>
@@ -73,12 +74,12 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 - 무엇이 바뀌었는가(하네스 관점).
 
 **소비자 조치 (필수)**
-- 이 커밋을 devDependency 핀으로 반영하는 소비 프로젝트가 정합성을 위해 해야 할 일. 없으면 "없음".
+- 이 커밋을 플러그인 갱신으로 반영하는 소비 프로젝트가 정합성을 위해 해야 할 일. 없으면 "없음".
 ```
 
-- 소비 프로젝트는 devDependency 핀 업데이트 후 `npm run harness:sync`로 이 항목을 읽고 반영한 뒤
-  `--ack`로 확인한다. 확인 전에는 소비자의 `harness:check`가 막는다(`.harness-sync` 게이트).
-- `harness:hooks`를 설치한 저장소는 pre-commit의 `verify-changelog`가 공용 표면 변경 커밋에
+- 소비 프로젝트는 플러그인을 마켓플레이스에서 갱신한 뒤 이 항목의 소비자 조치를 반영하고,
+  `/harness-init`을 다시 실행해 훅·`.harness.json` version을 맞춘다(별도 `.harness-sync` 원장은 없다).
+- `/harness-init`이 설치한 pre-commit 훅의 `verify-changelog`가 공용 표면 변경 커밋에
   CHANGELOG 항목을 강제한다(소비 프로젝트에서는 no-op).
 - 소비 프로젝트 자신의 제품 커밋은 이 규칙 대상이 아니다(하네스 CHANGELOG는 하네스가 쓴다).
 
@@ -168,9 +169,8 @@ EOF
 - `Not-tested:`는 알려진 공백을 적는다. 공백이 없으면 `None` 대신 구체적 맥락을
   짧게 쓴다.
 - `Related:`에는 raw unit 경로를 적는다.
-- `Co-authored-by:`는 커밋을 만든 에이전트의 정체성으로 채운다(Codex는
-  `OmX <omx@oh-my-codex.dev>`, ClaudeCode는 해당 도구의 co-author identity). 이는 커밋
-  규약이며, 하네스가 hook으로 강제하지 않는다. 각 도구는 자신의 정체성으로 서명한다.
+- `Co-authored-by:`는 커밋을 만든 ClaudeCode 도구의 co-author identity로 채운다. 이는 커밋
+  규약이며, 하네스가 hook으로 강제하지 않는다.
 
 권장 trailer:
 
@@ -192,12 +192,13 @@ EOF
 ## 하네스 정비 ride-along (브랜치 규율 예외)
 
 작업 단위는 원칙적으로 자기 브랜치에서 커밋한다(branch-per-unit). **딱 하나의 예외**로,
-**`.harness` devDependency 핀 최신화와 그에 부수되는 정합화**(`harness:sync --ack`, 위키 규칙-잔재
-제거, frontmatter 마이그레이션 등)는 **전용 브랜치나 워크트리를 새로 파지 않고 지금 작업 중인
-아무 브랜치에 chore 커밋 하나로 태워** 반영해도 된다.
+**하네스 플러그인 갱신과 그에 부수되는 정합화**(`/harness-init` 재실행이 갱신하는 `.harness.json`
+version·`.claude/settings.json`·`.github/workflows/harness.yml`, 위키 규칙-잔재 제거, frontmatter
+마이그레이션 등)는 **전용 브랜치나 워크트리를 새로 파지 않고 지금 작업 중인 아무 브랜치에 chore
+커밋 하나로 태워** 반영해도 된다.
 
-- 정비용 raw unit은 `npm run harness:kickoff -- --type chore --slug harness-update --no-branch`로
-  만든다. `--no-branch`는 브랜치 로직을 끄므로 현재 브랜치를 그대로 둔다(main이든 진행 중인
+- 정비용 raw unit은 `$kickoff --type chore --slug harness-update --no-branch`로 만든다.
+  `--no-branch`는 브랜치 로직을 끄므로 현재 브랜치를 그대로 둔다(main이든 진행 중인
   feature 브랜치든 무관). kickoff이 이 chore를 위키 운영 버킷에 **자동 링크**하므로 `harness:check`가
   바로 green이다(수동 ingest 불필요). raw unit을 kickoff 없이 손으로 만들면 링크가 없어
   `harness:check`가 막으니, kickoff 경로를 쓴다.

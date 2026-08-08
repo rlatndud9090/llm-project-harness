@@ -1,18 +1,64 @@
 # 하네스 CHANGELOG
 
-이 하네스를 `llm-project-harness` devDependency로 쓰는 소비 프로젝트는, 핀(태그/커밋)을
-올린 뒤 **반드시 정합성을 맞춰야 한다**:
+이 하네스는 **Claude Code 플러그인**으로 배포된다. 엔진(`scripts/harness/*.mjs`)·스킬·커맨드·
+에이전트·훅은 전부 플러그인 안에 있어 **마켓플레이스 업데이트만으로 자동 반영**된다:
 
-1. `npm run harness:sync` — 마지막으로 맞춘 이후의 항목과 **소비자 조치**를 읽는다.
-2. 각 항목의 소비자 조치를 실제로 반영한다(예: 위키 재작성, frontmatter 추가).
-3. `npm run harness:sync --ack` — 반영을 확인한다(`.harness-sync`가 CHANGELOG head로 갱신).
+1. `/plugin marketplace update llm-project-harness` — 플러그인을 최신 버전으로 갱신한다.
 
-확인 전에는 `harness:check`가 막는다(`.harness-sync` != CHANGELOG head). 이는 devDependency
-핀만 올리고 정책 변화를 놓치는 drift를 기계로 차단하기 위한 것이다.
+**대부분의 항목은 이걸로 끝이다(소비자 조치: 없음).** 예외는 둘뿐이다:
 
-**작성 규칙**: 하네스의 공용 표면(`harness/`, `scripts/harness/`, `.claude/`, `.codex/`)을
-바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD> <slug>` 항목을 추가한다(newest-first).
-각 항목은 **변경**과 **소비자 조치**를 적고, 조치가 없으면 "소비자 조치: 없음"으로 명시한다.
+- **프로젝트 산출물 조치** — 항목이 각 프로젝트가 자기 산출물에 반영할 내용을 요구할 때만(예:
+  위키 재작성, frontmatter 추가). 마켓플레이스 갱신과 무관하게 프로젝트가 손으로 반영한다.
+- **배선 변경** — 항목이 소비 레포에 직접 커밋된 "배선"(git훅의 baked 경로·`.github/workflows/harness.yml`·
+  `.harness.json`·`.claude/settings.json`)의 형태를 바꿀 때. 배선은 플러그인 업데이트로 자동으로 안 바뀌므로
+  소비 레포 루트에서 `/harness-init`을 다시 실행한다(훅 재-baking·`.harness.json` version 갱신). 세션 시작 시
+  플러그인이 배선이 뒤처졌음을 감지하면 재실행을 넛지한다.
+
+플러그인 모델에는 옛 `.harness-sync` 정합화 원장이 없다 — 모든 소비 프로젝트가 같은 플러그인 버전을
+참조하므로 갱신이 마켓플레이스로 일원화된다.
+
+**작성 규칙**: 하네스의 공용 표면(`harness/`, `scripts/harness/`, `commands/`, `agents/`,
+`skills/`, `hooks/`, `.claude-plugin/`)을 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD>
+<slug>` 항목을 추가한다(newest-first). 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가
+없으면 "소비자 조치: 없음"으로 명시한다. 배선(git훅·CI 워크플로·`.harness.json`·settings) 형태를
+바꾸는 항목은 소비자 조치에 "`/harness-init` 재실행"을 명시한다.
+
+## 2026-08-08 claude-code-plugin-migration
+
+**변경 (BREAKING — 배포 방식 전환)**
+
+하네스 배포를 **npm devDependency + `.harness` 심볼릭 링크 → Claude Code 플러그인**으로 전환했다.
+Codex/크로스 에이전트 지원은 **폐기**하고 Claude Code 전용이 됐다. 엔진(`scripts/harness/*.mjs`)과
+스킬·커맨드·에이전트는 전부 플러그인(이 저장소) 안에만 있고, 소비 저장소에는 얇은 배선만 남는다.
+
+- **플러그인 구조.** 컴포넌트가 저장소 루트로 올라왔다(`commands/`·`agents/`·`skills/`), 플러그인
+  매니페스트(`.claude-plugin/plugin.json`·`marketplace.json`)·훅(`hooks/hooks.json`)·CI용 composite
+  action(`action.yml`)을 신설했다. 엔진은 세션 안에서 `${CLAUDE_PLUGIN_ROOT}`로, CI에서는 composite
+  action으로 호출된다.
+- **제거.** `.codex/`, `attach-submodule.mjs`, `link.mjs`, `sync.mjs`, `submodule-attach` 스킬·
+  프로토콜, `.harness-sync`/devDependency freshness 메커니즘을 전부 삭제했다.
+- **소비 발자국.** 소비 저장소에는 `.harness.json`(루트 플래그+버전), `.claude/settings.json`(플러그인
+  활성화), `.github/workflows/harness.yml`(CI 게이트), docs 스캐폴드만 남는다 — 엔진 사본도, `.harness`
+  심볼릭 링크도, devDependency도 없다.
+
+**소비자 조치 (필수)**
+
+마켓플레이스에서 플러그인을 갱신하고 `/harness-init`을 실행한다. `/harness-init`이 옛
+devDependency/`.harness` 설치를 **자동으로 이관**한다(레포마다 한 번): `.harness` 심볼릭 링크 제거,
+`package.json`의 devDependency와 `link.mjs` postinstall 제거, `.harness-sync` 제거.
+
+```text
+# 신규 적용
+/plugin marketplace add rlatndud9090/llm-project-harness
+/harness-init
+
+# 기존(devDependency/submodule) 설치 이관 — /harness-init이 자동 감지·정리(먼저 --dry-run 권장)
+/harness-init --dry-run
+/harness-init
+```
+
+git submodule로 붙어 있던 경우엔 이관 전에 서브모듈을 먼저 제거한다(상세는
+`harness/protocols/harness-init.md`의 "옛 설치에서 이관").
 
 ## 2026-08-06 kickoff-worktree-first
 

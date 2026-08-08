@@ -27,7 +27,7 @@ branch-sized 작업 단위 후보를 추천하고 하나를 확정하는 단계�
 
 ### Phase 0: 컨텍스트 로딩
 
-1. `AGENTS.md`, `docs/wiki/index.md`, `.harness/harness/README.md`를 읽는다(이 컨텍스트에
+1. `AGENTS.md`, `docs/wiki/index.md`, `harness/README.md`를 읽는다(이 컨텍스트에
    아직 로드돼 있지 않을 때만 — `session-start`에서 이미 읽었으면 중복 재판독하지 않는다).
 2. 현재 브랜치와 관련 raw unit을 확인한다.
 3. 기존 raw unit이 새 요청과 충돌하면 먼저 사용자에게 결정 경계를 묻는다.

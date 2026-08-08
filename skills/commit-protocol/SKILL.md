@@ -43,14 +43,15 @@ trailer를 유지한다.
 - HEREDOC 없이 한 줄 `git commit -m`
 
 커밋에는 `Related: docs/raw/<type>/<slug>/`와
-커밋 에이전트의 co-author 정체성(Codex는 `OmX <omx@oh-my-codex.dev>`, ClaudeCode는 해당 도구의 co-author)을 포함한다.
+커밋을 만든 ClaudeCode 도구의 co-author 정체성을 포함한다.
 
 ## CHANGELOG (하네스 저장소 커밋)
 
-하네스 공용 표면(`harness/`, `scripts/harness/`, `.claude/`, `.codex/`)을 바꾸는 커밋은
-`CHANGELOG.md` 맨 위에 `## <YYYY-MM-DD> <slug>` 항목(변경 + 소비자 조치)을 추가해 stage
-한다. 소비 프로젝트는 서브모듈 업데이트 후 `harness:sync`로 이를 반영한다. 소비 프로젝트
-자신의 제품 커밋은 이 규칙 대상이 아니다.
+하네스 공용 표면(`harness/`, `scripts/harness/`, `commands/`, `agents/`, `skills/`, `hooks/`,
+`.claude-plugin/`)을 바꾸는 커밋은 `CHANGELOG.md` 맨 위에 `## <YYYY-MM-DD> <slug>` 항목(변경 +
+소비자 조치)을 추가해 stage 한다. 소비 프로젝트는 플러그인을 마켓플레이스에서 갱신하고
+`/harness-init`을 다시 실행해 이를 반영한다. 소비 프로젝트 자신의 제품 커밋은 이 규칙 대상이
+아니다.
 
 ## Claude Code — Background 세션 result 형식 (필수)
 

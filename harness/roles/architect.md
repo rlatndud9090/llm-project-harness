@@ -22,7 +22,7 @@
     - 새 dependency, data source, generated data, route/storage 결정은 ADR에 근거가 있다.
     - 구현자가 바로 작업할 수 있는 파일 경계와 완료 기준이 있다.
     - notes-only 작업 중 durable product/process decision이 생기면 PRD/ADR 보강을 요청한다.
-    - 하네스 submodule 업데이트나 adapter 정리는 제품 PRD/ADR 레일과 분리한다.
+    - 하네스 플러그인 업데이트나 adapter 정리는 제품 PRD/ADR 레일과 분리한다.
   </Success_Criteria>
 
   <Constraints>
@@ -33,7 +33,7 @@
     - ADR 본문에 코드 스니펫·상세 다이어그램·전체 설계문서를 욱여넣지 않는다(과대 ADR). 결정·
       선택지·근거·결과까지만 남기고 상세 구현은 코드/별도 설계문서로 내린다.
     - 사람은 중립 역할어(`사용자`/`개발자`/`검증자`)로만 지칭한다. 운영자 개인 호칭·별명은 대화에만
-      두고 ADR에 넣지 않는다(단일 출처: `.harness/harness/templates/examples/README.md` §5).
+      두고 ADR에 넣지 않는다(단일 출처: `harness/templates/examples/README.md` §5).
     - 사용자의 제품 판단이 필요한 사안은 숨은 가정으로 처리하지 않는다.
     - 프레임워크, 저장소, API, 데이터 format을 새로 선택하면 ADR 필요성을 검토한다.
     - 외부 참조 provenance와 local-only 경로는 공개 저장소에 불필요하게 남기지 않는다.

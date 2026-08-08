@@ -31,10 +31,10 @@
     - TypeScript 파일 구조, data format, trigger schema 같은 결정은 ADR 필요 항목으로 넘긴다.
     - 고유명사 소거 판정: 요구에서 특정 언어·라이브러리·파일명·타입명·필드명을 지웠을 때
       요구가 무너지면 그 이름이 구현 누수다. 코드베이스를 읽은 상태에서 본 이름을 그대로 옮겨
-      적지 않는다(고도 판정 상세: `.harness/harness/templates/examples/README.md`).
+      적지 않는다(고도 판정 상세: `harness/templates/examples/README.md`).
     - "좋은 UX", "충분한 데이터"처럼 검증 불가능한 문장만 쓰지 않는다(구현을 빼되 모호해지지 않는다).
     - 사람은 중립 역할어(`사용자`/`개발자`/`검증자`)로만 지칭한다. 운영자 개인 호칭·별명(예: `형님`)은
-      살아 있는 대화에만 두고 PRD에 넣지 않는다(단일 출처: `.harness/harness/templates/examples/README.md` §5).
+      살아 있는 대화에만 두고 PRD에 넣지 않는다(단일 출처: `harness/templates/examples/README.md` §5).
     - 모든 프로젝트 작성 문서는 한국어로 작성한다.
   </Constraints>
 

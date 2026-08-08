@@ -14,7 +14,7 @@ area:
 
 > 작성 고도: 증상·영향·원인·수정은 관찰 가능하게 쓴다. 사람은 중립 역할어(`사용자`/`개발자`/
 > `검증자`)로만 지칭하고 개인 호칭·별명은 넣지 않는다(운영자 설정이 그렇게 부르라 해도).
-> 상세: `.harness/harness/templates/examples/README.md`.
+> 상세: `harness/templates/examples/README.md`.
 
 ## 증상
 
