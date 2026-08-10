@@ -30,7 +30,7 @@ PR에 달린 **Codex 자동 리뷰**를 가져와 프로젝트/세션 컨텍스�
 
 ## 핵심 규칙 (반드시 준수)
 
-1. **기본모드 = live-watch to clean.** `--snapshot`을 명시하지 않으면 one-pass로 끝내지 않는다. 재리뷰 요청 뒤 Codex의 **명시적 무이슈 판정**이 나올 때까지 백그라운드 watch로 계속 감시·반복한다.
+1. **기본모드 = live-watch to clean.** `--snapshot`을 명시하지 않으면 one-pass로 끝내지 않는다. 재리뷰 요청 뒤 Codex의 **명시적 무이슈 판정**이 나올 때까지 백그라운드 watch로 계속 감시·반복한다. **PR 생성 시 Codex 자동리뷰가 붙지 않는 게 기본**이므로, **최초 진입에 처리할 리뷰가 없으면 먼저 설명·요약 없는 bare `@codex review` 한 줄을 걸고** watch를 시작한다(빈 첫 조회를 clean으로 오판 금지 — 리뷰 0건은 "아직 리뷰 전"이지 "무이슈"가 아니다).
 2. **완료 조건은 Codex의 실제 무이슈 응답뿐이다.** 아래만으로는 절대 완료가 아니다 — CI 성공 / CI 미구성 / `eyes` 접수 / **watch `timeout`**. `timeout`은 종료가 아니라 **같은 cycle 재개 신호**다. **thread resolved 상태는 완료조건이 아니다**(에이전트 행동이지 Codex 신호가 아님 — 게이트에 넣으면 데드락). (protocol.md §0, §3)
 3. **GitHub 작업은 `gh`가 기본이다**(gh 우선 — MCP는 폴백). 직접 `gh` 호출은 `gh ...`로 한다(helper 스크립트는 내부적으로 무효 `GITHUB_TOKEN`/`GH_TOKEN`을 자체 strip). 쓰기(답글/재리뷰/resolve)는 `gh` 우선, 불가 시 `mcp__github__*` 폴백. **git push는 `git`으로**, head 브랜치 한정. **write(답글/재리뷰) 전 계정·호스트 가드**: `gh api user -q .login`으로 인증 계정과 `git remote get-url origin`으로 repo 호스트를 확인해 의도한 계정·호스트와 다르거나 불명확하면 중단한다(계정 오발송 방지). 특정 계정을 고정하지 않는다.
 4. **수정은 항상 PR head 브랜치에서만.** `main`/기본 브랜치 직접 커밋·푸시 금지. **모든 force 계열 push 전면 금지**.
@@ -88,7 +88,7 @@ gh pr view <N> --repo <OWNER>/<REPO> \
      gh api repos/<O>/<R>/issues/<N>/reactions
      ```
      - Codex bot의 `+1`(무이슈) 흔적이 있으면 → 이미 clean. 보고 후 종료.
-     - `eyes`만 있거나 리액션이 없으면 → **아직 리뷰 전이거나 트리거 필요.** live-watch 기본이므로 **7단계로 가서 `@codex review`를 걸고 watch에 진입**한다(빈 첫조회를 clean으로 오판하지 않는다). `--snapshot`이면 "현재 리뷰 없음"만 보고.
+     - `eyes`만 있거나 리액션이 없으면 → **아직 리뷰가 없다(= 트리거 필요).** PR 생성 시 Codex 자동리뷰가 붙지 않는 설정이 기본이므로, **루프 최초 진입에서는 7단계로 가서 설명·요약 없는 bare `@codex review`(트리거 한 줄만)를 걸고 watch에 진입**한다(수정한 게 없으니 답글·반영 요약도 없다 — 7.1은 건너뛴다). 빈 첫조회를 clean으로 오판하지 않는다. (일부 저장소가 여전히 PR 생성 자동리뷰를 쓰면 위 `+1`/기존 리뷰로 잡히므로 그 경로로 처리된다.) `--snapshot`이면 "현재 리뷰 없음"만 보고.
 
 ### 3. (없음 — 2단계에서 흡수)
 
@@ -131,22 +131,30 @@ gh pr view <N> --repo <OWNER>/<REPO> \
 4. **커밋:** 저장소 커밋 컨벤션 준수. 트레일러(예: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`)를 끝에.
 5. **푸시:** push 직전 `git rev-parse --abbrev-ref HEAD` == `headRefName` 검증 후 `git push`. **non-fast-forward면 푸시 중단** → 원인 보고 후 사용자 확인. **force 계열 전면 금지.**
 
-### 7. 답글 + 재리뷰 요청
-1. **각 Codex 코멘트에 in-thread 답글** (반영/이미 처리(SHA)/보류(이유)/false-positive(근거)/의사결정 유지(ADR 인용)). 폴백: 인라인 스레드 reply(`gh api .../pulls/<N>/comments/<id>/replies` 또는 MCP `add_reply_to_pull_request_comment`) → 불가하면 단일 대화 코멘트에 각 항목 링크/인용+처리결과 묶어서. 스레드 resolve는 선택(정리 목적 — **완료조건 아님**, 안 해도 무이슈 판정이 서면 done. `gh api graphql` resolveReviewThread).
-2. **재리뷰 요청** — 트리거 코멘트 작성. 응답에서 `id`·`created_at`를 확보:
-   ```bash
-   gh api repos/<O>/<R>/issues/<N>/comments \
-     -f body=$'@codex review\n\n- 반영 내용 1\n- 반영 내용 2' \
-     --jq '{id: .id, created_at: .created_at}'
-   ```
-   - **첫 줄은 정확히 `@codex review`** (앞뒤 공백 없음).
-   - 반환된 `id` → `TRIGGER_COMMENT_ID`, `created_at` → `TRIGGER_TS`.
+### 7. 답글 + 리뷰 트리거
+
+> **최초 트리거 사이클(2단계에서 처리할 리뷰가 0건이라 진입)엔 답글 대상·반영 내용이 없다 → 7.1을 건너뛰고 7.2의 bare 트리거만 단다.** 코멘트를 반영·푸시한 뒤 오는 재리뷰 사이클에서만 7.1(답글)과 7.2의 재리뷰 형식을 쓴다.
+
+1. **각 Codex 코멘트에 in-thread 답글** (반영/이미 처리(SHA)/보류(이유)/false-positive(근거)/의사결정 유지(ADR 인용)). 폴백: 인라인 스레드 reply(`gh api .../pulls/<N>/comments/<id>/replies` 또는 MCP `add_reply_to_pull_request_comment`) → 불가하면 단일 대화 코멘트에 각 항목 링크/인용+처리결과 묶어서. 스레드 resolve는 선택(정리 목적 — **완료조건 아님**, 안 해도 무이슈 판정이 서면 done. `gh api graphql` resolveReviewThread). *(최초 트리거 사이클은 이 단계 없음.)*
+2. **리뷰 트리거 코멘트 작성** — 응답에서 `id`·`created_at`를 확보. 두 경우로 나뉜다:
+   - **최초 트리거(수정 전 첫 진입 — 반영할 내용 없음):** 설명·불릿 없이 **정확히 한 줄** `@codex review`만 단다.
+     ```bash
+     gh api repos/<O>/<R>/issues/<N>/comments -f body='@codex review' \
+       --jq '{id: .id, created_at: .created_at}'
+     ```
+   - **재리뷰 트리거(코멘트 반영·푸시 후):** 첫 줄 `@codex review` + 이번 사이클 반영 요약 불릿.
+     ```bash
+     gh api repos/<O>/<R>/issues/<N>/comments \
+       -f body=$'@codex review\n\n- 반영 내용 1\n- 반영 내용 2' \
+       --jq '{id: .id, created_at: .created_at}'
+     ```
+   - **첫 줄은 언제나 정확히 `@codex review`** (앞뒤 공백 없음). 반환된 `id` → `TRIGGER_COMMENT_ID`, `created_at` → `TRIGGER_TS`.
 3. **ack(eyes) 확인** (helper, read-only):
    ```bash
    python3 "$PR_REVIEW_WATCH" ack --owner <O> --repo <R> --pr-number <N> --comment-id <TRIGGER_COMMENT_ID>
    ```
-   - `acknowledged` → 8단계. `request-failed` → protocol.md §2.4 fallback_split → trigger_only_retry.
-   - 초기 PR 자동리뷰 모드(수동 트리거 없음)면 이 단계 건너뛰고 PR 본문 `eyes`로 접수 확인.
+   - `acknowledged` → 8단계(`--trigger-ack-state acknowledged`). `request-failed` → protocol.md §2.4 fallback_split → trigger_only_retry.
+   - (변형) 일부 저장소가 여전히 PR 생성 자동리뷰를 쓰는 경우에만: 수동 트리거 없이 PR 본문 `eyes`로 접수 확인(`--trigger-ack-state pr-body-auto-review`). 기본(자동리뷰 없음)에선 위 bare 트리거의 `eyes`로 `acknowledged` 확인한다.
 
 ### 8. Live-watch (기본모드)
 `eyes` 접수(또는 초기모드 PR 본문 접수) 후 **백그라운드 watch 실행** (protocol.md §3):

@@ -1,7 +1,7 @@
 {
   "name": "llm-project-harness",
   "displayName": "LLM Project Harness",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Claude Code plugin that enforces a shared PRD/ADR, raw/wiki, approval-gate, and commit workflow across product repositories. Activate a repo by dropping a .harness.json flag (run /harness-init).",
   "author": {
     "name": "LLM Project Harness",

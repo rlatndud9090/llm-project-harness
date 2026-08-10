@@ -23,6 +23,24 @@
 없으면 "소비자 조치: 없음"으로 명시한다. 배선(git훅·CI 워크플로·`.harness.json`·settings) 형태를
 바꾸는 항목은 소비자 조치에 "`/harness-init` 재실행"을 명시한다.
 
+## 2026-08-10 pr-review-loop-initial-bare-trigger
+
+**변경 (스킬 동작 — Codex 자동리뷰 비활성 설정 대응)**
+
+Codex가 PR 생성 시 자동리뷰를 더 이상 붙이지 않는 설정에 맞춰 `pr-review-check-loop`을
+고쳤다. 루프 **최초 진입에 처리할 리뷰가 없으면**, 먼저 **설명·요약 없는 bare `@codex review`
+한 줄**을 달고 곧장 live-watch에 진입한다(빈 첫 조회를 clean으로 오판하지 않음).
+
+- 최초 트리거(반영 전)는 **한 줄 `@codex review`만**, 재리뷰 트리거(코멘트 반영·푸시 후)만
+  "반영 내용" 요약 불릿을 붙이도록 SKILL.md·protocol.md에서 분리했다. 최초 사이클은 답글
+  대상이 없어 7.1(답글)을 건너뛴다.
+- 옛 "PR 생성 자동리뷰" 가정을 **기본 경로에서 변형(§2.1b)으로 강등**했다 — 자동리뷰를 여전히
+  쓰는 저장소가 있을 수 있어 `pr-body-auto-review` ack 경로와 helper 기능은 보존한다.
+- `pr-review-check-once`는 어차피 리뷰 유무를 매번 확인하므로 손대지 않았다. helper
+  (`pr_review_watch.py`)도 `acknowledged` 경로를 이미 지원해 변경 없음.
+
+**소비자 조치**: 없음(마켓플레이스 업데이트로 자동 반영).
+
 ## 2026-08-10 skills-unprefixed-drop-duplicate-commands
 
 **변경 (표면 정리 — 모든 스킬을 프리픽스 없이 호출 가능하게)**

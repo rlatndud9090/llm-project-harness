@@ -68,9 +68,20 @@ identify → process_reviews → post_trigger → wait_ack → watch
 
 ## 2. 트리거 규칙 (Trigger Rules)
 
-### 2.1 Initial PR Auto-review
+### 2.1 First-cycle Trigger (기본 — PR 생성 자동리뷰 없음)
 
-Codex가 새 PR에 자동리뷰를 거는 저장소용.
+PR 생성 시 Codex 자동리뷰가 붙지 않는 설정이 기본이다. 그래서 루프 최초 진입에서 처리할
+기존 리뷰가 없으면(`process_reviews`가 0건) 곧장 `post_trigger`로 가서 **설명·요약 없는 bare
+`@codex review` 한 줄**을 단다(수정한 게 없으니 반영 요약도, 답글 대상도 없다). 그 트리거
+코멘트의 `eyes`로 `wait_ack` → `watch`에 진입한다(`trigger_ack_state=acknowledged`).
+
+- 빈 첫 조회를 `done`(clean)으로 오판하지 않는다 — 리뷰 0건은 "아직 리뷰 전"이지 "무이슈"가
+  아니다. 무이슈는 트리거 뒤 Codex의 명시적 응답으로만 판정한다(§3).
+
+### 2.1b (변형) Initial PR Auto-review — 자동리뷰를 쓰는 저장소만
+
+Codex가 새 PR에 자동리뷰를 거는 저장소용 **변형**(기본 경로 아님). 시작 시 이미 리뷰/PR 본문
+리액션이 보이면 이 경로로 처리된다.
 
 - 첫 사이클에는 수동 `@codex review`를 작성하지 않는다.
 - Codex bot이 PR 본문에 `eyes` 리액션 → 자동리뷰 접수로 간주, 바로 `watch` 진입.
@@ -81,9 +92,10 @@ Codex가 새 PR에 자동리뷰를 거는 저장소용.
   - `trigger_ack_state`: `pr-body-auto-review`
 - 자동리뷰 사이클에서 실제 Codex 피드백이 생기면 일반 수동 트리거 루프로 합류.
 
-### 2.2 Default Trigger Format
+### 2.2 Trigger Format
 
-기본은 합본 코멘트 1개.
+- **첫 트리거(반영 전 — §2.1):** 정확히 한 줄 `@codex review`. 설명/요약 없음.
+- **재리뷰 트리거(반영·푸시 후):** 합본 코멘트 1개 — 첫 줄 `@codex review` + 반영 요약 불릿.
 
 ```text
 @codex review
@@ -94,8 +106,8 @@ Codex가 새 PR에 자동리뷰를 거는 저장소용.
 
 규칙:
 
-- **첫 줄은 정확히 `@codex review`** (앞뒤 공백 없음, 대소문자 그대로).
-- 둘째 줄부터 반영 요약 허용.
+- **첫 줄은 언제나 정확히 `@codex review`** (앞뒤 공백 없음, 대소문자 그대로).
+- 반영 요약(둘째 줄부터)은 **재리뷰 트리거에서만** 허용 — 첫 트리거는 반영한 게 없어 붙이지 않는다.
 - 작성 도구: `gh pr comment` 대신 **`gh api .../issues/{n}/comments`** 를 써서 응답에서 `id`(→ `trigger_comment_id`)와 `created_at`(→ `trigger_ts`)를 즉시 확보한다. (MCP `add_issue_comment`도 id를 반환하면 사용 가능.)
 
 ### 2.3 Ack (`eyes`) Check
