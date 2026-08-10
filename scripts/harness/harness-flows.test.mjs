@@ -950,7 +950,34 @@ describe("harness-init (plugin bootstrap)", () => {
               postinstall: "node node_modules/llm-project-harness/scripts/harness/link.mjs || true",
               "harness:check": "node .harness/scripts/harness/artifact-check.mjs",
               "harness:gate": "node .harness/scripts/harness/gate.mjs",
+              // devDep-era mount variant (node_modules/…), not the .harness/ symlink one.
+              "harness:approve": "node node_modules/llm-project-harness/scripts/harness/approve.mjs",
               build: "echo build",
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      // A stale lockfile still pinning the harness devDep — desyncs npm ci after the
+      // manifest is cleaned. Written in npm lockfileVersion 3 shape (packages map).
+      writeFile(
+        path.join(projectRoot, "package-lock.json"),
+        `${JSON.stringify(
+          {
+            name: "legacy-consumer",
+            lockfileVersion: 3,
+            requires: true,
+            packages: {
+              "": {
+                name: "legacy-consumer",
+                devDependencies: { "llm-project-harness": "github:rlatndud9090/llm-project-harness#v1.0.0" },
+              },
+              "node_modules/llm-project-harness": {
+                version: "1.0.0",
+                resolved: "git+ssh://git@github.com/rlatndud9090/llm-project-harness.git#abcdef",
+                dev: true,
+              },
             },
           },
           null,
@@ -975,7 +1002,13 @@ describe("harness-init (plugin bootstrap)", () => {
       expect(pkg.scripts?.postinstall).toBeUndefined();
       expect(pkg.scripts?.["harness:check"]).toBeUndefined();
       expect(pkg.scripts?.["harness:gate"]).toBeUndefined();
+      // A1-ext: a script pointing at the node_modules mount is stripped too, not only .harness/
+      expect(pkg.scripts?.["harness:approve"]).toBeUndefined();
       expect(pkg.scripts?.build).toBe("echo build");
+      // A2: the stale lockfile entry is removed so npm ci won't reject the cleaned manifest
+      const lock = JSON.parse(read(path.join(projectRoot, "package-lock.json")));
+      expect(lock.packages["node_modules/llm-project-harness"]).toBeUndefined();
+      expect(lock.packages[""].devDependencies?.["llm-project-harness"]).toBeUndefined();
       // the old CI workflow (npm run harness:gate) is migrated to the composite action
       const wf = read(path.join(projectRoot, ".github", "workflows", "harness.yml"));
       expect(wf).toContain("rlatndud9090/llm-project-harness");
@@ -997,6 +1030,63 @@ describe("harness-init (plugin bootstrap)", () => {
       expect(read(preCommit)).toContain(path.join(repoRoot, "scripts", "harness", "artifact-check.mjs"));
       expect(read(commitMsg)).toContain("verify-commit-msg.mjs");
       expect(read(preCommit)).not.toContain("CLAUDE_PLUGIN_ROOT");
+    });
+  });
+
+  it("scaffolds CI with node-version 'lts/*' by default and node-version-file when .nvmrc exists (A7 — never pins old node)", () => {
+    withProject((projectRoot) => {
+      harnessInit(projectRoot);
+      const wf = read(path.join(projectRoot, ".github", "workflows", "harness.yml"));
+      expect(wf).toContain("node-version: 'lts/*'");
+      expect(wf).not.toContain("node-version: 20");
+    });
+    withProject((projectRoot) => {
+      writeFile(path.join(projectRoot, ".nvmrc"), "22\n");
+      harnessInit(projectRoot);
+      const wf = read(path.join(projectRoot, ".github", "workflows", "harness.yml"));
+      expect(wf).toContain("node-version-file: '.nvmrc'");
+      expect(wf).not.toContain("node-version: 'lts/*'");
+    });
+  });
+
+  it("writes .harness.json without vestigial areas/sections and strips them on a version-bump retrofit (A6)", () => {
+    withProject((projectRoot) => {
+      harnessInit(projectRoot);
+      const created = JSON.parse(read(path.join(projectRoot, ".harness.json")));
+      expect(created.areas).toBeUndefined();
+      expect(created.sections).toBeUndefined();
+    });
+    withProject((projectRoot) => {
+      // a legacy flag carrying the old vestigial arrays at an older version
+      writeFile(
+        path.join(projectRoot, ".harness.json"),
+        `${JSON.stringify({ harness: "llm-project-harness", version: "1.0.0", areas: ["x"], sections: [] }, null, 2)}\n`,
+      );
+      harnessInit(projectRoot);
+      const updated = JSON.parse(read(path.join(projectRoot, ".harness.json")));
+      expect(updated.version).not.toBe("1.0.0");
+      expect(updated.areas).toBeUndefined();
+      expect(updated.sections).toBeUndefined();
+    });
+  });
+
+  it("reports residual .harness / harness:* references but excludes docs/raw immutable history (A4/A5)", () => {
+    withGitProject((projectRoot) => {
+      // a live doc with a stale mount + old-script reference (must be flagged)
+      writeFile(path.join(projectRoot, "README.md"), "# App\n\nBuilt at `.harness/` and run `npm run harness:gate`.\n");
+      // append-only history mentioning the old mount (must NOT be flagged — A5)
+      writeFile(
+        path.join(projectRoot, "docs", "raw", "chore", "harness-migration", "notes.md"),
+        "# notes\n\n당시 `.harness`는 git 서브모듈이었다.\n",
+      );
+      commitAll(projectRoot);
+
+      harnessInit(projectRoot, ["--no-git-hooks", "--report", "residual-report.md"]);
+      const report = read(path.join(projectRoot, "residual-report.md"));
+
+      expect(report).toContain("Residual references (manual followup)");
+      expect(report).toContain("README.md:");
+      expect(report).not.toContain("docs/raw/chore/harness-migration/notes.md");
     });
   });
 });

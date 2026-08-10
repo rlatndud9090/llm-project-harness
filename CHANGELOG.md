@@ -23,6 +23,40 @@
 없으면 "소비자 조치: 없음"으로 명시한다. 배선(git훅·CI 워크플로·`.harness.json`·settings) 형태를
 바꾸는 항목은 소비자 조치에 "`/harness-init` 재실행"을 명시한다.
 
+## 2026-08-10 harness-init-migration-hardening
+
+**변경 (실사용 이관 피드백 반영 — `/harness-init` 완결성·이식성)**
+
+실제 소비 레포(pokequiz-hub)를 플러그인 모델로 이관하며 드러난, init이 손대지 않아 수동으로
+메꿔야 했던 갭을 배치로 닫았다.
+
+- **CI 노드 하드코딩 제거(A7).** `.github/workflows/harness.yml`이 `node-version: 20`을
+  못박던 것을, 소비 레포에 `.nvmrc`가 있으면 `node-version-file: '.nvmrc'`, 없으면 최신
+  LTS(`node-version: 'lts/*'`)로 바꿨다. 옛 20이 소비 프로젝트 런타임(예: node 22)보다
+  낮아 정상 코드를 CI에서 오탐하던 실증 실패(신 ICU 전용 `Intl.NumberFormat` 옵션 →
+  구 node `RangeError`)를 막는다.
+- **lockfile 정합(A2).** devDependency를 `package.json`에서만 지우고 `package-lock.json`을
+  두면 `npm ci`(action.yml이 lockfile 있으면 이걸 씀)가 즉시 실패하던 것을 고쳤다. 이관 시
+  package-lock의 `llm-project-harness` 항목(v1/v2·v3 트리 모두)을 직접 제거하고,
+  pnpm/yarn lock은 재생성을 경고로 안내한다.
+- **죽은 스크립트 정리 확장(A1).** 옛 하네스 npm 스크립트 제거가 `.harness/scripts/`뿐
+  아니라 `node_modules/llm-project-harness`(devDep 시대 마운트)를 가리키는 것도 잡는다.
+- **잔존 참조 리포트(A4/A5·C2).** 이관 후 tracked 파일에 남은 옛 `.harness` 마운트/
+  `harness:*` 스크립트 참조를 `file:line`으로 나열하는 "Residual references" 섹션을
+  요약·`--report`·`--dry-run`에 추가했다. **`docs/raw/**`(append-only 불변 이력)는
+  의도적으로 제외**한다. 자동 수정은 하지 않는다(라이브 문서·설정·스킬 지시는 문맥 판단 필요).
+- **플래그 스키마 정리(A6).** `.harness.json`의 vestigial한 `areas`/`sections` 빈 배열을
+  걷어냈다(신규 생성은 제외, 기존은 version bump 시 strip). area 계보는 wiki index의 `### `
+  헤딩이 진실이라 게이트는 플래그의 그 배열을 읽지 않는다.
+- **프로토콜 문서(B1/B2/B3·C1).** `harness-init.md`에 수동 후속 체크리스트, 불변 이력
+  보존 규칙(`docs/raw/**` 편집 금지), git 훅 버전 결합 주의(bump 후 재-init), "로컬 전체
+  게이트 실행법"(pre-commit 훅/`sh .git/hooks/pre-commit`/스킬/CI — `npm run` 진입점은
+  의도적으로 없음)을 명문화했다.
+
+**소비자 조치**: 신규 이관은 자동. **이미 이관한 소비 레포는 `/harness-init`을 다시 실행**한다
+(배선 변경 — CI 노드 정책·`.harness.json` 스키마·lockfile 정합이 갱신되고, 재실행 시 잔존 참조
+리포트가 남은 수동 후속을 짚어준다). 먼저 `--dry-run`으로 확인.
+
 ## 2026-08-08 harness-init-migration-completeness
 
 **변경 (버그픽스 — 옛 설치 이관 완결성)**

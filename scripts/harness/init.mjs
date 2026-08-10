@@ -36,6 +36,7 @@ if (sameRealPath(projectRoot, harnessRoot)) {
 const operations = [];
 const warnings = [];
 const migrations = [];
+const residuals = [];
 
 const harnessVersion = readHarnessVersion();
 
@@ -45,6 +46,7 @@ ensureClaudeSettings();
 ensureWorkflow();
 ensureProjectDocs();
 if (installHooks) ensureGitHooks();
+reportResidualReferences();
 writeReport();
 
 printSummary();
@@ -53,12 +55,16 @@ process.exit(0);
 // ─── .harness.json 루트 플래그 ───────────────────────────────────────────────
 // 이 파일의 존재가 곧 "이 저장소는 하네스를 쓴다"는 표식이다. 플러그인의 SessionStart
 // 훅과 모든 consumer-mode 게이트가 이 파일을 키로 삼는다. 없으면 생성하고, 있으면
-// (retrofit) 나머지 필드는 보존한 채 version만 현재 하네스 버전으로 맞춘다.
+// (retrofit) 나머지 필드는 보존하되 vestigial한 areas/sections는 걷어내고 version만
+// 현재 하네스 버전으로 맞춘다.
 function ensureHarnessFlag() {
   const flagPath = path.join(projectRoot, ".harness.json");
 
   if (!pathExists(flagPath)) {
-    const flag = { harness: MARKETPLACE_NAME, version: harnessVersion, areas: [], sections: [] };
+    // 플래그는 "적용 표식 + 버전"만 담는다. area/section 계보는 wiki index의 `### ` 헤딩이
+    // 진실이라(게이트가 거기서 파싱) 플래그에는 두지 않는다. 옛 스키마의 areas/sections는
+    // 늘 빈 배열로 남아 현실과 불일치하던 vestigial 필드라 신규 플래그에서 제외한다.
+    const flag = { harness: MARKETPLACE_NAME, version: harnessVersion };
     operations.push(`create .harness.json (v${harnessVersion})`);
     if (!dryRun) writeJsonFile(flagPath, flag);
     return;
@@ -83,7 +89,14 @@ function ensureHarnessFlag() {
     return;
   }
   operations.push(`update .harness.json version ${flag.version ?? "(none)"} -> ${harnessVersion}`);
-  if (!dryRun) writeJsonFile(flagPath, { ...flag, version: harnessVersion });
+  if (!dryRun) {
+    // 버전을 올리는 김에 vestigial한 areas/sections를 걷어낸다("항상 빈 배열"이 현실과
+    // 불일치하는 오해를 없앤다). 그 외 소비자가 넣은 필드는 보존한다.
+    const next = { ...flag, version: harnessVersion };
+    delete next.areas;
+    delete next.sections;
+    writeJsonFile(flagPath, next);
+  }
 }
 
 // ─── .claude/settings.json 네이티브 플러그인 활성화 ──────────────────────────
@@ -158,6 +171,14 @@ function ensureWorkflow() {
   const workflowPath = path.join(projectRoot, ".github", "workflows", "harness.yml");
   const rel = relative(workflowPath);
 
+  // node를 하드코딩(옛 20)하면 소비 프로젝트 런타임보다 낮아 정상 코드를 오탐할 수 있다
+  // (예: 신 ICU에서만 되는 Intl.NumberFormat maximumFractionDigits>20을 구 node에서 RangeError).
+  // `.nvmrc`가 있으면 그 값을 따르고, 없으면 옛 버전을 못박는 대신 최신 LTS를 쓴다.
+  const nvmrcPath = path.join(projectRoot, ".nvmrc");
+  const setupNodeWith = pathExists(nvmrcPath)
+    ? "          node-version-file: '.nvmrc'"
+    : "          node-version: 'lts/*'";
+
   const content = `name: harness
 on:
   push:
@@ -173,7 +194,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+${setupNodeWith}
       - uses: ${MARKETPLACE_REPO}@main
 `;
 
@@ -360,15 +381,20 @@ function migrateOldInstall() {
         }
       }
       if (isPlainObject(pkg.scripts)) {
-        // 삭제된 `.harness` 마운트를 가리키던 하네스 스크립트(harness:check/kickoff/gate/…)와
-        // link.mjs postinstall을 걷어낸다. 플러그인 모델에선 소비자가 하네스 npm 스크립트를
-        // 두지 않는다(세션은 플러그인 스킬, CI는 composite action). 그대로 두면 죽은 경로를
-        // 가리켜 실행 시 깨진다.
+        // 옛 엔진 마운트를 가리키던 하네스 스크립트(harness:check/kickoff/gate/…)와 link.mjs
+        // postinstall을 걷어낸다. 마운트는 devDep 시대엔 `node_modules/llm-project-harness`,
+        // submodule/심볼릭 시대엔 `.harness/scripts/` 둘 다 있었으니 양쪽을 잡는다. 플러그인
+        // 모델에선 소비자가 하네스 npm 스크립트를 두지 않는다(세션은 플러그인 스킬, CI는
+        // composite action). 그대로 두면 죽은 경로를 가리켜 실행 시 깨진다.
         for (const [name, cmd] of Object.entries(pkg.scripts)) {
           if (typeof cmd !== "string") continue;
-          if (cmd.includes(".harness/scripts/") || (name === "postinstall" && cmd.includes("link.mjs"))) {
+          if (
+            cmd.includes(".harness/scripts/") ||
+            cmd.includes(`node_modules/${MARKETPLACE_NAME}`) ||
+            (name === "postinstall" && cmd.includes("link.mjs"))
+          ) {
             delete pkg.scripts[name];
-            migrations.push(`strip package.json script "${name}" (삭제된 .harness 마운트 참조)`);
+            migrations.push(`strip package.json script "${name}" (옛 하네스 엔진 마운트 참조)`);
             changed = true;
           }
         }
@@ -376,6 +402,12 @@ function migrateOldInstall() {
       if (changed && !dryRun) writeJsonFile(packagePath, pkg);
     }
   }
+
+  // 2b) lockfile 정합. package.json에서 devDep을 지워도 lockfile에 harness 항목이 남으면
+  //     `npm ci`(엄격 설치, action.yml이 lockfile 있으면 이걸 씀)가 즉시 실패한다
+  //     ("lock file does not satisfy package.json"). package-lock은 직접 걷어내고
+  //     (오프라인·결정적), pnpm/yarn lock은 포맷이 달라 재생성만 안내한다.
+  syncLockfiles();
 
   // 3) `.harness-sync` 파일(옛 동기화 원장)
   const syncFile = path.join(projectRoot, ".harness-sync");
@@ -406,6 +438,62 @@ function migrateOldInstall() {
       if (!pointsAtOldMount(link)) continue;
       migrations.push(`remove old adapter symlink ${relative(link)}`);
       if (!dryRun) fs.rmSync(link, { force: true });
+    }
+  }
+}
+
+// 옛 하네스 devDependency가 남긴 lockfile 잔재를 걷어낸다. package.json에서 devDep을
+// 지워도 lockfile이 그대로면 manifest↔lock 불일치라 `npm ci`가 실패한다. package-lock은
+// v1(legacy `dependencies` 트리)·v2/v3(`packages` 맵 + 루트 매니페스트 미러)를 모두 훑어
+// 직접 제거하고(오프라인·결정적), pnpm/yarn lock은 재생성만 안내한다.
+function syncLockfiles() {
+  const lockPath = path.join(projectRoot, "package-lock.json");
+  if (pathExists(lockPath)) {
+    let lock = null;
+    try {
+      lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+    } catch {
+      warnings.push("package-lock.json이 유효한 JSON이 아니라 lockfile 동기화를 건너뜁니다. `npm install`로 재생성하세요.");
+    }
+    if (isPlainObject(lock)) {
+      let changed = false;
+      // v1(legacy) 트리
+      if (isPlainObject(lock.dependencies) && lock.dependencies[MARKETPLACE_NAME] !== undefined) {
+        delete lock.dependencies[MARKETPLACE_NAME];
+        changed = true;
+      }
+      // v2/v3 packages 맵: 설치 엔트리 + 루트("") 매니페스트 미러
+      if (isPlainObject(lock.packages)) {
+        const nodeKey = `node_modules/${MARKETPLACE_NAME}`;
+        if (lock.packages[nodeKey] !== undefined) {
+          delete lock.packages[nodeKey];
+          changed = true;
+        }
+        const rootPkg = lock.packages[""];
+        if (isPlainObject(rootPkg)) {
+          for (const depKey of ["devDependencies", "dependencies"]) {
+            if (isPlainObject(rootPkg[depKey]) && rootPkg[depKey][MARKETPLACE_NAME] !== undefined) {
+              delete rootPkg[depKey][MARKETPLACE_NAME];
+              changed = true;
+            }
+          }
+        }
+      }
+      if (changed) {
+        migrations.push("strip llm-project-harness from package-lock.json (npm ci 정합)");
+        if (!dryRun) writeJsonFile(lockPath, lock);
+      }
+    }
+  }
+
+  // pnpm/yarn lock은 포맷이 달라 파싱하지 않고 재생성만 안내한다(안 하면 frozen/ci 설치 실패).
+  for (const [file, cmd] of [
+    ["pnpm-lock.yaml", "pnpm install"],
+    ["yarn.lock", "yarn install"],
+  ]) {
+    const lock = path.join(projectRoot, file);
+    if (pathExists(lock) && readText(lock).includes(MARKETPLACE_NAME)) {
+      warnings.push(`${file}에 ${MARKETPLACE_NAME} 항목이 남아 있습니다. \`${cmd}\`로 lockfile을 재생성하세요(안 하면 frozen/ci 설치가 실패).`);
     }
   }
 }
@@ -484,6 +572,54 @@ function upsertMarkerBlock(content, markerName, markerContent) {
   return `${content.trimEnd()}\n\n${block}\n`;
 }
 
+// 이관 후 소비 트리에 남은 옛 마운트(.harness)/제거된 harness:* 스크립트 참조를 스캔해
+// "수동 후속" 체크리스트로 보고한다. 절대 자동 수정하지 않는다 — 라이브 README·런북·설정·
+// 프로즈·스킬 지시라 무엇을 어떻게 고칠지는 문맥 판단이 필요하다. 핵심 함정(A5): docs/raw/**
+// 는 append-only 이력이라 당시 사실인 .harness 언급을 그대로 두는 게 정답이므로 반드시
+// 제외한다. tracked 파일만 본다(git ls-files) — init이 방금 쓴 배선은 아직 untracked라
+// 자기 자신을 오탐하지 않고, 소비자가 이미 커밋해 둔 잔재만 드러난다. dry-run에서도 돈다
+// (적용 전에 수동 범위를 미리 보여주는 C2 프리뷰).
+function reportResidualReferences() {
+  let tracked;
+  try {
+    tracked = execFileSync("git", ["ls-files", "-z"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .split("\0")
+      .filter(Boolean);
+  } catch {
+    return; // git 저장소가 아니거나 git이 없으면 스윕할 것이 없다
+  }
+
+  // 옛 마운트: `.harness/`(경로) 또는 bare `.harness`(예: .gitignore 항목). 단 `.harness.json`
+  // (뒤에 `.`)·`.harness-sync`(뒤에 `-`) 같은 현행/전용 토큰은 negative lookahead로 제외한다.
+  const mountRe = /\.harness(?![.\w-])/;
+  // 제거된 하네스 npm 스크립트 이름(값에 남은 `npm run harness:gate` 같은 caller도 잡힌다).
+  const scriptRe = /\bharness:(kickoff|ingest|check|sync|gate|hooks|approve)\b/;
+
+  for (const rel of tracked) {
+    if (rel.startsWith("docs/raw/")) continue; // A5: 불변 이력 제외
+    const abs = path.join(projectRoot, rel);
+    let text;
+    try {
+      const stat = fs.statSync(abs);
+      if (!stat.isFile() || stat.size > 512 * 1024) continue; // 심볼릭/대용량/바이너리 회피
+      text = fs.readFileSync(abs, "utf8");
+    } catch {
+      continue;
+    }
+    if (text.includes("\0")) continue; // 바이너리
+    const lines = text.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i += 1) {
+      if (mountRe.test(lines[i]) || scriptRe.test(lines[i])) {
+        residuals.push(`${rel}:${i + 1}`);
+      }
+    }
+  }
+}
+
 function writeReport() {
   if (!reportPath) return;
   operations.push(`${dryRun ? "would write" : "write"} report ${relative(reportPath)}`);
@@ -507,6 +643,14 @@ function writeReport() {
     "",
     ...(warnings.length ? warnings.map((w) => `- ${w}`) : ["- None"]),
     "",
+    "## Residual references (manual followup)",
+    "",
+    "> 이관 후에도 tracked 파일에 남은 옛 `.harness` 마운트/`harness:*` 스크립트 참조입니다. " +
+      "init은 자동 수정하지 않습니다(라이브 README·런북·설정·프로즈·스킬 지시라 문맥 판단 필요). " +
+      "`docs/raw/**`는 불변 이력이라 의도적으로 제외했습니다.",
+    "",
+    ...(residuals.length ? residuals.map((r) => `- ${r}`) : ["- None"]),
+    "",
   ].join("\n");
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(reportPath, content, "utf8");
@@ -522,6 +666,10 @@ function printSummary() {
   for (const op of operations) console.log(`- ${op}`);
   for (const m of migrations) console.log(`- 이관: ${m}`);
   for (const w of warnings) console.log(`- 경고: ${w}`);
+  if (residuals.length > 0) {
+    console.log("- 잔존 참조(수동 후속 필요, 자동 수정 안 함; docs/raw/**는 의도적으로 제외):");
+    for (const r of residuals) console.log(`  · ${r}`);
+  }
   if (!dryRun) {
     console.log("다음: /plugin marketplace add rlatndud9090/llm-project-harness 로 마켓플레이스를 등록하고 플러그인을 활성화하세요.");
   }
