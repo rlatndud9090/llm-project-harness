@@ -23,6 +23,26 @@
 없으면 "소비자 조치: 없음"으로 명시한다. 배선(git훅·CI 워크플로·`.harness.json`·settings) 형태를
 바꾸는 항목은 소비자 조치에 "`/harness-init` 재실행"을 명시한다.
 
+## 2026-08-10 skills-unprefixed-drop-duplicate-commands
+
+**변경 (표면 정리 — 모든 스킬을 프리픽스 없이 호출 가능하게)**
+
+같은 이름이 슬래시 커맨드와 스킬 양쪽에 등록되면 Claude Code가 스킬 호출에 플러그인
+프리픽스를 강제한다(`/kickoff` → `/llm-project-harness:kickoff`). 이 충돌을 없애 **모든 스킬이
+unprefixed로 호출**되게 했다.
+
+- **중복 커맨드 3종 제거.** `commands/kickoff.md`·`commands/wiki-ingest.md`·`commands/harness-init.md`
+  삭제. 이들은 대응 스킬(`skills/{kickoff,wiki-ingest,harness-init}`)이 `node …/*.mjs` 실행·옵션·
+  워크트리 격리·이슈 분류까지 **완전히 포함**하던 순수 중복이었다. 슬래시 진입점은 그대로다 —
+  `/kickoff`·`/wiki-ingest`·`/harness-init`은 이제 (커맨드가 아니라) 동명 스킬을 발동한다.
+- **동명 커맨드↔스킬 금지 게이트 신설.** `artifact-check`(provider 모드)이 `commands/<name>.md`와
+  `skills/<name>/`이 이름을 공유하면 실패한다. 스킬이 프리픽스 없이 유지되는 성질을 기계강제한다.
+  슬래시 커맨드가 필요하면 스킬과 **다른 이름**을 쓴다(예: `artifact-check` 커맨드 ↔
+  `artifact-validation` 스킬 — 이 쌍은 충돌하지 않으므로 유지).
+
+**소비자 조치**: 없음(마켓플레이스 업데이트로 자동 반영, 배선 변경 아님). 슬래시 호출 방식은
+그대로 동작한다.
+
 ## 2026-08-10 harness-init-migration-hardening
 
 **변경 (실사용 이관 피드백 반영 — `/harness-init` 완결성·이식성)**

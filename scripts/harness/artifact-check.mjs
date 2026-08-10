@@ -1066,16 +1066,14 @@ function assertHarnessAdapters() {
     { name: "make pr", paths: [rootAdapterPath("skills", "make-pr", "SKILL.md")] },
     { name: "prd helper", paths: [rootAdapterPath("skills", "prd-helper", "SKILL.md")] },
     { name: "adr helper", paths: [rootAdapterPath("skills", "adr-helper", "SKILL.md")] },
-    {
-      name: "kickoff",
-      paths: [rootAdapterPath("skills", "kickoff", "SKILL.md"), rootAdapterPath("commands", "kickoff.md")],
-    },
+    // kickoff/wiki-ingest/harness-init are skill-only: their slash entry point is the
+    // skill itself (`/kickoff` invokes the skill), and a same-named command would force
+    // the plugin prefix on the skill (see assertNoCommandSkillNameCollision). The skill
+    // fully carries the deterministic `node …/*.mjs` invocation, so no command is needed.
+    { name: "kickoff", paths: [rootAdapterPath("skills", "kickoff", "SKILL.md")] },
     { name: "harness init", paths: [rootAdapterPath("skills", "harness-init", "SKILL.md")] },
     { name: "ui verification", paths: [rootAdapterPath("skills", "ui-verification", "SKILL.md")] },
-    {
-      name: "wiki ingest",
-      paths: [rootAdapterPath("skills", "wiki-ingest", "SKILL.md"), rootAdapterPath("commands", "wiki-ingest.md")],
-    },
+    { name: "wiki ingest", paths: [rootAdapterPath("skills", "wiki-ingest", "SKILL.md")] },
   ];
 
   // Each listed entry is a distinct runtime entrypoint (e.g. a skill and a
@@ -1083,6 +1081,39 @@ function assertHarnessAdapters() {
   for (const surface of requiredSurfaces) {
     for (const adapterPath of surface.paths) {
       if (!pathExists(adapterPath)) addError(`missing adapter for ${surface.name}: ${toPosix(path.relative(process.cwd(), adapterPath))}`);
+    }
+  }
+}
+
+// Plugin-model invariant (provider mode): a skill and a slash command must never
+// share a name. Claude Code disambiguates a name registered as BOTH a command and a
+// skill by forcing the plugin prefix, which defeats unprefixed skill invocation
+// (`/kickoff` → `/llm-project-harness:kickoff`). Keeping every skill name unique
+// machine-guarantees all skills stay unprefixed-callable. When a slash entry point is
+// still wanted, name the command differently from the skill (e.g. the artifact-check
+// command ↔ artifact-validation skill pair); otherwise let the skill be the entry
+// point (a skill is invocable as `/<name>` on its own).
+function assertNoCommandSkillNameCollision() {
+  if (!harnessRepoMode) return;
+
+  const commandsDir = harnessPath("commands");
+  const skillsDir = harnessPath("skills");
+  if (!pathExists(commandsDir) || !pathExists(skillsDir)) return;
+
+  const commandNames = new Set(
+    fs
+      .readdirSync(commandsDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+      .map((entry) => path.basename(entry.name, ".md")),
+  );
+  for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (commandNames.has(entry.name)) {
+      addError(
+        `skill "${entry.name}" collides with a same-named slash command (commands/${entry.name}.md); ` +
+          `Claude Code then forces the plugin prefix on the skill. Rename the command differently ` +
+          `(see artifact-check ↔ artifact-validation) or drop it so every skill name stays unique/unprefixed.`,
+      );
     }
   }
 }
@@ -1114,6 +1145,7 @@ assertAdrReferences();
 assertImmutableAdrBody();
 assertPublicSafeDocs();
 assertHarnessAdapters();
+assertNoCommandSkillNameCollision();
 
 if (errors.length > 0) {
   for (const error of errors) {
