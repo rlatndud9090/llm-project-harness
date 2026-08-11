@@ -1,6 +1,7 @@
-# Harness Init 프로토콜 (Claude Code 플러그인)
+# LPH Init 프로토콜 (Claude Code 플러그인)
 
-공용 하네스를 소비 프로젝트에 **Claude Code 플러그인**으로 적용하는 절차다. 하네스 엔진
+공용 하네스를 소비 프로젝트에 **Claude Code 플러그인**으로 적용하는 절차다(예전 이름
+`harness-init`; 슬래시 진입점은 `/lph-init`, 엔진은 `scripts/harness/init.mjs`). 하네스 엔진
 (`scripts/harness/*.mjs`)과 스킬·커맨드·에이전트는 전부 플러그인(이 저장소) 안에만 있고,
 소비 저장소에는 **얇은 배선만** 남는다. `.harness` 심볼릭 링크도, devDependency도, 엔진
 사본도 없다.
@@ -32,14 +33,14 @@
 ## 신규 적용
 
 Claude Code에서 마켓플레이스를 등록하고 플러그인을 켠 뒤, 소비 프로젝트 루트에서
-`/harness-init`을 실행한다.
+`/lph-init`을 실행한다.
 
 ```text
 /plugin marketplace add rlatndud9090/llm-project-harness
-/harness-init
+/lph-init
 ```
 
-`/harness-init`(엔진: `scripts/harness/init.mjs`)이 하는 일:
+`/lph-init`(엔진: `scripts/harness/init.mjs`)이 하는 일:
 
 - `.harness.json` 루트 플래그 생성(현재 하네스 버전 기록).
 - `.claude/settings.json`에 마켓플레이스 + `enabledPlugins` additive 병합(없으면 생성).
@@ -59,20 +60,31 @@ docs/wiki/index.md
 멱등하다. 다시 실행해도 이미 있는 파일은 덮지 않고, `.harness.json`은 version만 현재
 버전으로 갱신하며, settings.json은 필요한 키만 병합한다.
 
+### 마지막 정합 버전 기록 (lph-doctor의 기준점)
+
+`/lph-init`이 `.harness.json`에 쓰는 `version` 필드는 **이 소비 프로젝트가 마지막으로
+정합(reconcile)한 lph 버전**이다. init은 항상 이 값을 현재 플러그인 버전
+(`.claude-plugin/plugin.json`)으로 확정한다 — 즉 init이 끝나면 이 프로젝트는 그 버전에
+정합된 것으로 기록된다. `$lph-doctor`가 이후 세션에서 이 값과 설치된 플러그인 버전을 비교해
+버전 범프·배선 drift를 감지하고, 버전 사이에 쌓인 소비자 정합 조치(`harness/reconcile.md`)를
+제시한다. 배선을 바꾸는 버전 업데이트 뒤에는 `/lph-init`을 다시 돌리면(먼저 `--dry-run`) 이
+값이 올라가 drift가 해소된다. `.harness.json` 자체가 없으면(아직 한 번도 정합 안 됨)
+`$lph-doctor`가 곧장 `/lph-init`을 안내한다.
+
 ## 기존 프로젝트에 붙이기 (retrofit)
 
 이미 진행 중인 프로젝트에는 `--retrofit`을 쓴다. 기존 `AGENTS.md`·`docs/wiki/index.md`는
 덮어쓰지 않고 marker block만 upsert한다. 먼저 dry-run으로 확인한다.
 
 ```text
-/harness-init --retrofit --dry-run
-/harness-init --retrofit --report harness-init-report.md
+/lph-init --retrofit --dry-run
+/lph-init --retrofit --report lph-init-report.md
 ```
 
 ## git 훅 (선택)
 
 커밋 직전에 `harness:check`와 커밋 메시지의 `관련 문서:` 블록을 강제하려면 훅을 설치한다.
-`/harness-init`이 기본으로 설치하며 `--no-git-hooks`로 끈다.
+`/lph-init`이 기본으로 설치하며 `--no-git-hooks`로 끈다.
 
 `${CLAUDE_PLUGIN_ROOT}`은 Claude Code 세션 밖(git 훅 실행 시)에서는 정의되지 않으므로, 훅
 본문에는 init 시점에 해석한 **플러그인 절대경로**를 구워 넣는다. `pre-commit`은 하네스
@@ -83,7 +95,7 @@ docs/wiki/index.md
 경로를 가리킨다. 플러그인이 마켓플레이스로 bump되면 엔진·스킬은 자동 갱신되지만 **이 훅
 경로는 재-init 전까지 옛 버전을 조용히 가리킨다.** 그래서 세션 시작 시 플러그인이 "설치된
 플러그인 버전 > 이 레포에 마지막으로 새긴 배선 버전(`.harness.json` version)"을 감지하면
-`/harness-init` 재실행을 넛지한다. **플러그인 bump 후에는 소비 레포에서 `/harness-init`을
+`/lph-init` 재실행을 넛지한다. **플러그인 bump 후에는 소비 레포에서 `/lph-init`을
 다시 돌려 훅 경로를 재-bake하라**(먼저 `--dry-run`으로 확인). 재실행하면 `.harness.json`
 version이 올라가 넛지가 저절로 사라진다. 이 훅(로컬)은 CI(우회 불가 계층)의 편의 미러일
 뿐이므로, 경로가 잠깐 뒤처져도 승인 게이트의 durable 강제는 CI가 계속 책임진다.
@@ -111,7 +123,7 @@ version이 올라가 넛지가 저절로 사라진다. 이 훅(로컬)은 CI(우
 `git commit --no-verify`, Bash 직접 쓰기, 파일 rename, MCP/원격 쓰기로 우회할 수 있다.
 승인 게이트를 **우회 불가능하게** 강제하는 유일한 계층은 서버사이드 CI다.
 
-`/harness-init`이 스캐폴드하는 `.github/workflows/harness.yml`은 push/PR마다 소비자를
+`/lph-init`이 스캐폴드하는 `.github/workflows/harness.yml`은 push/PR마다 소비자를
 checkout하고 공용 composite action(`rlatndud9090/llm-project-harness@main`)으로 하네스
 게이트를 돌린다.
 
@@ -146,7 +158,7 @@ CI가 없으면 승인 게이트는 "모델 규율 + opt-in 로컬 훅"까지로
 ## 옛 설치에서 이관 (devDependency/submodule → 플러그인, 1회)
 
 이미 옛 방식(devDependency 또는 git submodule)으로 하네스를 붙인 소비 프로젝트를 플러그인
-모델로 옮긴다. **레포마다 한 번**이다. `/harness-init`이 아래를 자동으로 감지·정리한다
+모델로 옮긴다. **레포마다 한 번**이다. `/lph-init`이 아래를 자동으로 감지·정리한다
 (`--dry-run`으로 미리 확인).
 
 - `.harness` 심볼릭 링크(옛 마운트) 제거.
@@ -168,7 +180,7 @@ CI가 없으면 승인 게이트는 "모델 규율 + opt-in 로컬 훅"까지로
 ### 잔존 참조 리포트 + 수동 후속 (init이 자동 수정하지 않는 것)
 
 위 자동 정리로도 남는 것이 있다 — 라이브 문서·설정·프로즈에 박힌 옛 참조는 **무엇을 어떻게
-고칠지 문맥 판단이 필요**해 기계가 함부로 못 고친다. `/harness-init`은 마지막에 tracked 파일을
+고칠지 문맥 판단이 필요**해 기계가 함부로 못 고친다. `/lph-init`은 마지막에 tracked 파일을
 스캔해 **"Residual references (manual followup)"** 섹션으로 `file:line`을 나열한다(`--report`에
 기록되고, `--dry-run`에서도 적용 전 미리 나온다). 전형적으로 손봐야 하는 것:
 
@@ -194,7 +206,7 @@ git rm -f .harness
 rm -rf .git/modules/.harness
 ```
 
-그 뒤 마켓플레이스 등록 → `/harness-init` 순으로 진행하면 위 정리가 함께 수행된다.
+그 뒤 마켓플레이스 등록 → `/lph-init` 순으로 진행하면 위 정리가 함께 수행된다.
 
 ## 실패 모드
 
@@ -205,4 +217,4 @@ rm -rf .git/modules/.harness
 - **좋음:** raw/wiki는 프로젝트별로 소유하고, 플러그인은 템플릿과 절차만 공유한다.
 
 - **나쁨:** `.harness.json` 없이 게이트만 돌린다(플러그인이 이 프로젝트를 하네스 대상으로 인식하지 못한다).
-- **좋음:** `/harness-init`으로 플래그·활성화·CI를 함께 배선한다.
+- **좋음:** `/lph-init`으로 플래그·활성화·CI를 함께 배선한다.

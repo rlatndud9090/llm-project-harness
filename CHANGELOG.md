@@ -11,17 +11,62 @@
   위키 재작성, frontmatter 추가). 마켓플레이스 갱신과 무관하게 프로젝트가 손으로 반영한다.
 - **배선 변경** — 항목이 소비 레포에 직접 커밋된 "배선"(git훅의 baked 경로·`.github/workflows/harness.yml`·
   `.harness.json`·`.claude/settings.json`)의 형태를 바꿀 때. 배선은 플러그인 업데이트로 자동으로 안 바뀌므로
-  소비 레포 루트에서 `/harness-init`을 다시 실행한다(훅 재-baking·`.harness.json` version 갱신). 세션 시작 시
-  플러그인이 배선이 뒤처졌음을 감지하면 재실행을 넛지한다.
+  소비 레포 루트에서 `/lph-init`을 다시 실행한다(훅 재-baking·`.harness.json` version 갱신). 세션 시작 시
+  플러그인이 배선이 뒤처졌음을 감지하면 재실행을 넛지하고, `/lph-doctor`가 버전 drift와 정합 조치를 진단한다.
 
 플러그인 모델에는 옛 `.harness-sync` 정합화 원장이 없다 — 모든 소비 프로젝트가 같은 플러그인 버전을
-참조하므로 갱신이 마켓플레이스로 일원화된다.
+참조하므로 갱신이 마켓플레이스로 일원화된다. 버전별 소비자 정합 조치는 `harness/reconcile.md`(버전 키)로
+추적하고 `/lph-doctor`가 소비 레포의 마지막 정합 버전(`.harness.json` version)과 대조해 제시한다.
 
 **작성 규칙**: 하네스의 공용 표면(`harness/`, `scripts/harness/`, `commands/`, `agents/`,
 `skills/`, `hooks/`, `.claude-plugin/`)을 바꾸는 모든 커밋은 이 파일 맨 위에 `## <YYYY-MM-DD>
 <slug>` 항목을 추가한다(newest-first). 각 항목은 **변경**과 **소비자 조치**를 적고, 조치가
 없으면 "소비자 조치: 없음"으로 명시한다. 배선(git훅·CI 워크플로·`.harness.json`·settings) 형태를
-바꾸는 항목은 소비자 조치에 "`/harness-init` 재실행"을 명시한다.
+바꾸는 항목은 소비자 조치에 "`/lph-init` 재실행"을 명시한다. **버전을 올리는 커밋**은 셋(`package.json`·
+`.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
+맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
+
+## 2026-08-11 v2.3.0 skill-fixes-lph-doctor-and-review-guideline
+
+**변경 (플러그인 전환 후 스킬 동작 교정 배치 · v2.3.0)**
+
+플러그인 전환 후 몇몇 스킬이 의도대로 안 돌던 문제를 묶어 고치고, 버전 정합 진단(`/lph-doctor`)과
+코드리뷰 가이드라인을 신설했다.
+
+- **kickoff 워크트리 리네이밍 생략 (작업 1·2).** kickoff은 항상 `EnterWorktree`로 격리하되, Claude
+  Code가 만든 브랜치 `worktree-<type>+<slug>`(프리픽스 + `/`→`+`)를 canonical로 **되돌리지 않는다**
+  (불필요 churn·ExitWorktree 정리를 깸). `parseWorkBranch`가 이 형태도 파싱해 raw 유닛으로 정합하므로
+  branch↔raw 게이트가 그대로 통과한다. `EnterWorktree` 실패 시 원인을 사용자에게 보고하고 멈춘다 —
+  `git worktree add`·`--checkout` 같은 우회 생성 금지(merge-and-clean의 ExitWorktree 정리를 위해).
+- **`/lph-init` 리네이밍 + 마지막 정합 버전 기록 (작업 7).** `harness-init` 스킬/프로토콜을 `lph-init`으로
+  리네이밍(엔진 파일은 그대로 `scripts/harness/init.mjs`). init은 완료 시 `.harness.json` version을 현재
+  플러그인 버전으로 확정한다(= 이 프로젝트의 "마지막 정합 버전").
+- **`/lph-doctor` 신설 (작업 6).** 소비 프로젝트의 마지막 정합 버전과 설치 플러그인 버전을 비교해
+  fresh/behind/ahead/uninitialized를 진단하고, 버전 사이 소비자 조치(`harness/reconcile.md`)를 제시한다.
+  정합된 적 없으면(`.harness.json` 없음) `/lph-init`을 안내한다. 엔진 `scripts/harness/doctor.mjs`, 버전-키
+  원장 `harness/reconcile.md`, provider 게이트 `assertReconcileLedgerCurrent`.
+- **adr-helper 디자인 결정 = 비교 HTML 파일 (작업 3).** 디자인 결정 레인이 ASCII 대신 자기완결 **비교
+  HTML 파일**(`harness/templates/design/design-options.html`)을 `docs/raw/<type>/<slug>/`에 떨군다 —
+  대안 나란히 비교·베이스 라디오 선택·수정요청 작성·"요약 생성→복사"로 루프를 닫는다. Claude 아티팩트
+  아님. ASCII는 브라우저 없는 순수 CLI의 degenerate fallback.
+- **prd/adr-helper의 deep-interview 진입 판단 강화 (작업 4).** Phase 1을 "강제 기본값"이 아니라
+  **진입 판단**으로 재작성했다: 이번 작업의 범위·깊이와 kickoff에서 받은 사용자 컨텍스트만으로 이미
+  명확한지(그대로 수용 기준으로 옮겨 통과/실패 판정 가능한지)를 가늠해 deep-interview 진입 여부를
+  정한다 — 모호/큰 결정이면 실제 호출→crystallize→PRD/ADR 매핑(실행 브리지는 안 탐), 명확·좁으면 단발
+  구조화 질문, 경계면 사용자에게 1줄 질의. 미설치 런타임은 구조화 질문 fallback.
+- **wiki-ingest 큰 방향성 갱신 넛지 (작업 5).** 의미 있는 ingest 뒤 "이 작업이 프로젝트의 큰 방향성을
+  바꿨다면 index.md의 `## 큰 방향성`도 갱신하라"를 한 줄 리마인드(의미 판단이라 게이트 강제 아님).
+- **code-review-guideline.md 신설·최신화 (작업 8·9).** `implementation-guidelines.md`를 리네이밍하고, 두
+  소비 레포 자동 리뷰 **391건(P1 57건)**을 재클러스터링해 "리뷰어가 diff에서 무엇을 잡아내야 하는가"의
+  탐지 렌즈 + R1–R7 근본 실패 계층으로 정립했다. 코퍼스 high-water mark(pokequiz-hub #127, cross-wars #75)를
+  기록해 다음 갱신 시 그 이후 PR만 확인한다. feature-develop에 자체 코드리뷰 Phase 3.7을 추가하고,
+  pr-self-loop 렌즈가 이 가이드(부록 A 매핑)를 단일 출처로 삼도록 배선했다.
+
+**소비자 조치**: **이미 이관한 소비 레포는 `/lph-init`을 다시 실행**한다(슬래시 진입점이 `/harness-init`
+→ `/lph-init`으로 바뀌었고 `.harness.json` version을 2.3.0으로 올린다; 먼저 `--dry-run`). git훅 baked 경로·
+CI·settings 형태 자체는 안 바뀌므로 게이트는 재실행 없이도 통과하나, 재실행 전까지 `/lph-doctor`가 drift로
+표시한다. 그 외(adr HTML·deep-interview·wiki 넛지·code-review-guideline)는 마켓플레이스 갱신으로 자동 반영
+(소비 산출물 조치 없음). 상세는 `harness/reconcile.md`의 `## 2.3.0`.
 
 ## 2026-08-10 pr-review-loop-initial-bare-trigger
 

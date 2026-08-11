@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>디자인 대안 비교 · {제목}</title>
+<!--
+  하네스 design-options 템플릿 (adr-helper 디자인 결정 레인).
+  - Claude 아티팩트가 아니다. 이 파일을 docs/raw/<type>/<slug>/design-options.html로
+    떨구고, 사용자가 브라우저에서 직접 연다(자기완결: 외부 CSS/JS/폰트/이미지 참조 없음).
+  - 에이전트가 채우는 곳은 <section class="option"> 카드 안의 .mockup 영역과
+    data-label(대안 이름)뿐이다. 카드를 복제/삭제해 대안 수(2개 이상)를 맞춘다.
+  - 사용자는 대안을 나란히 비교 → 베이스 라디오 선택 → 세부 수정 요구사항 작성 →
+    "요약 생성" → "복사"해서 에이전트에게 붙여넣는다(정적 파일이라 서버로 전송 불가 →
+    붙여넣기로 루프를 닫는다). 에이전트는 그 요약을 ADR 선택지/결정/선택 근거로 흡수한다.
+-->
+<style>
+  :root{
+    --bg:#f7f7f8; --fg:#1a1a1e; --muted:#5c5c66; --line:#d9d9e0; --card:#ffffff;
+    --accent:#3b5bdb; --accent-soft:#e7ecfb; --shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#16161a; --fg:#ececf0; --muted:#9a9aa5; --line:#2c2c34; --card:#1e1e24;
+      --accent:#7a93f5; --accent-soft:#22283d; --shadow:0 1px 3px rgba(0,0,0,.4); }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; padding:24px; background:var(--bg); color:var(--fg);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }
+  header{ max-width:1200px; margin:0 auto 20px; }
+  h1{ font-size:20px; margin:0 0 6px; }
+  .lead{ color:var(--muted); margin:0 0 12px; }
+  .how{ background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:12px 16px; box-shadow:var(--shadow); }
+  .how ol{ margin:6px 0 0; padding-left:20px; } .how li{ margin:2px 0; }
+  .grid{ max-width:1200px; margin:0 auto; display:grid; gap:16px;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); }
+  .option{ background:var(--card); border:1px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:hidden; }
+  .option.selected{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow); }
+  .option > header{ display:flex; align-items:center; gap:10px; padding:12px 14px;
+    border-bottom:1px solid var(--line); margin:0; }
+  .option > header label{ font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px; }
+  .option .name{ font-size:15px; }
+  .mockup{ padding:14px; min-height:160px; overflow-x:auto; }
+  /* 목업 안에서 쓰기 좋은 중립 프리미티브(원하면 무시하고 자유 HTML/CSS로 그려도 됨) */
+  .mockup .box{ border:1px dashed var(--line); border-radius:8px; padding:10px; margin:6px 0;
+    color:var(--muted); }
+  .mockup .bar{ height:12px; border-radius:6px; background:var(--line); margin:6px 0; }
+  .notes{ padding:12px 14px; border-top:1px solid var(--line); }
+  .notes label{ display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  textarea{ width:100%; min-height:64px; resize:vertical; border:1px solid var(--line);
+    border-radius:8px; padding:8px; background:var(--bg); color:var(--fg); font:inherit; }
+  .panel{ max-width:1200px; margin:18px auto 0; background:var(--card); border:1px solid var(--line);
+    border-radius:12px; padding:16px; box-shadow:var(--shadow); }
+  .panel label{ display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+  button{ font:inherit; font-weight:600; border:1px solid var(--accent); background:var(--accent);
+    color:#fff; border-radius:8px; padding:8px 16px; cursor:pointer; }
+  button.secondary{ background:transparent; color:var(--accent); }
+  button:disabled{ opacity:.5; cursor:not-allowed; }
+  #summary{ width:100%; min-height:150px; margin-top:12px; white-space:pre; font-family:ui-monospace,
+    SFMono-Regular,Menlo,monospace; font-size:13px; }
+  .hint{ color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>디자인 대안 비교 — {제목}</h1>
+  <p class="lead">아래 대안을 비교하고, <b>베이스로 삼을 안 하나를 라디오로 선택</b>한 뒤,
+    <b>세부 수정 요구사항</b>을 적어 주세요.</p>
+  <div class="how">
+    <b>사용법</b>
+    <ol>
+      <li>각 대안을 나란히 비교합니다.</li>
+      <li>가장 마음에 드는 안의 <b>◉ 라디오</b>를 선택합니다(베이스 = 이 안을 출발점으로 발전).</li>
+      <li>대안별 칸과 아래 "전체 수정 요구사항"에 원하는 변경을 구체적으로 적습니다.</li>
+      <li><b>"요약 생성"</b>을 누르고 <b>"복사"</b>해서 에이전트에게 붙여넣습니다(이 파일은 정적이라
+        직접 전송되지 않습니다 — 붙여넣기로 전달).</li>
+    </ol>
+  </div>
+</header>
+
+<!-- ▼▼▼ 에이전트가 채우는 영역: 대안 카드(최소 2개). 카드를 복제/삭제해 개수를 맞추고,
+     data-label과 .mockup 안을 이번 유닛의 실제 화면 배치로 채운다. value는 opt-a/opt-b/... 유지. ▼▼▼ -->
+<div class="grid" id="grid">
+
+  <section class="option" data-label="대안 A — {A 이름}">
+    <header>
+      <label><input type="radio" name="base" value="대안 A — {A 이름}" /><span class="name">대안 A — {A 이름}</span></label>
+    </header>
+    <div class="mockup">
+      <!-- 여기에 대안 A의 목업을 HTML/CSS로 그린다(레이아웃·위계 중심, 중립 톤). 예: -->
+      <div class="box">헤더 / 타이틀</div>
+      <div class="bar" style="width:70%"></div>
+      <div class="box">핵심 콘텐츠 영역</div>
+      <div class="box">컨트롤 / CTA</div>
+    </div>
+    <div class="notes">
+      <label>대안 A 세부 수정 요구사항</label>
+      <textarea data-notes placeholder="예: CTA를 상단으로, 배지는 우측 정렬…"></textarea>
+    </div>
+  </section>
+
+  <section class="option" data-label="대안 B — {B 이름}">
+    <header>
+      <label><input type="radio" name="base" value="대안 B — {B 이름}" /><span class="name">대안 B — {B 이름}</span></label>
+    </header>
+    <div class="mockup">
+      <div class="box">상단 요약 바</div>
+      <div class="bar" style="width:50%"></div>
+      <div class="box">좌: 목록 &nbsp;|&nbsp; 우: 상세</div>
+      <div class="box">하단 고정 액션</div>
+    </div>
+    <div class="notes">
+      <label>대안 B 세부 수정 요구사항</label>
+      <textarea data-notes placeholder="이 안에 대한 수정 요구사항…"></textarea>
+    </div>
+  </section>
+
+</div>
+<!-- ▲▲▲ 에이전트가 채우는 영역 끝 ▲▲▲ -->
+
+<div class="panel">
+  <label for="overall">전체 수정 요구사항 (선택한 베이스를 어떻게 발전시킬지 · 공통 사항)</label>
+  <textarea id="overall" placeholder="예: 모바일 320px에서 컨트롤이 겹치지 않게, 결과 위계를 점수 > 순위 > 상세 순으로…"></textarea>
+  <div class="row">
+    <button id="gen">요약 생성</button>
+    <button id="copy" class="secondary" disabled>복사</button>
+    <span class="hint">요약을 복사해 에이전트 대화창에 붙여넣으세요.</span>
+  </div>
+  <textarea id="summary" readonly placeholder="여기에 붙여넣을 요약이 생성됩니다."></textarea>
+</div>
+
+<script>
+  (function(){
+    var grid = document.getElementById('grid');
+    grid.addEventListener('change', function(e){
+      if (e.target && e.target.name === 'base') {
+        document.querySelectorAll('.option').forEach(function(o){ o.classList.remove('selected'); });
+        var card = e.target.closest('.option');
+        if (card) card.classList.add('selected');
+      }
+    });
+
+    function build(){
+      var checked = document.querySelector('input[name="base"]:checked');
+      var base = checked ? checked.value : '(아직 선택 안 함)';
+      var overall = document.getElementById('overall').value.trim() || '(없음)';
+      var lines = [];
+      lines.push('=== 디자인 선택 요약 (에이전트에게 붙여넣기) ===');
+      lines.push('베이스로 선택: ' + base);
+      lines.push('전체 수정 요구사항:');
+      lines.push(overall);
+      lines.push('');
+      lines.push('대안별 메모:');
+      document.querySelectorAll('.option').forEach(function(o){
+        var label = o.getAttribute('data-label') || '(무명)';
+        var ta = o.querySelector('textarea[data-notes]');
+        var note = (ta && ta.value.trim()) ? ta.value.trim() : '(없음)';
+        lines.push('- ' + label + ': ' + note);
+      });
+      return lines.join('\n');
+    }
+
+    document.getElementById('gen').addEventListener('click', function(){
+      var out = document.getElementById('summary');
+      out.value = build();
+      document.getElementById('copy').disabled = false;
+    });
+
+    document.getElementById('copy').addEventListener('click', function(){
+      var out = document.getElementById('summary');
+      out.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(out.value).then(function(){}, function(){});
+      }
+      this.textContent = ok ? '복사됨 ✓' : '직접 선택해 복사(Ctrl/Cmd+C)';
+      var b = this; setTimeout(function(){ b.textContent = '복사'; }, 1800);
+    });
+  })();
+</script>
+</body>
+</html>

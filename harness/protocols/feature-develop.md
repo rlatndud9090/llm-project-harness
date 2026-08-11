@@ -141,7 +141,7 @@ domain-engineer/ui-engineer/test-engineer → integrator` role 체인으로 펼�
    - 검증
 4. 구현 계획을 notes 또는 별도 계획 섹션에 남긴다. 이 계획이 Phase 2 위임의 **브리핑**이 된다 —
    각 역할은 이걸 받아 재탐색 없이 진행한다(코드 지도는 여기 한 번 남겨 공유한다).
-   `guides/implementation-guidelines.md`(구현 지침 단일 출처)의 표면 인덱스에서 이 작업이
+   `guides/code-review-guideline.md`(구현 지침 단일 출처)의 표면 인덱스에서 이 작업이
    건드리는 섹션을 골라 해당 규칙을 브리핑에 발췌 포함한다 — 전체 로드 금지(로딩 규칙은
    그 문서 상단). 서브에이전트는 발췌를 받으므로 지침 파일을 다시 열지 않는다.
    - domain 작업
@@ -170,7 +170,7 @@ domain-engineer/ui-engineer/test-engineer → integrator` role 체인으로 펼�
 
 담당: `domain-engineer`, `ui-engineer`
 
-구현은 브리핑에 발췌된 구현 지침(`guides/implementation-guidelines.md`) 규칙을 대조하며
+구현은 브리핑에 발췌된 구현 지침(`guides/code-review-guideline.md`) 규칙을 대조하며
 진행한다 — 지침의 §0 코어 원칙(스펙 동기화·단일 출처·경계 불신·왕복 완성)은 발췌와
 무관하게 항상 적용된다.
 
@@ -198,6 +198,28 @@ UI 작업:
   notes에 남긴다.
 - ADR이 있으면 거기 기록한 결정이 실제 구현에 반영됐는지(결정↔구현 정합성)
   확인한다. 불일치는 담당 role에 돌려준다.
+
+## Phase 3.7: 자체 코드리뷰 (code-review-guideline 렌즈로 1회)
+
+담당: 작성 lane과 분리된 리뷰어 패스
+
+구현·테스트가 끝나면 `$make-pr`로 넘기기 전에 **구현 diff를 `guides/code-review-guideline.md`의
+탐지 렌즈로 한 번 자체 리뷰한다.** 이건 `$pr-self-loop`(PR 단계의 전체 loop-until-dry)의 경량
+**1회판**이며, 자기 작성물을 같은 컨텍스트에서 self-approve하지 않도록 **작성과 분리된 리뷰어
+패스**로 돈다(격리 서브에이전트 권장 — 없으면 최소한 작성과 다른 리뷰 관점으로).
+
+1. diff 표면을 파악한다: `git diff <base>...HEAD --name-only`.
+2. `code-review-guideline.md`의 표면 인덱스에서 이 diff가 건드리는 섹션만 골라(전체 로드 금지)
+   "이런 diff를 보면 → 이 결함을 의심·확인하라" 탐지기로 diff를 훑는다. 렌즈↔섹션은 그 문서
+   부록 A를 따른다. Phase 1 브리핑에 이미 발췌된 섹션이 있으면 재로드하지 않는다.
+3. 발견을 심각도로 분류한다: **BLOCKER**(라이브 운영·사용자·데이터에 실제 영향)는 이 단계에서
+   고치고, **COSMETIC**(주석·문서 정합·내부 네이밍)은 놓치지 않되 배치로 모아 마지막에 정리한다
+   (`$pr-self-loop` 심각도 정책과 동일 축 — 사소한 걸로 흐름을 늘리지 않는다).
+4. BLOCKER를 고쳤으면(버그는 실패 테스트로 결함 입증 후 수정) `harness:gate`를 다시 green으로 만든다.
+
+이 패스는 **1회**다(전체 반복 루프가 아니다). PR 단계에서 Codex 자동 리뷰 또는 `$pr-self-loop`가
+더 깊은 반복 리뷰를 맡는다 — feature-develop 자체 검증은 명백한 결함을 make-pr 전에 걸러 내고
+self-review 품질을 Codex 수준으로 끌어올리는 것이 목적이다.
 
 ## Phase 4: 통합
 

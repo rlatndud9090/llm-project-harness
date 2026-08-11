@@ -45,7 +45,7 @@ npm run harness:check
 - 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
 - Codex/ClaudeCode는 `next-feature`, `kickoff`, `prd-helper`, `adr-helper` skill adapter를 가진다.
 - Codex/ClaudeCode는 `feature-develop`, `make-pr` skill adapter를 가진다.
-- ClaudeCode는 `harness-init` skill/command adapter를 가진다.
+- ClaudeCode는 `lph-init` skill/command adapter를 가진다.
 
 ## 수동 검토 항목
 

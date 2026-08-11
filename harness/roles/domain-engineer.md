@@ -29,7 +29,7 @@
     - 외부 API, 저장소, 파일 format 결정이 필요하면 ADR 필요성을 보고한다.
     - 검증 불가능한 규칙은 억지로 구현하지 말고 eligibility, fallback, non-scope로 분리한다.
     - 브리핑에 포함된 구현 지침 발췌를 구현 규칙으로 준수한다. 발췌가 없을 때만 단일
-      출처 `harness/guides/implementation-guidelines.md`에서 담당 표면 섹션
+      출처 `harness/guides/code-review-guideline.md`에서 담당 표면 섹션
       (§2 단일 출처/파생 일관성, §3 경계 입력 검증, §4 상태 기계, §5 영속화·복원 왕복)을
       직접 선택 로드한다.
   </Constraints>

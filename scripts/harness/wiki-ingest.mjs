@@ -180,6 +180,18 @@ if (already.length) {
   console.log(`[wiki-ingest] ${relativeUnit} already linked under: ${already.join(", ")}`);
 }
 
+// 큰 방향성 nudge: ingest는 area 계보 링크만 기계로 갱신한다. 이 작업이 프로젝트의 목표·
+// 범위·무엇/누구·지식 경계를 실제로 바꿨다면 index.md의 `## 큰 방향성`도 함께 갱신해야
+// 하는데(의미 판단이라 도구가 강제하지 않는다), 소비 프로젝트가 이 갱신을 자주 빠뜨려
+// 방향성이 낡는다. 그래서 의미 있는 ingest 뒤에 한 줄 리마인드한다(특히 둘째 touch=통합).
+if (linked.length || reconciled.length) {
+  console.log(
+    `- 이 작업이 프로젝트의 큰 방향성(목표·범위·무엇/누구·지식 경계)을 바꿨다면 ` +
+      `${toPosix(path.relative(process.cwd(), indexPath))}의 "## 큰 방향성"도 함께 갱신하세요 ` +
+      `(계보 링크만으론 방향성이 낡습니다 — 의미 판단이라 게이트가 강제하지 않습니다).`,
+  );
+}
+
 // ─── section 헬퍼 ────────────────────────────────────────────────────────────
 
 // This unit's section: --section overrides, else the primary artifact's

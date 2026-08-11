@@ -68,6 +68,43 @@ export function isHarnessRepository() {
   return path.resolve(findHarnessRoot()) === path.resolve(REPO_ROOT);
 }
 
+// The plugin's declared harness version, from .claude-plugin/plugin.json — the
+// single source of truth other version consumers derive from (init writes it into
+// each consumer's .harness.json; lph-doctor compares against it). Returns null if
+// unreadable. NOTE: session-start.mjs keeps an inline mirror of this + the compare
+// below on purpose — a SessionStart hook must fail-open with no import-time deps.
+export function readPluginVersion() {
+  try {
+    const raw = readText(harnessPath(".claude-plugin", "plugin.json"));
+    const v = JSON.parse(raw).version;
+    return typeof v === "string" && v ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+// Compares two dotted-numeric versions: 1 if a>b, -1 if a<b, 0 if equal. Returns
+// null when either side is not purely numeric-dotted (prerelease tags etc.), so
+// callers decline to act on an undecidable comparison rather than guess.
+export function compareVersions(a, b) {
+  const pa = String(a).split(".").map(Number);
+  const pb = String(b).split(".").map(Number);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i += 1) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (Number.isNaN(x) || Number.isNaN(y)) return null;
+    if (x !== y) return x > y ? 1 : -1;
+  }
+  return 0;
+}
+
+// True iff a is strictly newer than b (both dotted-numeric); false otherwise,
+// including when the comparison is undecidable.
+export function isNewerVersion(a, b) {
+  return compareVersions(a, b) === 1;
+}
+
 export function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
 }
@@ -208,7 +245,14 @@ export function parseArgs(argv) {
 }
 
 export function parseWorkBranch(branch) {
-  const match = /^(feature|bugfix|chore)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(branch);
+  // Accept the canonical `<type>/<slug>` AND the Claude Code EnterWorktree form
+  // `worktree-<type>+<slug>`: EnterWorktree names the worktree branch with a
+  // `worktree-` prefix and substitutes `/` → `+` (e.g. name "feature/main-layout"
+  // → branch "worktree-feature+main-layout"). kickoff no longer renames the
+  // worktree branch back to canonical — the name already carries type+meaning, and
+  // renaming is pure churn that also breaks ExitWorktree's clean removal — so branch
+  // parity and inference must read both shapes. The raw unit stays docs/raw/<type>/<slug>.
+  const match = /^(?:worktree-)?(feature|bugfix|chore)[/+]([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(branch);
   if (!match) return null;
 
   const [, type, slug] = match;

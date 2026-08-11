@@ -30,6 +30,7 @@ import {
   parseWorkBranch,
   pathExists,
   primaryArtifactName,
+  readPluginVersion,
   readText,
   readUnitAreas,
   readUnitSection,
@@ -62,7 +63,9 @@ function assertHarnessShape() {
   for (const requiredPath of [
     harnessPath("harness", "README.md"),
     harnessPath("harness", "protocols", "session-start.md"),
-    harnessPath("harness", "protocols", "harness-init.md"),
+    harnessPath("harness", "protocols", "lph-init.md"),
+    harnessPath("harness", "protocols", "lph-doctor.md"),
+    harnessPath("harness", "reconcile.md"),
     harnessPath("harness", "templates", "raw", "feature-prd.md"),
     harnessPath("harness", "templates", "raw", "feature-adr.md"),
     harnessPath("harness", "templates", "raw", "notes.md"),
@@ -101,7 +104,7 @@ function assertProjectDocsPresent() {
 }
 
 // Plugin-model adoption marker (consumer mode only). A repo opts into the harness
-// by dropping a `.harness.json` flag at its root (written by `/harness-init`); the
+// by dropping a `.harness.json` flag at its root (written by `/lph-init`); the
 // plugin's SessionStart hook and every consumer-mode gate key on it. Require it to
 // exist and be valid JSON — a missing or malformed flag means the repo is not (or
 // not cleanly) adopted, so fail loudly. Replaces the old devDependency-era sync
@@ -114,7 +117,7 @@ function assertHarnessFlag() {
   if (!pathExists(flagPath)) {
     addError(
       `missing .harness.json flag at the project root — this repo has not adopted the harness plugin. ` +
-        `Run /harness-init to write it (or add {"harness":"llm-project-harness"} manually).`,
+        `Run /lph-init to write it (or add {"harness":"llm-project-harness"} manually).`,
     );
     return;
   }
@@ -1066,12 +1069,13 @@ function assertHarnessAdapters() {
     { name: "make pr", paths: [rootAdapterPath("skills", "make-pr", "SKILL.md")] },
     { name: "prd helper", paths: [rootAdapterPath("skills", "prd-helper", "SKILL.md")] },
     { name: "adr helper", paths: [rootAdapterPath("skills", "adr-helper", "SKILL.md")] },
-    // kickoff/wiki-ingest/harness-init are skill-only: their slash entry point is the
-    // skill itself (`/kickoff` invokes the skill), and a same-named command would force
+    // kickoff/wiki-ingest/lph-init/lph-doctor are skill-only: their slash entry point is
+    // the skill itself (`/kickoff` invokes the skill), and a same-named command would force
     // the plugin prefix on the skill (see assertNoCommandSkillNameCollision). The skill
     // fully carries the deterministic `node …/*.mjs` invocation, so no command is needed.
     { name: "kickoff", paths: [rootAdapterPath("skills", "kickoff", "SKILL.md")] },
-    { name: "harness init", paths: [rootAdapterPath("skills", "harness-init", "SKILL.md")] },
+    { name: "lph init", paths: [rootAdapterPath("skills", "lph-init", "SKILL.md")] },
+    { name: "lph doctor", paths: [rootAdapterPath("skills", "lph-doctor", "SKILL.md")] },
     { name: "ui verification", paths: [rootAdapterPath("skills", "ui-verification", "SKILL.md")] },
     { name: "wiki ingest", paths: [rootAdapterPath("skills", "wiki-ingest", "SKILL.md")] },
   ];
@@ -1093,6 +1097,33 @@ function assertHarnessAdapters() {
 // still wanted, name the command differently from the skill (e.g. the artifact-check
 // command ↔ artifact-validation skill pair); otherwise let the skill be the entry
 // point (a skill is invocable as `/<name>` on its own).
+// Provider-repo gate: every version bump must record its consumer reconciliation in
+// harness/reconcile.md so lph-doctor can surface it. Require a `## <version>` heading
+// matching the plugin's current version (`.claude-plugin/plugin.json`). No-op in
+// consumer projects (they read the ledger, they don't author it). Mirrors the
+// verify-changelog discipline: shared-surface changes stay reconcilable per version.
+function assertReconcileLedgerCurrent() {
+  if (!harnessRepoMode) return;
+
+  const version = readPluginVersion();
+  if (!version) {
+    addError("could not read plugin version from .claude-plugin/plugin.json (reconcile-ledger gate)");
+    return;
+  }
+  const ledgerPath = harnessPath("harness", "reconcile.md");
+  if (!pathExists(ledgerPath)) {
+    addError("missing harness/reconcile.md (lph-doctor reconcile ledger)");
+    return;
+  }
+  const headingRe = new RegExp(`^##\\s+${version.replace(/\./g, "\\.")}\\s*$`, "m");
+  if (!headingRe.test(readText(ledgerPath))) {
+    addError(
+      `harness/reconcile.md has no "## ${version}" entry — a version bump must record its ` +
+        `consumer reconciliation (use "- (없음)" if there is no consumer action).`,
+    );
+  }
+}
+
 function assertNoCommandSkillNameCollision() {
   if (!harnessRepoMode) return;
 
@@ -1118,6 +1149,7 @@ function assertNoCommandSkillNameCollision() {
   }
 }
 
+assertReconcileLedgerCurrent();
 assertHarnessShape();
 assertNoHarnessDocsNamespace();
 assertProjectDocsPresent();

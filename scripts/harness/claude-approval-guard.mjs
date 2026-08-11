@@ -24,7 +24,7 @@
 // This is NOT a complete runtime gate: Bash writes (sed/tee/redirect), file
 // renames, and MCP/remote writers are out of a PreToolUse matcher's reach. The
 // load-bearing, non-bypassable gate is the harness check run in CI (see
-// harness/protocols/harness-init.md). The plugin wires this guard as a PreToolUse
+// harness/protocols/lph-init.md). The plugin wires this guard as a PreToolUse
 // (Edit|Write|MultiEdit) hook in hooks/hooks.json via
 // `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/claude-approval-guard.mjs"`.
 //

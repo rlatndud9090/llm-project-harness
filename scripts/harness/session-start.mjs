@@ -3,7 +3,7 @@
 //
 // Fires at the start of every Claude Code session in which the plugin is
 // enabled. It is scoped by the project root flag `.harness.json`: only a repo
-// that has adopted the harness (via `/harness-init`, which writes that file)
+// that has adopted the harness (via `/lph-init`, which writes that file)
 // gets the harness session-start protocol injected. In any other repo this
 // stays completely silent, so a globally-enabled plugin never intrudes on
 // projects that do not opt in.
@@ -62,7 +62,7 @@ function main() {
   );
 
   // 배선 신선도 넛지. 플러그인(엔진·스킬·훅)은 마켓플레이스로 자동 갱신되지만,
-  // /harness-init이 소비 레포에 직접 커밋한 "배선"(git훅의 baked 절대경로·CI 워크플로·
+  // /lph-init이 소비 레포에 직접 커밋한 "배선"(git훅의 baked 절대경로·CI 워크플로·
   // .harness.json·settings)은 자동으로 안 바뀐다. 설치된 플러그인 버전이 이 저장소에
   // 마지막으로 새긴 배선 버전(.harness.json version)보다 새로우면, 재실행을 권한다.
   // 재실행하면 flag version이 올라가 넛지가 저절로 사라진다. 로컬 비교라 네트워크 없음.
@@ -70,7 +70,7 @@ function main() {
   if (pluginVersion && typeof flag.version === "string" && isNewerVersion(pluginVersion, flag.version)) {
     lines.push(
       `※ 플러그인이 v${pluginVersion}로 업데이트됐습니다(이 저장소 배선은 v${flag.version}). ` +
-        "배선(git훅·CI·.harness.json)이 뒤처졌을 수 있으니 /harness-init을 다시 실행해 갱신하세요(먼저 --dry-run으로 확인).",
+        "배선(git훅·CI·.harness.json)이 뒤처졌을 수 있으니 /lph-init을 다시 실행해 갱신하세요(먼저 --dry-run으로 확인).",
     );
   }
 

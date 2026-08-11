@@ -35,10 +35,11 @@ composite action으로 소비된다 — 소비 저장소에 `.harness` 심볼릭
 
 ## 가이드
 
-- `guides/implementation-guidelines.md` — 소비 프로젝트들의 자동 코드리뷰 지적 264건을
-  전수 클러스터링한 **구현 시점 예방 규칙**의 단일 출처. `feature-develop`의 architect가
-  표면 인덱스로 해당 섹션만 골라 구현 브리핑에 발췌하고, `domain-engineer`/`ui-engineer`/
-  `test-engineer`가 얇게 참조한다(전체 로드 금지·복제 금지).
+- `guides/code-review-guideline.md` — 소비 프로젝트들의 자동 코드리뷰 지적 391건(P1 57건)을
+  전수 클러스터링해 **"리뷰어가 diff에서 무엇을 잡아내야 하는가(탐지)"** 로 정립한 단일 출처
+  (R1–R7 근본 실패 계층 + 표면별 탐지기). `$pr-self-loop`·`$pr-review-check-*` 리뷰어가 탐지
+  렌즈로(부록 A), `feature-develop`의 설계·구현·자체 검증(Phase 3.7)이 같은 규칙을 예방·자가리뷰
+  체크리스트로 참조한다(표면 인덱스로 해당 섹션만·전체 로드 금지·복제 금지).
 
 ## 소비 프로젝트 실행 흐름
 
@@ -78,7 +79,7 @@ verbatim을 원장에 기록), 에이전트가 직접 frontmatter status를 `app
 1. `harness/protocols/feature-develop.md`
 2. 관련 raw PRD/ADR/notes
 3. 필요한 role 문서
-4. 작업 표면에 해당하는 `harness/guides/implementation-guidelines.md` 섹션
+4. 작업 표면에 해당하는 `harness/guides/code-review-guideline.md` 섹션
    (§0 코어 원칙 + 표면 인덱스로 선택 — 전체 로드 금지)
 
 구조, 데이터, engine, dependency, 다중 모듈 변경은 설계를 먼저 확정한 뒤 구현한다
@@ -104,7 +105,7 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 - [Kickoff](protocols/kickoff.md)
 - [PRD Helper](protocols/prd-helper.md)
 - [ADR Helper](protocols/adr-helper.md)
-- [Harness Init](protocols/harness-init.md)
+- [LPH Init](protocols/lph-init.md)
 - [기능 개발](protocols/feature-develop.md)
 - [Wiki ingest](protocols/wiki-ingest.md)
 - [아티팩트 검증](protocols/artifact-validation.md)
@@ -143,13 +144,13 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"
 
 `wiki-ingest`는 raw unit을 `docs/wiki/index.md`의 **영역(area)별 시간순 계보**에
 연결한다(area는 `prd.md`/`bugfix.md` frontmatter에 선언). 하네스 공용 표면을 바꾸는
-커밋은 `CHANGELOG.md`에 항목을 남기고, 소비 프로젝트는 플러그인 갱신 후 `/harness-init`을
+커밋은 `CHANGELOG.md`에 항목을 남기고, 소비 프로젝트는 플러그인 갱신 후 `/lph-init`을
 다시 실행해 정합성을 맞춘다.
 
 `approve`는 PRD를 `review`→`approved`(및 `--adr`로 ADR `proposed`→`accepted`)로
 전환하는 **유일한 정규 경로**다. 사용자의 명시 승인 발화 없이는 실행하지 않는다.
 추가로 승인 상태 직접 편집을 런타임에서 차단하는 PreToolUse 가드 훅
-(`scripts/harness/claude-approval-guard.mjs`)을 `/harness-init`이 opt-in으로 배선할 수 있다.
+(`scripts/harness/claude-approval-guard.mjs`)을 `/lph-init`이 opt-in으로 배선할 수 있다.
 
 `gate`는 `artifact-check`, `lint`, `build`, `test:run`을 순서대로 실행한다.
 실패하면 다음 단계로 넘어가지 않는다.

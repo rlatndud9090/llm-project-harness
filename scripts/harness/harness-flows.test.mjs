@@ -644,7 +644,7 @@ describe("artifact-check area gates", () => {
 });
 
 describe("harness plugin adoption flag", () => {
-  it("harness-init writes a valid .harness.json flag and a fresh consumer passes the check", () => {
+  it("lph-init writes a valid .harness.json flag and a fresh consumer passes the check", () => {
     withProject((projectRoot) => {
       harnessInit(projectRoot);
       const flag = JSON.parse(read(path.join(projectRoot, ".harness.json")));
@@ -892,7 +892,7 @@ describe("install-hooks", () => {
   });
 });
 
-describe("harness-init (plugin bootstrap)", () => {
+describe("lph-init (plugin bootstrap)", () => {
   it("merges .claude/settings.json additively, preserving unrelated keys", () => {
     withProject((projectRoot) => {
       writeFile(
@@ -2201,6 +2201,37 @@ describe("kickoff branch handling (worktree-first; main worktree reserved)", () 
     });
   });
 
+  it("recognizes the EnterWorktree branch form (worktree-<type>+<slug>) as branch-first and infers the unit", () => {
+    withGitProject((projectRoot) => {
+      harnessInit(projectRoot);
+      commitAll(projectRoot);
+      // The real Claude Code flow: EnterWorktree({name:"feature/enter-wt"}) puts the
+      // agent on branch "worktree-feature+enter-wt", then it runs `kickoff --title`
+      // with no --type/--slug. kickoff must infer the unit from the worktree branch,
+      // leave the branch as-is (no rename), and materialize docs/raw/feature/enter-wt.
+      git(projectRoot, ["checkout", "-q", "-b", "worktree-feature+enter-wt"]);
+      const k = kickoff(projectRoot, ["--title", "워크트리 진입"]);
+      expect(k.status).toBe(0);
+      expect(currentBranch(projectRoot)).toBe("worktree-feature+enter-wt"); // no rename
+      expect(`${k.stdout}${k.stderr}`).toContain("그대로 둠"); // branch-first, not an isolation hint
+      expect(fs.existsSync(path.join(projectRoot, "docs", "raw", "feature", "enter-wt", "prd.md"))).toBe(true);
+    });
+  });
+
+  it("harness:check passes on the EnterWorktree branch form (parity resolves to the same raw unit)", () => {
+    withGitProject((projectRoot) => {
+      harnessInit(projectRoot);
+      commitAll(projectRoot);
+      git(projectRoot, ["checkout", "-q", "-b", "worktree-bugfix+parity-probe"]);
+      const k = kickoff(projectRoot, ["--title", "패리티 프로브"]);
+      expect(k.status).toBe(0);
+      // The branch/raw parity gate must accept worktree-bugfix+parity-probe against
+      // docs/raw/bugfix/parity-probe (kickoff is green immediately per its contract).
+      const check = runCheck(projectRoot);
+      expect(check.status).toBe(0);
+    });
+  });
+
   it("creates an in-place branch on main only with the explicit --checkout escape hatch", () => {
     withGitProject((projectRoot) => {
       harnessInit(projectRoot);
@@ -2546,6 +2577,79 @@ function frontmatter(fields) {
   const lines = Object.entries({ date: "2026-01-01", ...fields }).map(([key, value]) => `${key}: ${value}`);
   return ["---", ...lines, "---"].join("\n");
 }
+
+describe("lph-doctor (version reconcile diagnosis)", () => {
+  // doctor runs from repoRoot/scripts/harness/doctor.mjs, so findHarnessRoot() resolves
+  // to this plugin and it compares the consumer's .harness.json against the REAL plugin
+  // version + reconcile ledger. Reading the version here keeps the tests bump-robust.
+  const pluginVersion = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, ".claude-plugin", "plugin.json"), "utf8"),
+  ).version;
+  const doctor = (projectRoot) =>
+    spawnSync(process.execPath, [path.join(repoRoot, "scripts", "harness", "doctor.mjs")], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+
+  it("reports uninitialized and points to /lph-init when .harness.json is absent", () => {
+    withGitProject((projectRoot) => {
+      const r = doctor(projectRoot);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain("status=uninitialized");
+      expect(r.stdout).toContain("/lph-init");
+    });
+  });
+
+  it("reports fresh when the flag version matches the installed plugin", () => {
+    withGitProject((projectRoot) => {
+      writeFile(
+        path.join(projectRoot, ".harness.json"),
+        JSON.stringify({ harness: "llm-project-harness", version: pluginVersion }),
+      );
+      const r = doctor(projectRoot);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain("status=fresh");
+    });
+  });
+
+  it("reports behind and surfaces the current version's reconcile entry when the flag lags", () => {
+    withGitProject((projectRoot) => {
+      writeFile(
+        path.join(projectRoot, ".harness.json"),
+        JSON.stringify({ harness: "llm-project-harness", version: "0.0.1" }),
+      );
+      const r = doctor(projectRoot);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain("status=behind");
+      // The reconcile ledger must carry a current-version entry (gate-enforced), so a
+      // repo at 0.0.1 sees it surfaced. Robust across bumps: always compares to current.
+      expect(r.stdout).toContain(`## ${pluginVersion}`);
+      expect(r.stdout).toContain("/lph-init");
+    });
+  });
+
+  it("reports ahead and points to a marketplace update when the flag is newer", () => {
+    withGitProject((projectRoot) => {
+      writeFile(
+        path.join(projectRoot, ".harness.json"),
+        JSON.stringify({ harness: "llm-project-harness", version: "999.0.0" }),
+      );
+      const r = doctor(projectRoot);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain("status=ahead");
+      expect(r.stdout).toContain("marketplace update");
+    });
+  });
+
+  it("treats a malformed .harness.json as uninitialized", () => {
+    withGitProject((projectRoot) => {
+      writeFile(path.join(projectRoot, ".harness.json"), "{ not json");
+      const r = doctor(projectRoot);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain("status=uninitialized");
+    });
+  });
+});
 
 function withProject(callback) {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "llm-harness-flows-"));

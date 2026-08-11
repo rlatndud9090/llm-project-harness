@@ -36,9 +36,18 @@ describe("parseWorkBranch", () => {
     expect(parseWorkBranch("chore/repo-bootstrap")).toEqual({ type: "chore", slug: "repo-bootstrap" });
   });
 
-  it("flags vague slugs as invalid rather than valid", () => {
-    const parsed = parseWorkBranch("feature/fix");
-    expect(parsed?.invalid).toBeTruthy();
+  it("parses the Claude Code EnterWorktree branch form (worktree-<type>+<slug>)", () => {
+    // EnterWorktree({name:"feature/main-layout"}) materializes branch
+    // "worktree-feature+main-layout"; kickoff keeps it as-is (no rename) so parity
+    // and inference must resolve it to the same raw unit as the canonical form.
+    expect(parseWorkBranch("worktree-feature+main-layout")).toEqual({ type: "feature", slug: "main-layout" });
+    expect(parseWorkBranch("worktree-bugfix+session-restore")).toEqual({ type: "bugfix", slug: "session-restore" });
+    expect(parseWorkBranch("worktree-chore+repo-bootstrap")).toEqual({ type: "chore", slug: "repo-bootstrap" });
+  });
+
+  it("flags vague slugs as invalid rather than valid (both branch forms)", () => {
+    expect(parseWorkBranch("feature/fix")?.invalid).toBeTruthy();
+    expect(parseWorkBranch("worktree-feature+fix")?.invalid).toBeTruthy();
   });
 
   it("rejects malformed branch names", () => {
@@ -46,6 +55,8 @@ describe("parseWorkBranch", () => {
     expect(parseWorkBranch("feature/Main-Layout")).toBeNull();
     expect(parseWorkBranch("feature/")).toBeNull();
     expect(parseWorkBranch("release/v1")).toBeNull();
+    expect(parseWorkBranch("worktree-release+v1")).toBeNull();
+    expect(parseWorkBranch("worktree-feature+")).toBeNull();
   });
 });
 

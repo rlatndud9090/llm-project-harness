@@ -34,12 +34,22 @@ raw 골격이 생기면 `$prd-helper`로 PRD 작성을 잇는다.
    - **ClaudeCode**: `EnterWorktree`(이름 `<type>/<slug>`). 기본 `worktree.baseRef=fresh`면
      origin/<기본 브랜치>에서 분기한다(설정이 `head`면 origin/main 기준이 되도록 조정).
    - **Codex**: `git worktree add -b <type>/<slug> <path> origin/main` 후 그 경로로 이동.
-3. 그 워크트리 안에서 위 `harness:kickoff`을 실행한다. 이미 `<type>/<slug>` 위라 스크립트가
-   브랜치를 건드리지 않고 골격만 만든다.
+3. 그 워크트리 안에서 위 `harness:kickoff`을 실행한다. 이미 이 유닛의 작업 브랜치 위라
+   스크립트가 브랜치를 건드리지 않고 골격만 만든다.
+
+**브랜치명은 손대지 않는다.** ClaudeCode `EnterWorktree`는 이름 `<type>/<slug>`를 받아 브랜치를
+`worktree-<type>+<slug>`로 만든다(`worktree-` 프리픽스 + `/`→`+`). 이 형태를 canonical로 되돌리는
+리네이밍을 하지 않는다 — 이름이 이미 유형·의미를 담고, 리네이밍은 불필요 churn이자 나중에
+`ExitWorktree` 정리를 깬다. 하네스가 이 형태를 그대로 인정한다(`parseWorkBranch`가 파싱해 raw
+`docs/raw/<type>/<slug>`로 정합; branch↔raw 게이트 통과).
+
+**EnterWorktree가 실패하면 그 결과·원인을 사용자에게 그대로 알리고 멈춘다.** `git worktree add`나
+main-wt 그 자리 `--checkout` 같은 우회로 워크트리/브랜치를 만들지 않는다 — 우회 생성물은
+`ExitWorktree`가 추적하지 못해 merge-and-clean이 깔끔히 못 빠져나온다. `--checkout`은 사용자가
+명시적으로 main-wt에서 작업하겠다고 할 때만 쓰는 탈출구이지 실패 폴백이 아니다.
 
 격리 없이 base(main)에서 부르면 kickoff은 전환하지 않고 "워크트리로 격리하라" 힌트만 낸다.
-정말 현재 위치(main-wt)에 브랜치를 파야 할 때만 `--checkout`을 쓴다. 공용 기준은
-`${CLAUDE_PLUGIN_ROOT}/harness/protocols/kickoff.md`의 "브랜치 처리".
+공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/kickoff.md`의 "브랜치 처리".
 
 ## GitHub 이슈로 시작 (이슈 번호 인자)
 
@@ -76,8 +86,9 @@ next-feature 단계에서 붙였던 `next-feature` 제목을 확정된 작업 �
 
 - **작업명 = 브랜치 slug의 하이픈을 공백으로 바꾼 표현**(`feature/do-next-thing` →
   `do next thing`). 아래 호출에 slug을 넣으면 공용 헬퍼가 변환한다.
-- slug은 kickoff 명령의 `--slug` 값 또는 현재 브랜치 `{type}/{slug}`의 `{slug}` 부분이다
-  (kickoff 출력의 `- unit: {type}/{slug}` 줄에서도 확인할 수 있다).
+- slug은 kickoff 명령의 `--slug` 값, 또는 **kickoff 출력의 `- unit: {type}/{slug}` 줄**에서
+  가져온다(이 줄은 브랜치가 워크트리 형태 `worktree-{type}+{slug}`여도 언제나 canonical
+  slug을 준다). 브랜치 문자열에서 직접 뽑을 땐 `worktree-` 프리픽스와 `+` 치환에 유의한다.
 - 제목 세팅·가드는 공용 헬퍼가 담당한다. agents 세션이 아니면 조용히 no-op이고 절대
   실패하지 않으므로 세션 종류를 신경 쓰지 말고 항상 호출한다.
 

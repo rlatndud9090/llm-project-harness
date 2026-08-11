@@ -106,15 +106,33 @@ Codex 자동 리뷰를 **격리된 리뷰어 에이전트의 자체 리뷰**로 
 
 ---
 
+## 탐지 렌즈의 단일 출처 = code-review-guideline (Codex 수준을 겨냥)
+
+self-review가 Codex 리뷰보다 정확도·깊이·퀄리티가 떨어지는 근본 원인은 "무엇을 잡아야 하는지"의
+체계가 없어서다. 그래서 이 루프의 finder 렌즈는 `${CLAUDE_PLUGIN_ROOT}/harness/guides/code-review-guideline.md`
+(두 소비 프로젝트 자동 리뷰 391건에서 도출한 안티패턴 탐지기)를 **단일 출처**로 삼는다. 그 문서
+부록 A가 렌즈↔섹션을 잇는다:
+
+| 렌즈 | 가이드 섹션 |
+| --- | --- |
+| correctness-core | §4 상태기계·오류분류, §5 영속·동시성, §6 비동기·타이머 |
+| contract-data | §3 경계 입력·서버, §9 데이터 파이프라인, §2 단일출처 |
+| regression-consistency | §1 스펙·문서·라이선스 동기화, §2 파생, §10 게이트·릴리스 |
+| ui-i18n | §7 레이아웃·뷰포트, §8 접근성·포커스·로케일 |
+| tests | §10(게이트가 무엇을 검증 안 하는지) |
+
+**렌즈 focus에는 담당 표면에 해당하는 §섹션의 탐지 불릿을 발췌 주입한다**(가이드 로딩 규칙대로 전체
+로드 금지 — 이번 diff 표면 섹션만). finder는 그 "이런 diff를 보면 → 이 결함을 의심하라" 신호로 훑는다.
+
 ## Workflow 스크립트 템플릿
 
-`scripts/self-review.template.js`를 세션 tmp로 복사하고 **LENSES만 이번 diff 표면에 맞게** 바꾼 뒤
-`Workflow({scriptPath})`로 라운드마다 재실행한다. 스크립트는 `{ blockers, cosmetics, round_clean }`를 낸다.
-템플릿 전문·주석은 [scripts/self-review.template.js](scripts/self-review.template.js) 참고.
+`scripts/self-review.template.js`를 세션 tmp로 복사하고 **LENSES를 이번 diff 표면에 맞게**(위 렌즈↔섹션
+매핑대로 해당 §섹션 탐지 불릿을 focus에 발췌 주입) 바꾼 뒤 `Workflow({scriptPath})`로 라운드마다
+재실행한다. 스크립트는 `{ blockers, cosmetics, round_clean }`를 낸다. 템플릿 전문·주석은
+[scripts/self-review.template.js](scripts/self-review.template.js) 참고.
 
-렌즈 예시(프로젝트·diff에 맞춰 3~5개): `correctness-core`(핵심 로직·엣지·fail-soft) · `contract-data`(계약·
-스키마·집계·저장) · `regression-consistency`(전 경로 정합·다른 모듈 무영향·잔재 없음) · `ui-i18n`(표시·키
-패리티·접근성) · `tests`(수용기준 커버·동어반복/skip 없음·위험경로 가드). 순수 표시 PR이면 correctness+ui+tests만.
+렌즈는 diff에 맞춰 3~5개만 남긴다(안 건드린 영역 렌즈 금지). 순수 표시 PR이면 correctness-core+ui-i18n+tests만,
+순수 백엔드면 contract-data+correctness-core+tests만.
 
 ---
 

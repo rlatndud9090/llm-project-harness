@@ -24,6 +24,11 @@ const SCOPE = `리뷰 대상은 이 브랜치의 ${BASE} 대비 diff 뿐이다(�
 먼저 \`git -C ${REPO} diff ${BASE}...HEAD -- <담당 파일들>\`로 정확한 변경을 읽고, 필요하면 변경 파일 전문을 Read로 확인해라.
 이 PR이 도입한 diff의 결함·누락·불일치만 보고한다(diff 밖 기존 코드 트집 금지). 스타일 nitpick 금지.
 
+탐지 렌즈의 단일 출처는 \`\${CLAUDE_PLUGIN_ROOT}/harness/guides/code-review-guideline.md\`다
+(두 소비 프로젝트의 자동 리뷰 391건에서 도출한 안티패턴 탐지기; 부록 A가 렌즈↔섹션을 잇는다).
+아래 lens.focus에 담당 표면에 해당하는 §섹션 탐지 불릿이 발췌 주입돼 있으니, 그 "이런 diff를
+보면 → 이 결함을 의심·확인하라" 신호로 diff를 훑어라. Codex 리뷰 수준의 recall/깊이가 목표다.
+
 각 지적에 반드시 severity를 매긴다:
 - **BLOCKER** = 라이브 운영·사용자·데이터에 실제 영향: correctness/logic 버그, 엣지 NaN/Infinity/크래시, 부동소수
   누출·0 뭉갬, contract/스키마 파손, regression, security, data integrity, user-visible 오작동(잘못된 수치·깨진
@@ -71,23 +76,48 @@ const VERDICT_SCHEMA = {
 }
 
 // ── CUSTOMIZE 2: diff 표면에 맞춘 렌즈(3~5개). 안 건드린 영역엔 렌즈 금지 ────
+// 렌즈 key는 code-review-guideline.md 부록 A와 정렬한다. 각 focus 끝에 담당 표면에 해당하는
+// §섹션 탐지 불릿을 발췌 주입한다(전체 로드 금지 — 로딩 규칙은 가이드 상단). 매핑(부록 A):
+//   correctness-core → §4,§5,§6 · contract-data → §3,§9,§2 · regression-consistency → §1,§2,§10
+//   · ui-i18n → §7,§8 · tests → §10(게이트가 무엇을 검증 안 하는지)
 const LENSES = [
   {
     key: 'correctness-core',
     files: 'FILL/core/logic/files.ts',
-    focus: `정확성·엣지·fail-soft 렌즈. 산식·경계값·NaN/Infinity/0 나눗셈·부동소수 표기 누출·스펙 일치·예외 흡수.`,
+    focus: `정확성·엣지·fail-soft 렌즈(가이드 §4 상태기계·오류분류, §5 영속·동시성, §6 비동기·타이머).
+산식·경계값·NaN/Infinity/0 나눗셈·부동소수 표기 누출·스펙 일치·예외 흡수·종결 상태 freeze·복원 왕복·경합(read-check-write).
+[여기에 §4/§5/§6에서 이 diff 표면에 맞는 탐지 불릿을 발췌 주입]`,
   },
   {
-    key: 'contract-regression',
-    files: 'FILL/contract/schema/adjacent.ts',
-    focus: `계약·정합·회귀 렌즈. API/스키마/버전 분리·전 경로 지표 일관·다른 모듈 무영향·잔재(옛 로직/import) 없음.`,
+    key: 'contract-data',
+    files: 'FILL/contract/schema/api/*.ts',
+    focus: `계약·경계·생성물 렌즈(가이드 §3 경계 입력·서버, §9 데이터 파이프라인, §2 단일출처).
+공개 입력 bounded 검증·서버 재검증·소유자/CSRF·커서/이스케이프, 캐시 키 버전·파생 속성 순회 범위·단일출처 드리프트.
+[여기에 §3/§9/§2에서 이 diff 표면에 맞는 탐지 불릿을 발췌 주입]`,
   },
   {
-    key: 'ui-i18n-tests',
-    files: 'FILL/ui/i18n/*.ts src/**/*.test.*',
-    focus: `표시·i18n·테스트 렌즈. 문구·키 패리티(로케일 누락)·접근성·레이아웃, 수용기준 커버·동어반복/skip/only 없음·위험경로 가드.`,
+    key: 'regression-consistency',
+    files: 'FILL/adjacent/docs/*.ts',
+    focus: `드리프트·회귀·전환 렌즈(가이드 §1 스펙·문서·라이선스 동기화, §2 파생, §10 게이트·릴리스).
+동작 변경↔문서/문구/라이선스 동기화·심볼 삭제 잔존 참조·게이트가 실불변식 검증·다른 모듈 무영향·잔재 없음.
+[여기에 §1/§2/§10에서 이 diff 표면에 맞는 탐지 불릿을 발췌 주입]`,
+  },
+  {
+    key: 'ui-i18n',
+    files: 'FILL/ui/i18n/*.tsx',
+    focus: `표시·접근·로케일 렌즈(가이드 §7 레이아웃·뷰포트, §8 접근성·포커스·로케일).
+극단 뷰포트/기하 측정·visualViewport·포커스 이동·IME·전 로케일 전수 적용·CLS.
+[여기에 §7/§8에서 이 diff 표면에 맞는 탐지 불릿을 발췌 주입]`,
+  },
+  {
+    key: 'tests',
+    files: 'src/**/*.test.*',
+    focus: `테스트·게이트 렌즈(가이드 §10 "게이트가 무엇을 검증 안 하는지").
+수용기준 커버·동어반복/skip/only 없음·위험경로 가드·대리지표만 보는 게이트·brittle invariant.`,
   },
 ]
+// 순수 표시 PR이면 correctness-core+ui-i18n+tests만, 순수 백엔드면 contract-data+correctness-core+tests만 등,
+// diff 표면에 맞게 3~5개만 남긴다(안 건드린 영역 렌즈 금지 — 토큰 효율).
 // ──────────────────────────────────────────────────────────────────────────
 
 phase('Find')

@@ -3,7 +3,7 @@
 This repository builds and maintains a reusable harness distributed as a
 **Claude Code plugin**. It is installed once with
 `/plugin marketplace add rlatndud9090/llm-project-harness` and adopted per
-product repository by running `/harness-init`, which drops a `.harness.json`
+product repository by running `/lph-init`, which drops a `.harness.json`
 flag and wires the plugin's enablement. The engine and all
 skills/commands/agents live inside the plugin; a consumer repository never
 copies them.
@@ -19,7 +19,7 @@ This repository is the **harness provider**, not a product project.
 
 - It owns shared protocols, role prompts, adapter surfaces, raw/wiki templates,
   validation scripts, and harness adoption automation (`init.mjs`, run via
-  `/harness-init`).
+  `/lph-init`).
 - **Editing this repository means authoring the harness, not running it.** Do
   the work directly on `main` and push to `main`. Do not create `feature/*`,
   `bugfix/*`, or `chore/*` branches, and do not open a pull request, for a
@@ -101,7 +101,7 @@ provides its commands, agents, and skills globally once it is enabled.
   never collide with a project's own files.
 - A project overrides any harness surface by defining a same-named local skill
   or command in its own `.claude/` — the local definition wins.
-- `/harness-init` is retrofit-safe: it never clobbers existing project files
+- `/lph-init` is retrofit-safe: it never clobbers existing project files
   (`AGENTS.md`, `docs/wiki/index.md`, and the like are created only when
   absent) and merges `.claude/settings.json` additively (only the marketplace
   and `enabledPlugins` keys, preserving everything else).

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { findHarnessRoot, parseArgs, pathExists, readText, toPosix } from "./lib.mjs";
 
-// `/harness-init` 엔진. 소비 프로젝트 루트(REPO_ROOT = process.cwd())에서 실행해 그
+// `/lph-init` 엔진. 소비 프로젝트 루트(REPO_ROOT = process.cwd())에서 실행해 그
 // 저장소를 LLM Project Harness "플러그인"에 적용하거나(신규), 옛 devDependency/submodule
 // 설치에서 이관한다(retrofit). 하네스 엔진(scripts/harness/*.mjs)은 오직 플러그인
 // (이 저장소) 안에만 있고, 소비 저장소에는 얇은 배선만 남는다:
@@ -303,7 +303,7 @@ function ensureGitHooks() {
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
   } catch {
-    warnings.push("git 저장소가 아니라 훅 설치를 건너뜁니다(--no-git-hooks와 동일). git init 후 /harness-init을 다시 실행하세요.");
+    warnings.push("git 저장소가 아니라 훅 설치를 건너뜁니다(--no-git-hooks와 동일). git init 후 /lph-init을 다시 실행하세요.");
     return;
   }
   const absoluteHooksDir = path.resolve(projectRoot, hooksDir);
@@ -321,7 +321,7 @@ function installHook(hooksDir, name, command) {
   const rel = relative(hookPath);
   const body = `#!/bin/sh
 # >>> ${marker} >>>
-# Installed by /harness-init (scripts/harness/init.mjs).
+# Installed by /lph-init (scripts/harness/init.mjs).
 # Remove this file to opt out.
 ${command}
 # <<< ${marker} <<<

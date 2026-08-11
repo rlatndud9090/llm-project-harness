@@ -14,6 +14,7 @@ import {
   localBranchExists,
   normalizeIssueRef,
   parseArgs,
+  parseWorkBranch,
   pathExists,
   rawUnitPath,
   readText,
@@ -94,10 +95,16 @@ function resolveBranch() {
   }
 
   const current = getCurrentBranch();
+  const currentParsed = parseWorkBranch(current);
 
   // 이미 이 유닛의 작업 브랜치 위 → branch-first, 그대로 둔다. 에이전트가 origin/main
-  // 기준 워크트리를 먼저 파고 그 안에서 kickoff을 부른 정상 경로가 여기로 온다.
-  if (current === branchName) return `이미 ${branchName} 위 (그대로 둠)`;
+  // 기준 워크트리를 먼저 파고 그 안에서 kickoff을 부른 정상 경로가 여기로 온다. canonical
+  // `<type>/<slug>`든 EnterWorktree가 만든 `worktree-<type>+<slug>`든 모두 인정하며, 워크트리
+  // 브랜치를 canonical로 리네이밍하지 않는다(이름이 이미 type+의미를 담고, 리네이밍은 churn이며
+  // ExitWorktree 정리를 깬다). 판정은 브랜치 문자열 일치가 아니라 파싱한 type/slug 일치로 한다.
+  if (currentParsed && currentParsed.type === type && currentParsed.slug === slug) {
+    return `이미 ${current} 위 (그대로 둠)`;
+  }
 
   // 목표 브랜치가 이미 있으면 `checkout -b`는 실패한다. 자동 전환 대신 힌트만.
   if (localBranchExists(branchName)) {

@@ -78,8 +78,8 @@ diff 라벨이 아니라 raw PRD/ADR/notes와 연결되는 결정 기록이다.
 ```
 
 - 소비 프로젝트는 플러그인을 마켓플레이스에서 갱신한 뒤 이 항목의 소비자 조치를 반영하고,
-  `/harness-init`을 다시 실행해 훅·`.harness.json` version을 맞춘다(별도 `.harness-sync` 원장은 없다).
-- `/harness-init`이 설치한 pre-commit 훅의 `verify-changelog`가 공용 표면 변경 커밋에
+  `/lph-init`을 다시 실행해 훅·`.harness.json` version을 맞춘다(별도 `.harness-sync` 원장은 없다).
+- `/lph-init`이 설치한 pre-commit 훅의 `verify-changelog`가 공용 표면 변경 커밋에
   CHANGELOG 항목을 강제한다(소비 프로젝트에서는 no-op).
 - 소비 프로젝트 자신의 제품 커밋은 이 규칙 대상이 아니다(하네스 CHANGELOG는 하네스가 쓴다).
 
@@ -138,7 +138,7 @@ git commit --no-verify
 깨지기 쉬우므로 사용하지 않는다. 단, 메시지에 제어문자가 섞일 수 있으면(리뷰 코멘트
 인용 등) HEREDOC 대신 메시지를 파일로 쓰고 `git commit -F <file>`로 전달한다 — raw
 NUL 등은 `InputValidationError`를 일으키며, 그 파일 자체도 raw 제어문자 스캔을 한다
-(`guides/implementation-guidelines.md` §10 문서 위생 참고).
+(`guides/code-review-guideline.md` §10 문서 위생 참고).
 
 ```sh
 git commit -m "$(cat <<'EOF'
@@ -192,7 +192,7 @@ EOF
 ## 하네스 정비 ride-along (브랜치 규율 예외)
 
 작업 단위는 원칙적으로 자기 브랜치에서 커밋한다(branch-per-unit). **딱 하나의 예외**로,
-**하네스 플러그인 갱신과 그에 부수되는 정합화**(`/harness-init` 재실행이 갱신하는 `.harness.json`
+**하네스 플러그인 갱신과 그에 부수되는 정합화**(`/lph-init` 재실행이 갱신하는 `.harness.json`
 version·`.claude/settings.json`·`.github/workflows/harness.yml`, 위키 규칙-잔재 제거, frontmatter
 마이그레이션 등)는 **전용 브랜치나 워크트리를 새로 파지 않고 지금 작업 중인 아무 브랜치에 chore
 커밋 하나로 태워** 반영해도 된다.

@@ -101,15 +101,38 @@ state 원장에만 남는다). URL을 주면 URL을, 번호를 주면 `#<번호>
 
 1. `git fetch origin` — origin/main을 최신으로 맞춘다.
 2. **origin/main을 베이스로 전용 워크트리를 만들고 그 안으로 들어간다.**
-   - **ClaudeCode**: `EnterWorktree`(이름 = `<type>/<slug>`). 워크트리는 기본
-     `worktree.baseRef=fresh`로 origin/<기본 브랜치>에서 분기한다.
+   - **ClaudeCode**: `EnterWorktree`(이름 = `<type>/<slug>`, 예 `feature/data-contract`).
+     워크트리는 기본 `worktree.baseRef=fresh`로 origin/<기본 브랜치>에서 분기한다.
    - **Codex**: `git worktree add -b <type>/<slug> <path> origin/main` 후 그 경로로 이동.
-3. 격리된 워크트리 안에서 `harness:kickoff`을 실행한다. 이미 `<type>/<slug>` 위이므로
+3. 격리된 워크트리 안에서 `harness:kickoff`을 실행한다(워크트리 브랜치명은 아래
+   "브랜치명은 손대지 않는다"대로 그대로 둔다). 이미 이 유닛의 작업 브랜치 위이므로
    스크립트는 브랜치를 건드리지 않고(branch-first) 골격만 만든다.
+
+#### 브랜치명은 손대지 않는다 (EnterWorktree 형태 그대로)
+
+ClaudeCode `EnterWorktree`는 이름 `<type>/<slug>`를 받아 **브랜치를 `worktree-<type>+<slug>`로
+만든다**(`worktree-` 프리픽스 + `/`→`+`; 예: `feature/data-contract` →
+`worktree-feature+data-contract`). 이 형태를 canonical `<type>/<slug>`로 **되돌리는 리네이밍을
+하지 않는다** — 이름이 이미 유형(feature/bugfix/chore)과 작업 의미를 담고 있어 프리픽스
+제거·`+`→`/` 치환은 불필요한 churn이고, 리네이밍은 merge-and-clean의 `ExitWorktree` 정리를
+깨뜨린다. 하네스는 이 워크트리 형태를 그대로 인정한다: `parseWorkBranch`가
+`worktree-<type>+<slug>`도 파싱해 raw 유닛 `docs/raw/<type>/<slug>`로 정합시키므로 branch↔raw
+게이트와 `harness:check`가 그대로 통과한다. raw 경로·커밋 트레일러·wiki 링크는 언제나
+canonical `<type>/<slug>`을 쓰고, **브랜치명만** 워크트리 형태로 남는다.
+
+#### EnterWorktree가 실패하면 — 보고하고 멈춘다 (우회 생성 금지)
+
+워크트리 진입에 실패하면(이미 워크트리 세션 안이라 새로 못 만듦·이름 충돌·훅 미설정·비-git
+등) **그 실패 결과와 원인을 사용자에게 그대로 전달하고 멈춘다.** `git worktree add` 수동 생성이나
+main-wt 그 자리 `--checkout` 같은 **우회로 워크트리/브랜치를 만들지 않는다** — 우회로 만든
+워크트리는 `EnterWorktree`가 추적하지 않아 나중에 merge-and-clean이 `ExitWorktree`로 깔끔히
+빠져나올 수 없다. 사용자가 원인을 보고 직접 조치(예: 기존 워크트리 종료 후 재시도)하게 한다.
+`--checkout`은 사용자가 **명시적으로** 주 워킹트리에서 작업하겠다고 할 때만 쓰는 탈출구이지,
+EnterWorktree 실패의 자동 폴백이 아니다.
 
 | 상황 | 동작 |
 | --- | --- |
-| 격리된 워크트리에서 `<type>/<slug>` 위 (정상 경로) | 브랜치 그대로 두고 골격 생성 (branch-first) |
+| 격리된 워크트리에서 이 유닛의 작업 브랜치 위 — `worktree-<type>+<slug>`(EnterWorktree 형태) 또는 canonical `<type>/<slug>` (정상 경로) | 브랜치 그대로 두고 골격 생성 (branch-first, 리네이밍 없음) |
 | `main`/`master` 등 base 위에서 격리 없이 실행 | 전환하지 않고 "워크트리로 격리하라" 힌트만 |
 | 목표 브랜치가 이미 존재 | 전환하지 않고 힌트만 (그 브랜치의 워크트리로 진입) |
 | 다른 브랜치 / detached HEAD / 비-git | 브랜치를 건드리지 않고 힌트만 |

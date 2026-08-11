@@ -15,7 +15,7 @@ description: "PRD/ADR 기반 기능 구현, 재작업, 부분 수정을 진행�
 3. 디스패치할 role 문서: `${CLAUDE_PLUGIN_ROOT}/harness/roles/`.
 4. `AGENTS.md`·`docs/wiki/index.md`는 이 컨텍스트에 아직 로드돼 있지 않을 때만
    (`session-start`에서 이미 읽었으면 재판독하지 않는다).
-5. 작업 표면에 해당하는 `${CLAUDE_PLUGIN_ROOT}/harness/guides/implementation-guidelines.md` 섹션 —
+5. 작업 표면에 해당하는 `${CLAUDE_PLUGIN_ROOT}/harness/guides/code-review-guideline.md` 섹션 —
    §0 코어 원칙 + 표면 인덱스로 선택해 구현 브리핑에 발췌한다(전체 로드 금지).
 
 ## 사전 승인 게이트 (구현 전 하드 차단)
@@ -89,7 +89,7 @@ ClaudeCode에서는 role 체인을 자기 도구로 실행한다(공용 절차�
 모드에서도, 값만 바꾸는 편집·대소문자 변형 파일명 포함). 사전 승인된 문서의 본문 편집(빌드 중
 개정)은 막지 않는다. 단 이건 **편의 트립와이어**다 — Bash 직접 쓰기(`sed`/redirect), 파일
 rename, MCP/원격 쓰기는 PreToolUse 매처가 못 잡는다. 우회 불가능한 최종 강제는 CI에서
-도는 `harness:check`다(harness-init의 "CI 강제" 참고).
+도는 `harness:check`다(lph-init의 "CI 강제" 참고).
 
 ### 자율 레인의 제약 (중요)
 
