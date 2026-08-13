@@ -5,11 +5,11 @@
     "url": "https://github.com/rlatndud9090"
   },
   "description": "Single-plugin marketplace for the LLM Project Harness. The plugin lives at this repository root.",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "plugins": [
     {
       "name": "llm-project-harness",
-      "version": "2.3.0",
+      "version": "2.3.1",
       "source": ".",
       "description": "Shared PRD/ADR, raw/wiki, approval-gate, and commit workflow for product repositories. Run /lph-init inside a repo to adopt it.",
       "category": "workflow",
