@@ -26,6 +26,26 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-08-14 v2.3.2 design-mockup-cp-edit-no-scaffold-reemit
+
+**변경 (디자인 시안 HTML은 cp 복사 후 목업만 Edit — 스캐폴딩 재출력 제거)**
+
+adr-helper 디자인 결정 레인이 비교 HTML(`design-options.html`)을 만들 때, 에이전트가 파일 전체를
+`Write`로 다시 써 CSS·JS·패널 등 형식이 고정된 ~9KB 스캐폴딩을 매번 **출력 토큰으로 재생성**하던
+낭비를 없앴다. 이제 템플릿을 `cp`로 목적지에 그대로 복사한 뒤 **채우기 구역만 `Edit`**한다
+(`{제목}`·`data-label`·라디오 `value`·`.name`·`.mockup`). 목업(진짜 작업물)만 출력 토큰을 쓰므로
+이 단계 출력 토큰이 대략 5~8배 줄어든다. 템플릿 파일 자체(스캐폴딩·계약)는 그대로다.
+
+- **프로토콜/역할 강제.** `adr-helper.md` Phase 3.5 step 2와 `designer.md`(Constraints·
+  Investigation_Protocol)를 "cp 복사 → 목업 구역만 Edit, 스캐폴딩 Write 재출력 금지"로 재작성했다.
+- **템플릿 주석 각인 + stale 교정.** `design-options.html` 상단·fill-zone 주석에 cp+Edit 규약을
+  명시하고, 실제 마크업과 어긋나던 주석(`value는 opt-a/opt-b 유지` → `value·data-label·.name을
+  대안 이름으로 함께 일치`)을 바로잡았다.
+- **어댑터 drift 정리.** `agents/designer.md`가 아직 "ASCII 와이어프레임으로 비교"라던 것을 HTML
+  비교 파일(cp+Edit) 우선으로 맞췄다(ASCII는 순수 CLI fallback).
+
+**소비자 조치: 없음** (마켓플레이스 갱신으로 자동 반영 — 배선/산출물 조치 없음).
+
 ## 2026-08-13 v2.3.1 markdown-link-for-local-paths
 
 **변경 (사용자에게 로컬 경로·링크를 마크다운 링크+절대경로로 제시)**

@@ -8,8 +8,10 @@
   하네스 design-options 템플릿 (adr-helper 디자인 결정 레인).
   - Claude 아티팩트가 아니다. 이 파일을 docs/raw/<type>/<slug>/design-options.html로
     떨구고, 사용자가 브라우저에서 직접 연다(자기완결: 외부 CSS/JS/폰트/이미지 참조 없음).
-  - 에이전트가 채우는 곳은 <section class="option"> 카드 안의 .mockup 영역과
-    data-label(대안 이름)뿐이다. 카드를 복제/삭제해 대안 수(2개 이상)를 맞춘다.
+  - 이 파일을 그대로 cp로 목적지에 복사한 뒤, 채우기 구역만 Edit한다. 파일 전체를 Write로
+    다시 쓰지 않는다 — 고정된 CSS/JS/패널 스캐폴딩 재출력은 순수 출력 토큰 낭비다.
+  - 에이전트가 채우는 곳은 <section class="option"> 카드 안의 .mockup 영역과 data-label·라디오
+    value·.name(대안 이름으로 함께 일치)뿐이다. 카드를 복제/삭제해 대안 수(2개 이상)를 맞춘다.
   - 사용자는 대안을 나란히 비교 → 베이스 라디오 선택 → 세부 수정 요구사항 작성 →
     "요약 생성" → "복사"해서 에이전트에게 붙여넣는다(정적 파일이라 서버로 전송 불가 →
     붙여넣기로 루프를 닫는다). 에이전트는 그 요약을 ADR 선택지/결정/선택 근거로 흡수한다.
@@ -80,8 +82,9 @@
   </div>
 </header>
 
-<!-- ▼▼▼ 에이전트가 채우는 영역: 대안 카드(최소 2개). 카드를 복제/삭제해 개수를 맞추고,
-     data-label과 .mockup 안을 이번 유닛의 실제 화면 배치로 채운다. value는 opt-a/opt-b/... 유지. ▼▼▼ -->
+<!-- ▼▼▼ 에이전트가 채우는 영역: 대안 카드(최소 2개). cp한 복사본에서 이 구역만 Edit한다.
+     카드를 복제/삭제해 개수를 맞추고, data-label·라디오 value·.name·.mockup을 이번 유닛의
+     실제 화면 배치로 채운다(value·data-label·.name은 대안 이름으로 함께 일치). ▼▼▼ -->
 <div class="grid" id="grid">
 
   <section class="option" data-label="대안 A — {A 이름}">

@@ -29,7 +29,7 @@
   <Constraints>
     - 모든 프로젝트 문서는 한국어로 작성한다.
     - 사용자 승인 전 PRD를 `approved`, ADR을 `accepted`로 바꾸지 않는다(proposed/review 유지).
-    - 기본 산출물은 **비교용 HTML 파일**이다: `harness/templates/design/design-options.html`를 베이스로 `docs/raw/<type>/<slug>/design-options.html`에 떨군다(자기완결·외부 참조 없음). **Claude 아티팩트를 쓰지 않는다.** 사용자가 브라우저에서 열어 베이스 선택·수정요청을 요약해 붙여넣으면 받는다. ASCII 와이어프레임은 HTML을 열 브라우저가 전혀 없는 순수 CLI 환경의 degenerate fallback이다.
+    - 기본 산출물은 **비교용 HTML 파일**이다: `harness/templates/design/design-options.html`를 **`cp`로 목적지에 그대로 복사한 뒤 채우기 구역(`.mockup`·`data-label`·라디오 `value`·`.name`·`{제목}`)만 `Edit`으로 채운다** — CSS·JS·패널 같은 스캐폴딩을 `Write`로 다시 출력하지 않는다(형식이 고정된 보일러플레이트 재생성은 순수 출력 토큰 낭비다). 결과는 `docs/raw/<type>/<slug>/design-options.html`에 떨군다(자기완결·외부 참조 없음). **Claude 아티팩트를 쓰지 않는다.** 사용자가 브라우저에서 열어 베이스 선택·수정요청을 요약해 붙여넣으면 받는다. ASCII 와이어프레임은 HTML을 열 브라우저가 전혀 없는 순수 CLI 환경의 degenerate fallback이다.
     - hi-fi 재확인(목업 렌더 → 스크린샷)은 브라우저 도구가 있을 때만 쓰는 optional 가속기다. 쓸 때는 **토큰 효율이 가장 좋은 인터페이스를 최우선**한다 — 부분 스냅샷·스크린샷만 되받는 CLI 드라이버(예: Playwright CLI)를 기본값으로, 전체 접근성 스냅샷 MCP는 CLI로 안 될 때만 쓴다.
     - 미적 방향·타이포·"템플릿 같지 않은" 판단은 `frontend-design` 스킬이 있으면 참조하되, 없어도 진행한다.
     - 새 UI 라이브러리/의존성은 ADR·사용자 승인 없이 도입하지 않는다.
@@ -41,7 +41,7 @@
     2. 이 유닛이 UI-significant이고 배치가 실제 다투는 결정인지 확인한다(아니면 build-first로 반려).
     3. 기존 화면/컴포넌트 관례와 접근성 관례를 확인한다.
     4. controls, status, input, result의 정보 우선순위를 정한다.
-    5. 배치 대안을 최소 2개 설계하고, design-options 템플릿으로 `docs/raw/<type>/<slug>/design-options.html` 비교 파일을 떨군다(각 대안 목업을 채운다). Claude 아티팩트 금지.
+    5. 배치 대안을 최소 2개 설계하고, design-options 템플릿을 **`cp`로 목적지에 복사한 뒤 목업 구역만 `Edit`으로 채워** `docs/raw/<type>/<slug>/design-options.html` 비교 파일을 만든다(스캐폴딩 재출력 금지). Claude 아티팩트 금지.
     6. 사용자에게 파일 경로를 **마크다운 링크로**(raw 경로가 아니라 `[디자인 비교 화면](절대경로)` 형식, 절대경로) 알려 열게 하고, (가속기 있으면) 목업을 렌더해 스크린샷으로 재확인한다.
     7. 사용자가 HTML에서 베이스 선택·수정요청을 "요약 생성→복사"로 붙여넣으면 그 선택을 받는다.
     8. 채택안·기각 사유·근거를 ADR `## 선택지`/`## 결정`/`## 선택 근거`에 `proposed`로 남긴다.
