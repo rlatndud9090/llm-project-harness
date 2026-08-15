@@ -33,7 +33,11 @@ const verbose = process.env.HARNESS_GATE_VERBOSE === "1" || process.argv.include
 
 const maxBuffer = Number(process.env.HARNESS_GATE_MAX_BUFFER) || 64 * 1024 * 1024;
 
-const steps = ["harness:check", "lint", "build", "test:run"];
+// docs-only PR에서는 action이 `--check-only`로 불러 harness:check만 돌린다 — 코드가
+// 안 바뀐 문서 전용 변경이라 lint/build/test 결과가 달라질 수 없고(이전 PR에서 이미
+// 통과), branch↔raw·승인 원장 정합만 harness:check로 재확인하면 된다. 그 외에는 전체.
+const checkOnly = process.argv.includes("--check-only");
+const steps = checkOnly ? ["harness:check"] : ["harness:check", "lint", "build", "test:run"];
 
 // process.exit()는 pending stdio를 flush하지 않아, 방금 write한 실패 전문 덤프가
 // 잘린 채 종료될 수 있다(Node 공식 문서 경고). exitCode만 세우고 자연 종료한다.

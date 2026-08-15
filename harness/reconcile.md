@@ -28,6 +28,21 @@
 
 ---
 
+## 2.4.0
+
+- (배선) **CI 워크플로를 PR-only로 개편(서버 push 게이트 제거·concurrency 취소·setup-node
+  cache·docs-only 분기).** GitHub Actions 분(minute) 절감이 목적이다. 신규 `/lph-init`은 최신
+  워크플로를 심지만, 이미 플러그인 CI를 가진 소비 레포의 `.github/workflows/harness.yml`은
+  자동으로 안 바뀐다(손수 넣은 job/matrix 보존). `/lph-init --refresh-workflow`로 최신 PR-only
+  워크플로로 교체한다(먼저 `--dry-run`; 기존은 `.bak` 백업). 교체하면 (1) main 직접 push마다 돌던
+  서버 게이트가 사라져 squash-merge 재실행 낭비가 없어지고, (2) 연속 커밋의 무효화된 중간 게이트가
+  취소되며, (3) 문서 전용 PR은 `harness:check`만 돌아 lint/build/test를 건너뛴다. 교체 안 해도
+  게이트는 통과하나 init이 구버전 CI를 감지해 refresh를 넛지한다. main 직접 push의 승인·정합
+  검사는 로컬 pre-commit(`harness:check`)이 계속 막는다(서버 push 게이트를 대신).
+- (없음) 엔진 `action.yml`의 docs-only 분기는 마켓플레이스 갱신만으로 자동 반영된다 —
+  refresh 전이라도 소비 레포의 PR 게이트는 문서 전용 PR을 `harness:check`만으로 처리한다(코드 PR·
+  main push는 종전대로 full). 즉 refresh는 서버 push 게이트 제거·concurrency 취소를 위한 것이다.
+
 ## 2.3.2
 
 - (없음) adr-helper 디자인 결정 레인이 비교 HTML을 만들 때 템플릿을 `cp` 복사 후 목업 구역만

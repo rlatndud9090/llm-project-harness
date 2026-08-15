@@ -164,12 +164,16 @@ function ensureClaudeSettings() {
 }
 
 // ─── CI 게이트 워크플로 ──────────────────────────────────────────────────────
-// push/PR마다 하네스 게이트를 서버사이드에서 돌려 승인 게이트를 우회 불가능하게 만든다.
-// 소비자 checkout + setup-node + 공용 composite action(rlatndud9090/llm-project-harness@main,
-// action.yml)만 호출한다 — 엔진은 그 action이 태그로 fetch하므로 소비자엔 사본이 없다.
+// 소비자 PR마다 하네스 게이트를 서버사이드에서 돌려 승인 게이트를 우회 불가능하게 만든다.
+// main 직접 push는 서버에서 게이트하지 않는다 — 코드 변경은 전부 PR을 거치고(PR 게이트가
+// full로 커버), main 직접 커밋은 로컬 pre-commit(harness:check)이 막으며, squash-merge to
+// main이 이미 통과한 게이트를 재실행하던 CI 낭비를 없앤다. 소비자 워크플로는 얇게 유지하고
+// (checkout + setup-node + 공용 composite action 한 줄), docs-only/code 분기는 엔진(action.yml
+// + ci-scope.mjs)이 감춘다 — 소비자는 재설치 없이 엔진 업데이트만으로 그 로직을 받는다.
 function ensureWorkflow() {
   const workflowPath = path.join(projectRoot, ".github", "workflows", "harness.yml");
   const rel = relative(workflowPath);
+  const refreshWorkflow = Boolean(args["refresh-workflow"]);
 
   // node를 하드코딩(옛 20)하면 소비 프로젝트 런타임보다 낮아 정상 코드를 오탐할 수 있다
   // (예: 신 ICU에서만 되는 Intl.NumberFormat maximumFractionDigits>20을 구 node에서 RangeError).
@@ -179,40 +183,87 @@ function ensureWorkflow() {
     ? "          node-version-file: '.nvmrc'"
     : "          node-version: 'lts/*'";
 
+  // cache:npm은 lockfile이 있어야 setup-node가 캐시 키를 만들 수 있다(없으면 그 스텝이
+  // "Dependencies lock file is not found"로 실패한다). package-lock.json이 있을 때만 켠다.
+  const cacheLine = pathExists(path.join(projectRoot, "package-lock.json")) ? "\n          cache: npm" : "";
+
   const content = `name: harness
 on:
-  push:
-    branches: [main]
   pull_request:
+    # main-타겟 PR만 게이트한다. 코드 변경은 전부 PR을 거쳐 여기서 검증하고, main 직접
+    # push는 로컬 pre-commit(harness:check)이 막는다(서버 push 게이트는 두지 않는다 —
+    # squash-merge to main이 이미 통과한 게이트를 재실행하던 낭비를 없앤다).
+    branches: [main]
+
+# 같은 PR의 이전 실행은 취소한다 — 연속 커밋 시 최신 커밋만 게이트해 무효화된 중간
+# 커밋의 게이트가 끝까지 도는 낭비를 막는다.
+concurrency:
+  group: harness-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
-      # git-history 기반 검사(전이/불변/stage 후퇴)가 HEAD 대비 비교하므로 전체 히스토리가 필요
+      # git-history 검사가 HEAD 대비 비교하고, action이 PR base 대비 변경 스코프를
+      # 판정하므로 전체 히스토리가 필요하다.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-${setupNodeWith}
+${setupNodeWith}${cacheLine}
+      # docs/ 전용 PR이면 action이 harness:check만, 코드 변경이면 full gate를 돌린다.
       - uses: ${MARKETPLACE_REPO}@main
 `;
 
   if (pathExists(workflowPath)) {
     const existing = readText(workflowPath);
-    if (existing.includes(`${MARKETPLACE_REPO}@`)) {
-      operations.push(`kept ${rel} (already plugin CI)`);
+    const isPluginCi = existing.includes(`${MARKETPLACE_REPO}@`);
+    const isOldDevDepCi = existing.includes("harness:gate") || existing.includes(".harness/scripts");
+
+    // --refresh-workflow: 하네스 소유 CI(플러그인 CI 또는 옛 devDep CI)를 최신 템플릿으로
+    // 교체한다(기존은 .bak 백업). 커스텀 워크플로(둘 다 아님)는 명시 opt-in이어도 건드리지
+    // 않는다 — 소비자가 손수 넣은 job/matrix가 날아가지 않게.
+    if (refreshWorkflow && (isPluginCi || isOldDevDepCi)) {
+      // 이미 최신 템플릿과 동일하면 no-op — 재실행이 원본 .bak을 덮어써 최초 백업을
+      // 잃는 것(리뷰 지적)을 막고, 멱등하게 유지한다.
+      if (existing === content) {
+        operations.push(`kept ${rel} (already latest workflow)`);
+        return;
+      }
+      operations.push(`refresh ${rel} (→ latest PR-only workflow; backup ${path.basename(workflowPath)}.bak)`);
+      migrations.push(`refresh ${rel} to latest template (push 트리거 제거·concurrency 취소·cache·docs-only 분기)`);
+      if (!dryRun) {
+        fs.copyFileSync(workflowPath, `${workflowPath}.bak`);
+        fs.writeFileSync(workflowPath, content, "utf8");
+      }
       return;
     }
+
+    if (isPluginCi) {
+      operations.push(`kept ${rel} (already plugin CI)`);
+      // 구버전 하네스 CI(서버 push 게이트가 남아 있거나 concurrency 취소가 없음)는
+      // squash-merge마다 게이트를 재실행하는 등 CI 분을 낭비한다. 재설치가 아니라 형태
+      // 교체가 필요하므로 --refresh-workflow를 넛지한다(자동 교체는 커스텀 보존 위해 안 함).
+      if (!existing.includes("concurrency:") || /\n\s*push:\s*(\n|$)/.test(existing)) {
+        warnings.push(
+          `${rel}이 구버전 하네스 CI입니다(서버 push 게이트 또는 concurrency 취소 없음 → CI 분 낭비). "/lph-init --refresh-workflow"로 최신 PR-only 워크플로로 교체하세요(먼저 --dry-run; 기존은 .bak 백업).`,
+        );
+      }
+      return;
+    }
+
     // 옛 devDependency 모델 워크플로(`npm run harness:gate`/`.harness/scripts` 참조)는
-    // 삭제된 `.harness` 마운트를 가리켜 CI가 깨진다. 하네스 CI로 식별되면 composite
-    // action 버전으로 교체한다(마이그레이션). 하네스로 안 보이는 커스텀 워크플로는 보존.
-    if (existing.includes("harness:gate") || existing.includes(".harness/scripts")) {
+    // 삭제된 `.harness` 마운트를 가리켜 CI가 깨진다. 하네스 CI로 식별되면 최신 composite
+    // action 워크플로로 교체한다(마이그레이션). 하네스로 안 보이는 커스텀 워크플로는 보존.
+    if (isOldDevDepCi) {
       operations.push(`migrate ${rel} (old harness CI → composite action)`);
       migrations.push(`replace old ${rel} (npm run harness:gate → uses: ${MARKETPLACE_REPO})`);
       if (!dryRun) fs.writeFileSync(workflowPath, content, "utf8");
       return;
     }
+
     operations.push(`kept ${rel} (non-harness workflow)`);
     warnings.push(`${rel}이 이미 있고 하네스 CI로 보이지 않습니다. 플러그인 CI가 필요하면 "- uses: ${MARKETPLACE_REPO}@<tag>" 스텝을 직접 추가하세요.`);
     return;

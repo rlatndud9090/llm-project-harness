@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { classifyChangeScope } from "./ci-scope.mjs";
 
 // The harness engine lives ONLY in this repo (the plugin). Tests spawn each engine
 // script straight from here with cwd = a temp consumer, so REPO_ROOT resolves to the
@@ -1049,6 +1050,71 @@ describe("lph-init (plugin bootstrap)", () => {
     });
   });
 
+  it("scaffolds a PR-only workflow (no server push gate) with a concurrency cancel", () => {
+    withProject((projectRoot) => {
+      harnessInit(projectRoot);
+      const wf = read(path.join(projectRoot, ".github", "workflows", "harness.yml"));
+      // PR-scoped to main; no `push:` server gate (a squash-merge to main must not re-run it).
+      expect(wf).toContain("pull_request:");
+      expect(wf).toContain("branches: [main]");
+      expect(wf).not.toContain("push:");
+      // superseded PR runs are cancelled
+      expect(wf).toContain("concurrency:");
+      expect(wf).toContain("cancel-in-progress: true");
+      // still just the thin composite-action call (engine hides docs-only/code branching)
+      expect(wf).toContain("rlatndud9090/llm-project-harness@main");
+    });
+  });
+
+  it("adds setup-node cache:npm only when a package-lock.json exists (no lockfile → no cache key failure)", () => {
+    withProject((projectRoot) => {
+      harnessInit(projectRoot);
+      expect(read(path.join(projectRoot, ".github", "workflows", "harness.yml"))).not.toContain("cache: npm");
+    });
+    withProject((projectRoot) => {
+      writeFile(path.join(projectRoot, "package-lock.json"), '{"name":"x","lockfileVersion":3}\n');
+      harnessInit(projectRoot);
+      expect(read(path.join(projectRoot, ".github", "workflows", "harness.yml"))).toContain("cache: npm");
+    });
+  });
+
+  it("refreshes an outdated plugin CI to the PR-only template on --refresh-workflow, backing up the old one", () => {
+    withProject((projectRoot) => {
+      const wfPath = path.join(projectRoot, ".github", "workflows", "harness.yml");
+      // an outdated plugin CI: has the composite action but a server push gate and no concurrency
+      writeFile(
+        wfPath,
+        "name: harness\non:\n  push:\n    branches: [main]\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: rlatndud9090/llm-project-harness@main\n",
+      );
+      harnessInit(projectRoot, ["--no-git-hooks", "--refresh-workflow"]);
+      const wf = read(wfPath);
+      expect(wf).not.toContain("push:");
+      expect(wf).toContain("concurrency:");
+      // the old workflow is preserved as a backup
+      const backup = read(`${wfPath}.bak`);
+      expect(backup).toContain("push:");
+      // a second refresh is idempotent and must NOT clobber the original backup
+      harnessInit(projectRoot, ["--no-git-hooks", "--refresh-workflow"]);
+      expect(read(`${wfPath}.bak`)).toContain("push:"); // still the ORIGINAL, not the refreshed template
+    });
+  });
+
+  it("keeps an outdated plugin CI untouched without --refresh-workflow and nudges the refresh", () => {
+    withProject((projectRoot) => {
+      const wfPath = path.join(projectRoot, ".github", "workflows", "harness.yml");
+      writeFile(
+        wfPath,
+        "name: harness\non:\n  push:\n    branches: [main]\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: rlatndud9090/llm-project-harness@main\n",
+      );
+      harnessInit(projectRoot, ["--no-git-hooks", "--report", "r.md"]);
+      // untouched (non-destructive): still the old shape, no backup written
+      expect(read(wfPath)).toContain("push:");
+      expect(fs.existsSync(`${wfPath}.bak`)).toBe(false);
+      // and the report nudges the refresh
+      expect(read(path.join(projectRoot, "r.md"))).toContain("--refresh-workflow");
+    });
+  });
+
   it("writes .harness.json without vestigial areas/sections and strips them on a version-bump retrofit (A6)", () => {
     withProject((projectRoot) => {
       harnessInit(projectRoot);
@@ -1087,6 +1153,52 @@ describe("lph-init (plugin bootstrap)", () => {
       expect(report).toContain("Residual references (manual followup)");
       expect(report).toContain("README.md:");
       expect(report).not.toContain("docs/raw/chore/harness-migration/notes.md");
+    });
+  });
+});
+
+describe("ci-scope (CI change-scope classifier)", () => {
+  it("classifies docs-only changes as check-only and anything else as full", () => {
+    expect(classifyChangeScope(["docs/raw/feature/x/prd.md", "docs/wiki/index.md"])).toBe("check-only");
+    expect(classifyChangeScope(["docs"])).toBe("check-only");
+    expect(classifyChangeScope(["docs/raw/x/state.md", "src/app.ts"])).toBe("full");
+    expect(classifyChangeScope(["src/app.ts"])).toBe("full");
+    expect(classifyChangeScope(["README.md"])).toBe("full"); // root docs are conservative → full
+    expect(classifyChangeScope(["docsx/foo.md"])).toBe("full"); // not the docs/ subtree
+    expect(classifyChangeScope([])).toBe("full"); // undecidable → fail-safe
+  });
+
+  it("resolves the mode from a real PR diff and fails safe when it cannot", () => {
+    withGitProject((projectRoot) => {
+      writeFile(path.join(projectRoot, "docs", "raw", "feature", "x", "prd.md"), "base\n");
+      writeFile(path.join(projectRoot, "src", "app.js"), "code\n");
+      commitAll(projectRoot);
+      const base = gitSha(projectRoot, "HEAD");
+
+      // docs-only follow-up → check-only
+      writeFile(path.join(projectRoot, "docs", "raw", "feature", "x", "prd.md"), "base\nmore\n");
+      commitAll(projectRoot);
+      const headDocs = gitSha(projectRoot, "HEAD");
+      expect(runCiScope(projectRoot, { event: "pull_request", base, head: headDocs })).toBe("check-only");
+
+      // code follow-up → full
+      writeFile(path.join(projectRoot, "src", "app.js"), "code\nchanged\n");
+      commitAll(projectRoot);
+      const headCode = gitSha(projectRoot, "HEAD");
+      expect(runCiScope(projectRoot, { event: "pull_request", base, head: headCode })).toBe("full");
+
+      // a Korean-named docs file must still classify check-only (core.quotePath=false keeps
+      // the docs/ prefix intact for non-ASCII wiki section files like docs/wiki/<섹션>.md)
+      writeFile(path.join(projectRoot, "docs", "wiki", "공유기능.md"), "ko\n");
+      commitAll(projectRoot);
+      const headKo = gitSha(projectRoot, "HEAD");
+      expect(runCiScope(projectRoot, { event: "pull_request", base: headCode, head: headKo })).toBe("check-only");
+
+      // non-PR event → full (no scope basis)
+      expect(runCiScope(projectRoot, { event: "push", base, head: headCode })).toBe("full");
+      // unresolvable base sha → full (fail-safe)
+      const missing = "0000000000000000000000000000000000000000";
+      expect(runCiScope(projectRoot, { event: "pull_request", base: missing, head: headCode })).toBe("full");
     });
   });
 });
@@ -2762,6 +2874,30 @@ function commitAll(projectRoot) {
 
 function git(projectRoot, args) {
   execFileSync("git", args, { cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function gitSha(projectRoot, ref) {
+  return execFileSync("git", ["rev-parse", ref], { cwd: projectRoot, encoding: "utf8" }).trim();
+}
+
+// Runs the ci-scope engine like action.yml does (env-driven) and returns the
+// `mode` it writes to GITHUB_OUTPUT.
+function runCiScope(projectRoot, { event, base, head }) {
+  const outFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "ci-scope-out-")), "gh-output");
+  fs.writeFileSync(outFile, "");
+  execFileSync(process.execPath, [path.join(repoRoot, "scripts", "harness", "ci-scope.mjs")], {
+    cwd: projectRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      HARNESS_EVENT_NAME: event,
+      HARNESS_PR_BASE_SHA: base || "",
+      HARNESS_PR_HEAD_SHA: head || "",
+      GITHUB_OUTPUT: outFile,
+    },
+  });
+  const match = read(outFile).match(/mode=(\S+)/);
+  return match ? match[1] : null;
 }
 
 function currentBranch(projectRoot) {

@@ -112,8 +112,8 @@ version이 올라가 넛지가 저절로 사라진다. 이 훅(로컬)은 CI(우
 - **수동 즉시 실행** — 커밋 없이 지금 돌리려면 `sh .git/hooks/pre-commit`. (훅에 baked된
   플러그인 절대경로를 그대로 태우므로 세션 밖에서도 동작한다.)
 - **세션 내** — `/llm-project-harness:artifact-validation` 스킬(플러그인 엔진 직접 호출).
-- **CI(권장·우회 불가)** — `.github/workflows/harness.yml`의 composite action이 push/PR마다
-  `check + lint + build + test`를 서버사이드에서 돌린다.
+- **CI(권장)** — `.github/workflows/harness.yml`의 composite action이 **main-타겟 PR마다**
+  `check + lint + build + test`를 서버사이드에서 돌린다(문서 전용 PR은 `check`만).
 
 즉 로컬 표준 진입점은 "커밋(=pre-commit 훅)" 또는 "`sh .git/hooks/pre-commit`"이다.
 
@@ -121,37 +121,58 @@ version이 올라가 넛지가 저절로 사라진다. 이 훅(로컬)은 CI(우
 
 로컬 pre-commit 훅과 ClaudeCode PreToolUse 가드는 **클라이언트 사이드 편의 장치**다.
 `git commit --no-verify`, Bash 직접 쓰기, 파일 rename, MCP/원격 쓰기로 우회할 수 있다.
-승인 게이트를 **우회 불가능하게** 강제하는 유일한 계층은 서버사이드 CI다.
+코드 변경은 전부 PR을 거치므로, **PR을 막는 서버사이드 CI**가 그 변경의 우회 불가 계층이다.
+`main`에 **직접** 커밋·push하는 경로는 서버에서 게이트하지 않는다(아래) — 그 경로의 승인·정합
+검사는 로컬 pre-commit(`harness:check`)이 막는다.
 
-`/lph-init`이 스캐폴드하는 `.github/workflows/harness.yml`은 push/PR마다 소비자를
-checkout하고 공용 composite action(`rlatndud9090/llm-project-harness@main`)으로 하네스
-게이트를 돌린다.
+`/lph-init`이 스캐폴드하는 `.github/workflows/harness.yml`은 **main-타겟 PR마다** 소비자를
+checkout하고 공용 composite action(`rlatndud9090/llm-project-harness@main`)으로 하네스 게이트를
+돌린다. `push: [main]` 서버 게이트는 두지 않는다 — squash-merge가 main에 올라올 때마다 이미
+PR에서 통과한 게이트를 재실행하던 GitHub Actions 분 낭비를 없앤다.
 
 ```yaml
 # .github/workflows/harness.yml (init이 생성)
 name: harness
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main] # main-타겟 PR만. main 직접 push는 로컬 pre-commit이 막는다.
+concurrency: # 연속 커밋 시 무효화된 중간 게이트를 취소하고 최신 커밋만 게이트
+  group: harness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # git-history 기반 검사(전이/불변/stage 후퇴)가 HEAD 대비 비교하므로 필요
+          fetch-depth: 0 # git-history 검사(HEAD 대비)·action의 PR base 대비 스코프 판정에 필요
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*' # 소비 레포에 .nvmrc가 있으면 init이 node-version-file: '.nvmrc'로 대신 생성
-      - uses: rlatndud9090/llm-project-harness@main
+          node-version: 'lts/*' # .nvmrc가 있으면 init이 node-version-file로 대신 생성
+          # package-lock.json이 있으면 init이 여기에 `cache: npm`을 더한다
+      - uses: rlatndud9090/llm-project-harness@main # docs/ 전용 PR이면 check만, 코드면 full
 ```
 
-노드 버전은 **하드코딩하지 않는다.** init은 소비 레포에 `.nvmrc`가 있으면
-`node-version-file: '.nvmrc'`를, 없으면 최신 LTS(`node-version: 'lts/*'`)를 쓴다. 옛 버전
-(예: 20)을 못박으면 CI 노드가 소비 프로젝트 런타임보다 낮아 정상 코드를 오탐할 수 있다(예:
-신 ICU에서만 되는 `Intl.NumberFormat` 옵션이 구 node에서 `RangeError`). 특정 노드가 필요하면
-소비 레포에 `.nvmrc`를 두는 것이 단일 진실 소스다.
+**docs-only 스코프.** action은 PR이 도입한 변경이 `docs/` 하위에만 있으면 `harness:check`만
+돌리고(의존성 설치·lint·build·test 건너뜀), 코드 변경·판정 불가·비-PR 이벤트는 full gate를 돈다.
+단순 `paths-ignore`로 문서 PR을 통째 스킵하지 않는 이유는 그러면 branch↔raw·승인 원장 정합을 보는
+`harness:check`가 함께 누락되기 때문이다 — `harness:check`는 항상 돌리고 lint/build/test만 조건부로 뺀다.
+
+**권장: main 브랜치 보호.** 서버 push 게이트를 뺐으므로, PR이 열릴 땐 green이었지만 머지 시점엔
+main보다 뒤처진(behind) 상태로 squash-merge되면 그 **머지 결과**는 재검증되지 않는다. 소비 레포의
+`main`에 브랜치 보호 "Require branches to be up to date before merging"(또는 merge queue)을 켜면 이
+stale-base 갭이 닫힌다 — PR을 최신 main에 맞춘 뒤에만 머지되므로 PR 게이트가 곧 머지 결과의 게이트가
+된다. 승인 원장 정합 자체는 squash가 PR 트리를 쓰므로 `harness:check`가 이미 보장한다(이 갭은
+build/test 커버리지에 한정된다).
+
+**노드 버전은 하드코딩하지 않는다.** init은 `.nvmrc`가 있으면 `node-version-file: '.nvmrc'`를, 없으면
+최신 LTS(`node-version: 'lts/*'`)를 쓴다. 옛 버전(예: 20)을 못박으면 CI 노드가 소비 프로젝트 런타임보다
+낮아 정상 코드를 오탐할 수 있다. 특정 노드가 필요하면 소비 레포에 `.nvmrc`를 두는 것이 단일 진실 소스다.
+
+**기존 소비자 갱신.** 이미 플러그인 CI를 가진 소비 레포의 워크플로는 `/lph-init`이 자동으로 안
+바꾼다(손수 넣은 job/matrix 보존). 최신 PR-only 워크플로로 교체하려면 `/lph-init --refresh-workflow`
+(먼저 `--dry-run`; 기존은 `.bak` 백업). refresh 없이 재init하면 구버전 CI(서버 push 게이트·concurrency
+취소 없음)를 감지해 refresh를 넛지한다.
 
 CI가 없으면 승인 게이트는 "모델 규율 + opt-in 로컬 훅"까지로만 보장된다.
 

@@ -26,6 +26,41 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-08-15 v2.4.0 ci-pr-only-and-docs-scoped-gate
+
+**변경 (CI 게이트를 PR-only로 개편 + 문서 전용 PR은 harness:check만 — GitHub Actions 분 절감)**
+
+소비 프로젝트의 하네스 CI가 GitHub Actions 무료 한도를 빠르게 태우던 원인 세 갈래를 걷어낸다.
+게이트 본체(승인 원장·정합·lint·build·test)의 커버리지 손실은 0이고, **낭비 실행만** 제거한다.
+
+- **서버 push 게이트 제거(소비자 템플릿).** `/lph-init`이 심는 워크플로가 이제 `pull_request:
+  branches: [main]`에서만 돈다. 옛 `push: branches: [main]` 트리거를 뺐다 — 코드 변경은 전부 PR을
+  거쳐 PR 게이트가 full로 커버하므로, squash-merge가 main에 올라올 때마다 **이미 통과한 게이트를
+  재실행하던 낭비**(형님이 지적한 "merge 후 한 번 더 도는 CI")가 사라진다. main 직접 push의
+  승인·정합 검사는 로컬 pre-commit(`harness:check`)이 계속 막는다. (프로바이더 저장소 자신은
+  main 직행 워크플로라 `push: [main]` 게이트를 유지한다 — 소비자와 별개.)
+- **concurrency 취소.** 같은 PR의 이전 실행을 취소해(`cancel-in-progress`), 연속 커밋 시 무효화된
+  중간 커밋의 게이트가 끝까지 도는 낭비를 막고 최신 커밋만 게이트한다.
+- **setup-node cache:npm(lockfile 있을 때만).** 매 실행 npm 패키지 전량 재다운로드 대신 `~/.npm`
+  캐시를 복원한다. `package-lock.json`이 있을 때만 켠다(없으면 setup-node 캐시 키 생성이 실패).
+- **문서 전용 PR은 harness:check만(엔진 `action.yml` + 새 `ci-scope.mjs`).** PR이 도입한 변경이
+  `docs/` 하위에만 있으면 의존성 설치·lint·build·test를 건너뛰고 `harness:check`만 돌린다. 단순
+  `paths-ignore: docs/**`로 통째 스킵하지 않는 이유는, 그러면 branch↔raw·승인 원장 정합을 보는
+  `harness:check`가 함께 누락되기 때문이다 — `harness:check`(외부 npm 의존성 없는 순수 node)는
+  **항상** 돌리고, 코드가 안 바뀐 PR에서 결과가 달라질 수 없는 lint/build/test만 조건부로 뺀다.
+  스코프 판정 근거가 없거나(비-PR 이벤트·base sha 미해결) 애매하면 언제나 full로 떨어진다(fail-safe).
+  분기는 엔진에 감춰 소비자 워크플로는 `uses: …@main` 한 줄로 얇게 유지한다 — 소비자는 재설치
+  없이 마켓플레이스 갱신만으로 이 로직을 받는다.
+- **`/lph-init --refresh-workflow`.** 이미 플러그인 CI를 가진 소비 레포의 워크플로는 자동으로 안
+  바뀐다(손수 넣은 job/matrix 보존). 이 플래그로 최신 PR-only 워크플로로 교체한다(먼저 `--dry-run`;
+  기존은 `.bak` 백업). refresh 없이 재init하면 init이 구버전 CI(서버 push 게이트·concurrency 취소
+  없음)를 감지해 refresh를 넛지한다.
+
+**소비자 조치**: `/lph-init --refresh-workflow`를 소비 레포 루트에서 실행해 `.github/workflows/harness.yml`을
+최신 PR-only 워크플로로 교체한다(먼저 `--dry-run`, 기존은 `.bak` 백업). 교체 전에도 문서 전용 PR
+최적화는 마켓플레이스 갱신만으로 자동 반영되지만, 서버 push 게이트 제거·concurrency 취소는 refresh가
+필요하다. (버전 키 조치는 `harness/reconcile.md` 2.4.0 참조.)
+
 ## 2026-08-14 v2.3.2 design-mockup-cp-edit-no-scaffold-reemit
 
 **변경 (디자인 시안 HTML은 cp 복사 후 목업만 Edit — 스캐폴딩 재출력 제거)**

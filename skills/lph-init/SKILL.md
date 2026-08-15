@@ -53,6 +53,21 @@ Claude Code에서 마켓플레이스를 등록·활성화한 뒤 소비 프로�
 
 기존 `AGENTS.md`·`docs/wiki/index.md`는 덮지 않고 marker block만 upsert한다.
 
+## CI 워크플로 갱신 (`--refresh-workflow`)
+
+이미 플러그인 CI를 가진 소비 레포의 `.github/workflows/harness.yml`은 기본적으로 안 바꾼다
+(손수 넣은 job/matrix 보존). 최신 PR-only 워크플로(서버 push 게이트 제거·concurrency 취소·
+`cache: npm`·docs-only 분기)로 교체하려면:
+
+```text
+/lph-init --refresh-workflow --dry-run
+/lph-init --refresh-workflow
+```
+
+기존 워크플로는 `.bak`로 백업한다. refresh 없이 재init하면 구버전 CI(서버 push 게이트 또는
+concurrency 취소 없음)를 감지해 refresh를 넛지한다. 하네스로 안 보이는 커스텀 워크플로는
+`--refresh-workflow`로도 건드리지 않는다.
+
 ## 옛 설치에서 이관
 
 옛 devDependency/submodule 설치는 `/lph-init`이 자동 감지·정리한다: `.harness` 심볼릭

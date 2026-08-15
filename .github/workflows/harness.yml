@@ -1,16 +1,23 @@
 name: harness
 
-# Server-side gate: runs on every push and PR so the harness checks (artifact
-# integrity, the state.md approval-ledger consistency, lint, build, tests) cannot
-# be skipped with `git commit --no-verify` or by a client that never installed
-# the local pre-commit hook. This is the durable, non-bypassable enforcement
-# layer; the pre-commit hook and the ClaudeCode PreToolUse guard are only
-# convenience tripwires ahead of it.
+# Server-side gate for THIS repo (the harness provider). The provider works
+# main-direct (no PR flow), so `push: branches:[main]` is the non-bypassable
+# enforcement layer here — it cannot be skipped with `git commit --no-verify` or
+# by a client that never installed the local pre-commit hook. (Consumer projects
+# install a PR-only workflow via /lph-init: they go through PRs, so their gate
+# runs on `pull_request` and a squash-merge to main does not re-run it.)
 
 on:
   push:
     branches: [main]
   pull_request:
+
+# Cancel superseded runs of the same PR/branch so consecutive pushes only gate
+# the latest commit instead of running every invalidated intermediate gate to
+# completion.
+concurrency:
+  group: harness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   gate:
@@ -22,5 +29,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm # restore ~/.npm so `npm ci` doesn't re-download every run
       - run: npm ci
       - run: npm run harness:gate

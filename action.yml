@@ -1,14 +1,32 @@
 name: "LLM Project Harness Gate"
-description: "우회 불가능한 하네스 승인 게이트를 CI에서 실행한다 — 아티팩트/state.md 승인 원장 정합성 검사에 이어 프로젝트의 lint·build·test를 순서대로 돈다. 엔진은 이 플러그인 저장소에서 오고, 소비 저장소에는 엔진 사본이 없다."
+description: "우회 불가능한 하네스 승인 게이트를 CI에서 실행한다 — 아티팩트/state.md 승인 원장 정합성 검사(harness:check)에 이어, 코드가 바뀐 PR에서만 프로젝트의 lint·build·test를 돈다. 문서(docs/) 전용 PR은 harness:check만 돌려 CI 분(minute)을 아낀다. 엔진은 이 플러그인 저장소에서 오고, 소비 저장소에는 엔진 사본이 없다."
 
 # 소비 저장소의 워크플로에서 다음처럼 호출한다(actions/checkout·setup-node 이후):
 #   - uses: rlatndud9090/llm-project-harness@<tag 또는 main>
 # composite 스텝은 기본적으로 소비 저장소 checkout(GITHUB_WORKSPACE)을 cwd로 돌고,
 # 엔진 스크립트는 ${{ github.action_path }}(이 플러그인 저장소 checkout) 아래에서 온다.
+#
+# 변경 스코프 분기: PR이 도입한 변경이 docs/ 하위에만 있으면(문서 전용) 의존성 설치·
+# lint·build·test를 건너뛰고 harness:check만 돌린다. harness:check는 외부 npm 의존성이
+# 없는 순수 node 검사라 branch↔raw·승인 원장 정합을 항상 재확인한다(단순 paths-ignore가
+# 그 검사를 통째 누락시키는 위험을 피한다). 코드 변경·판정 불가·비-PR 이벤트는 전체 게이트.
 runs:
   using: composite
   steps:
+    - name: Determine change scope (docs-only → check only, code → full gate)
+      id: scope
+      shell: bash
+      run: node "${{ github.action_path }}/scripts/harness/ci-scope.mjs"
+      env:
+        HARNESS_EVENT_NAME: ${{ github.event_name }}
+        HARNESS_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HARNESS_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    - name: Harness check only (docs-only change — skip deps/lint/build/test)
+      if: steps.scope.outputs.mode == 'check-only'
+      shell: bash
+      run: node "${{ github.action_path }}/scripts/harness/gate.mjs" --check-only
     - name: Install project dependencies
+      if: steps.scope.outputs.mode != 'check-only'
       shell: bash
       run: |
         if [ -f package-lock.json ]; then
@@ -19,5 +37,6 @@ runs:
           echo "no package.json — skipping dependency install (harness check + declared scripts only)"
         fi
     - name: Harness gate (check + lint + build + test)
+      if: steps.scope.outputs.mode != 'check-only'
       shell: bash
       run: node "${{ github.action_path }}/scripts/harness/gate.mjs"
