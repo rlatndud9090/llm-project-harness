@@ -31,6 +31,27 @@ scripts/harness/    init, kickoff, wiki ingest, artifact check, gate 엔진 스�
 이 템플릿은 feature를 `Product & Architecture` 같은 큰 바구니가 아니라
 프로젝트별 taxonomy로 점진적으로 분류하도록 강제합니다.
 
+## 워크플로·스킬
+
+플러그인이 소비 프로젝트에 제공하는 스킬은 하나의 작업 단위(feature/bugfix/chore)를
+아이디어부터 머지까지 끌고 가는 수명주기를 이룹니다. 스킬은
+`/llm-project-harness:<name>`으로 노출됩니다.
+
+1. `next-feature` — 다음 작업 단위 후보를 추천하고 하나를 선택합니다.
+2. `kickoff` — 확정된 단위의 브랜치·`docs/raw` 디렉터리·템플릿을 생성합니다.
+3. `prd-helper` → `adr-helper` — PRD를 인터뷰·리서치·리뷰로 작성하고, 아키텍처
+   결정이 필요하면 ADR로 기록합니다.
+4. `feature-develop` — PRD/ADR을 근거로 구현·재작업·부분 수정을 진행합니다.
+5. `make-pr` — 사전 승인·구현이 끝난 단위를 최종 확정하고 커밋·PR을 만듭니다.
+6. `pr-review-check-loop` / `pr-self-loop` — 리뷰 코멘트를 무이슈까지 반영합니다.
+7. `merge-and-clean` — PR을 머지하고 브랜치·워크트리를 정리합니다.
+
+`one-shot`은 kickoff부터 리뷰 수렴까지를 사용자 개입 없이 한 번에 진행합니다.
+보조 스킬로 `commit-protocol`(검증·명시적 스테이징·`관련 문서:` 링크 커밋),
+`wiki-ingest`(raw 작업 단위를 `docs/wiki`에 영역별 시간순으로 연결),
+`artifact-validation`·`ui-verification`(산출물·UI 검증)이 있고, 적용·진단은
+`lph-init`·`lph-doctor`가 맡습니다.
+
 ## 소비 프로젝트에 장착하기
 
 Claude Code에서 마켓플레이스를 등록·활성화한 뒤, 소비 프로젝트 루트에서
