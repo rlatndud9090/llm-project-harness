@@ -28,6 +28,15 @@
 
 ---
 
+## 2.4.1
+
+- (없음) pr-review-check-loop watch helper(`skills/pr-review-check-loop/scripts/pr_review_watch.py`)의
+  GraphQL 조회가 `owner`/`repo`를 `gh api graphql -F`로 넘겨, 순수 숫자 소유자/저장소 이름(GitHub에서
+  합법 — `users/0`·`1`·`123` 실존)에서 `$owner`/`$repo:String!` coerce 에러(`Could not coerce value
+  123 to String`)로 watch가 전 예산을 poll-error에 빠뜨려 종료 불능이 되던 버그를, 문자열 변수를
+  `-f`(raw string)로 바꿔 교정. helper는 플러그인 안에 있어 마켓플레이스 갱신으로 자동 반영 —
+  배선/산출물 조치 없음.
+
 ## 2.4.0
 
 - (배선) **CI 워크플로를 PR-only로 개편(서버 push 게이트 제거·concurrency 취소·setup-node

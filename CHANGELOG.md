@@ -26,6 +26,31 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-08-22 v2.4.1 pr-review-loop-numeric-owner-repo-graphql
+
+**변경 (pr-review-check-loop watch helper가 순수 숫자 소유자/저장소 이름에서 무한 poll-error에 빠지던 버그 수정)**
+
+`skills/pr-review-check-loop/scripts/pr_review_watch.py`의 GraphQL 조회 두 곳
+(`fetch_recent_reviews`, `fetch_unresolved_codex_threads`)이 `owner`/`repo`를 `gh api graphql -F`
+(타입 추론 필드)로 넘기고 있었다. `gh`의 `-F`는 **값이 순수 숫자면 JSON 정수로 변환**하는데
+(실증: `-F x=123` → `{"x":123}`), 쿼리 변수는 `$owner`/`$repo:String!`로 선언돼 있다. 그래서
+소유자나 저장소 이름이 순수 숫자면(GitHub에서 합법 — `users/0`·`1`·`12`·`123`이 실제로 존재하고
+저장소 이름은 `owner/123`처럼 얼마든지 숫자만으로 가능) GitHub가 `Could not coerce value 123 to
+String`으로 거부한다.
+
+- **연쇄 효과**: 이 에러가 `gh_json`에서 `RuntimeError`로 튀어 `fetch_watch_state`가 실패하고,
+  watch 루프의 `try/except`가 매 폴마다 `poll-error`로 삼킨 뒤 continue한다. 리뷰 본문(무이슈
+  판정의 핵심 소스)을 영영 못 읽어, Codex가 무이슈를 내도 감지 못 하고 전 예산을 poll-error로
+  소진 → timeout → 재개를 무한 반복한다. 순수 숫자 소유자/저장소에서 루프가 사실상 종료 불능.
+- **수정**: GraphQL 문자열 변수(`owner`/`repo`/`cursor`)는 `-f`(raw, 항상 문자열)로, 정수 변수
+  (`$number`/`$count`:Int!)만 `-F`를 유지한다. REST 경로(`repos/{owner}/{repo}/…`)·`pr view
+  --repo`는 문자열 보간이라 원래 안전했고, 결함은 이 두 GraphQL 조회의 `-F`가 유일했다.
+- **검증**: read-only 대비 실증(`-F owner=123`/`-F repo=123` → coerce 에러, `-f` → 타입 통과) +
+  두 helper 함수를 순수 숫자 소유자/저장소로 직접 호출해 타입 통과 확인 + provider 게이트 4종 green.
+
+**소비자 조치**: 없음. helper는 플러그인 안에 있어 마켓플레이스 갱신만으로 자동 반영된다
+(배선/산출물 조치 없음). (버전 키 조치는 `harness/reconcile.md` 2.4.1 참조.)
+
 ## 2026-08-15 v2.4.0 ci-pr-only-and-docs-scoped-gate
 
 **변경 (CI 게이트를 PR-only로 개편 + 문서 전용 PR은 harness:check만 — GitHub Actions 분 절감)**

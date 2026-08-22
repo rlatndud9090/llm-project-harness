@@ -280,9 +280,16 @@ def fetch_recent_reviews(owner: str, repo: str, pr_number: int) -> list[dict[str
             "graphql",
             "-f",
             "query=query($owner:String!, $repo:String!, $number:Int!, $count:Int!) { repository(owner:$owner, name:$repo) { pullRequest(number:$number) { reviews(last:$count) { nodes { databaseId submittedAt body author { login } } } } } }",
-            "-F",
+            # String vars MUST use -f (raw): -F coerces an all-digit value to a
+            # JSON int, so an all-numeric owner or repo (both are legal on
+            # GitHub — the users 0/1/12/123 all exist, and orgs follow the same
+            # rule) is sent as `repo: 123`, which GitHub rejects with "Could not
+            # coerce value 123 to String" against $owner/$repo:String!. That
+            # RuntimeError bubbles up and the watch silently poll-errors for its
+            # whole budget. Int vars ($number/$count) keep -F.
+            "-f",
             f"owner={owner}",
-            "-F",
+            "-f",
             f"repo={repo}",
             "-F",
             f"number={pr_number}",
@@ -304,13 +311,17 @@ def fetch_unresolved_codex_threads(owner: str, repo: str, pr_number: int) -> int
                 "graphql",
                 "-f",
                 "query=query($owner:String!, $repo:String!, $number:Int!, $cursor:String) { repository(owner:$owner, name:$repo) { pullRequest(number:$number) { reviewThreads(first:100, after:$cursor) { pageInfo { hasNextPage endCursor } nodes { isResolved comments(first:1) { nodes { author { login } } } } } } } }",
-                "-F",
+                # String vars (owner/repo/cursor) MUST use -f: -F would coerce an
+                # all-digit value to a JSON int, breaking an all-numeric owner or
+                # repo (both legal on GitHub) against $owner/$repo:String!. See
+                # fetch_recent_reviews.
+                "-f",
                 f"owner={owner}",
-                "-F",
+                "-f",
                 f"repo={repo}",
                 "-F",
                 f"number={pr_number}",
-                "-F",
+                "-f",
                 f"cursor={cursor}" if cursor else "cursor=",
             ]
         )
