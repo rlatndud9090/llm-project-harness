@@ -99,6 +99,18 @@ next-feature 단계에서 붙였던 `next-feature` 제목을 확정된 작업 �
   && node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/set-fleet-title.mjs" --slug "do-next-thing" 2>/dev/null || true
 ```
 
+## Claude Code — 단계 핸드오프 종료 (필수)
+
+이 단계를 끝내고 **다음 진행이 사용자 행동(다음 스킬 호출·승인·선택)에 달린** 핸드오프 지점에서는,
+턴을 산문 "완료" 보고로 끝내지 말고 **`AskUserQuestion`으로 끝낸다.** Claude Code는 사용자 입력
+대기로 끝난 턴만 세션을 **Needs input**으로 분류해 FleetView 배지·`agent_needs_input` 알림·탭
+제목을 띄운다 — "완료" 산문으로 끝내면 **Done(Idle)**으로 분류돼 background·다중 세션에서 알림이
+안 떠 사용자가 다음 단계를 놓친다.
+
+- 이 스킬의 핸드오프 질문: "골격 생성 완료 — 지금 `$prd-helper`로 PRD 작성에 들어갈까요?"처럼 다음 스킬과 효과를 명시하고 "지금 진행 / 나중에" 선택지를 준다.
+- **기계 대기는 예외**: 서브에이전트·`Workflow` 결과를 기다리는 중간 상태는 Working이 정답이니 질문으로 끝내지 않는다 — 사람이 행동할 지점만 질문으로 끝낸다.
+- **`$one-shot` 등 무인 오케스트레이터 구간에는 적용하지 않는다**(자동 체이닝; 정지 조건에서만 질문).
+
 ## Claude Code — Background 세션 result 형식 (필수)
 
 background 세션에서 `result:` 라인을 출력할 때 — 중간 보고든 완료든 — **맨 앞에 반드시 `[kickoff]`를 붙인다.**

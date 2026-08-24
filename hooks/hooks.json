@@ -20,6 +20,17 @@
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "matcher": "agent_needs_input|agent_completed",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/harness/notify.mjs\""
+          }
+        ]
+      }
     ]
   }
 }

@@ -17,6 +17,8 @@ description: "PRD/ADR 기반 기능 구현, 재작업, 부분 수정을 진행�
    (`session-start`에서 이미 읽었으면 재판독하지 않는다).
 5. 작업 표면에 해당하는 `${CLAUDE_PLUGIN_ROOT}/harness/guides/code-review-guideline.md` 섹션 —
    §0 코어 원칙 + 표면 인덱스로 선택해 구현 브리핑에 발췌한다(전체 로드 금지).
+6. 주석을 남기는 구현이면 `${CLAUDE_PLUGIN_ROOT}/harness/guides/comment-convention.md`의
+   관문·허용목록 — WHY(결정 근거·수치·이력·결정 ID)는 정본에 두고 코드엔 제약만 남긴다.
 
 ## 사전 승인 게이트 (구현 전 하드 차단)
 
@@ -140,6 +142,18 @@ return { results: results.filter(Boolean) }
 - 게이트 판정과 커밋은 이 스크립트가 아니라 메인 루프에서 한다(위 "자율 레인의 제약").
 
 하네스 규칙 자체는 이 프로젝트가 아니라 플러그인 저장소에서 바뀐다.
+
+## Claude Code — 단계 핸드오프 종료 (필수)
+
+이 단계를 끝내고 **다음 진행이 사용자 행동(다음 스킬 호출·승인·선택)에 달린** 핸드오프 지점에서는,
+턴을 산문 "완료" 보고로 끝내지 말고 **`AskUserQuestion`으로 끝낸다.** Claude Code는 사용자 입력
+대기로 끝난 턴만 세션을 **Needs input**으로 분류해 FleetView 배지·`agent_needs_input` 알림·탭
+제목을 띄운다 — "완료" 산문으로 끝내면 **Done(Idle)**으로 분류돼 background·다중 세션에서 알림이
+안 떠 사용자가 다음 단계를 놓친다.
+
+- 이 스킬의 핸드오프 질문: "구현·게이트 통과 완료 — 지금 `$make-pr`로 최종 확정·PR 생성에 들어갈까요?"처럼 다음 스킬과 효과를 명시하고 "지금 진행 / 나중에" 선택지를 준다.
+- **기계 대기는 예외**: 서브에이전트·`Workflow` 결과를 기다리는 중간 상태는 Working이 정답이니 질문으로 끝내지 않는다 — 사람이 행동할 지점만 질문으로 끝낸다.
+- **`$one-shot` 등 무인 오케스트레이터 구간에는 적용하지 않는다**(자동 체이닝; 정지 조건에서만 질문).
 
 ## Claude Code — Background 세션 result 형식 (필수)
 

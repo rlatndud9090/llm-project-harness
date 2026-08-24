@@ -172,7 +172,9 @@ domain-engineer/ui-engineer/test-engineer → integrator` role 체인으로 펼�
 
 구현은 브리핑에 발췌된 구현 지침(`guides/code-review-guideline.md`) 규칙을 대조하며
 진행한다 — 지침의 §0 코어 원칙(스펙 동기화·단일 출처·경계 불신·왕복 완성)은 발췌와
-무관하게 항상 적용된다.
+무관하게 항상 적용된다. 남기는 주석은 `guides/comment-convention.md`의 관문·허용목록을
+대조한다 — WHY(결정 근거·수치·이력·결정 ID)는 정본(PRD/ADR·커밋·PR)에 두고 코드에 옮겨
+적지 않으며, 불변식 주장은 주석이 아니라 테스트로 봉인한다.
 
 domain 작업:
 
@@ -211,9 +213,10 @@ UI 작업:
 1. diff 표면을 파악한다: `git diff <base>...HEAD --name-only`.
 2. `code-review-guideline.md`의 표면 인덱스에서 이 diff가 건드리는 섹션만 골라(전체 로드 금지)
    "이런 diff를 보면 → 이 결함을 의심·확인하라" 탐지기로 diff를 훑는다. 렌즈↔섹션은 그 문서
-   부록 A를 따른다. Phase 1 브리핑에 이미 발췌된 섹션이 있으면 재로드하지 않는다.
+   부록 A를 따른다. Phase 1 브리핑에 이미 발췌된 섹션이 있으면 재로드하지 않는다. 주석(코드·
+   테스트)을 추가·수정한 diff면 `guides/comment-convention.md`의 관문·허용목록으로도 훑는다.
 3. 발견을 심각도로 분류한다: **BLOCKER**(라이브 운영·사용자·데이터에 실제 영향)는 이 단계에서
-   고치고, **COSMETIC**(주석·문서 정합·내부 네이밍)은 놓치지 않되 배치로 모아 마지막에 정리한다
+   고치고, **COSMETIC**(주석 컨벤션 위반·문서 정합·내부 네이밍)은 놓치지 않되 배치로 모아 마지막에 정리한다
    (`$pr-self-loop` 심각도 정책과 동일 축 — 사소한 걸로 흐름을 늘리지 않는다).
 4. BLOCKER를 고쳤으면(버그는 실패 테스트로 결함 입증 후 수정) `harness:gate`를 다시 green으로 만든다.
 

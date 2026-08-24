@@ -28,6 +28,16 @@
 
 ---
 
+## 2.5.0
+
+- (없음) 세 가지 인-플러그인 변경으로, 전부 마켓플레이스 갱신으로 자동 반영된다: (1) 스킬 간
+  핸드오프·대기 지점을 `AskUserQuestion`으로 끝내 Claude Code가 세션을 Needs input으로 분류
+  (FleetView 배지·`agent_needs_input` OS 알림·탭 제목)하게 하는 규약을 6개 세션 스킬에 신설,
+  (2) background/agents 세션이 입력 대기·완료로 전환될 때 터미널 벨을 울리는 `Notification` 훅
+  (플러그인 `hooks/hooks.json`, `.harness.json` 게이트), (3) 보편 주석 컨벤션 가이드
+  `harness/guides/comment-convention.md` 신설 + feature-develop·code-review-guideline 참조 배선.
+  훅은 플러그인 번들(`hooks/hooks.json`)이라 소비 레포 배선 변경이 없다 — 배선/산출물 조치 없음.
+
 ## 2.4.1
 
 - (없음) pr-review-check-loop watch helper(`skills/pr-review-check-loop/scripts/pr_review_watch.py`)의

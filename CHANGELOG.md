@@ -26,6 +26,51 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-08-24 v2.5.0 handoff-needs-input-notify-and-comment-convention
+
+**변경 1 (스킬 간 핸드오프·대기를 Needs input으로 신호 — FleetView 상태·알림 정확도)**
+
+cmux + background 다중 세션에서 스킬이 자기 단계를 끝내고 **사용자가 다음 행동(다음 스킬 호출·
+승인)을 해야** 진행되는 핸드오프 지점(예: `prd-helper` 완료 후 `adr-helper` 대기)에서, 세션이
+"완료"로 끝나 FleetView가 **Done**으로 보이고 "Needs input" 알림이 안 뜨던 문제를 고쳤다.
+
+- **뿌리**: FleetView `state`(working/done/blocked)와 `detail`은 **Claude Code 데몬이 매 턴 마지막
+  어시스턴트 메시지를 자동 분류**해서 쓴다(하네스가 직접 못 쓴다 — `state.json` 직접 쓰기는 비지원
+  사설 포맷). 산문 "완료" 턴은 `done`(Idle), "awaiting 사용자 승인" 턴은 `blocked`(Needs input),
+  서브에이전트 대기 턴은 `working`으로 분류된다. 기존 스킬은 핸드오프를 "완료" 산문으로 끝내 사람
+  대기인데도 `done`으로 찍혔다.
+- **수정**: 6개 세션 스킬(`next-feature`·`kickoff`·`prd-helper`·`adr-helper`·`feature-develop`·
+  `make-pr`)에 "단계 핸드오프 종료" 규약을 신설했다. 핸드오프·대기 지점은 산문 완료가 아니라
+  **`AskUserQuestion`으로 턴을 끝낸다** — 이것이 Claude Code가 세션을 Needs input으로 분류하게 하는
+  유일한 지원 레버이고, 그러면 `agent_needs_input` 알림·FleetView 배지·탭 제목(`N awaiting input`)이
+  뜬다. 두 경계선: (a) **기계 대기**(서브에이전트·`Workflow` 결과 대기)는 Working이 정답이라 질문으로
+  끝내지 않는다, (b) **`$one-shot` 등 무인 오케스트레이터 구간엔 적용 안 함**(자동 체이닝; 정지
+  조건에서만 질문).
+
+**변경 2 (background 세션 상태 전환 시 터미널 벨 — cmux 알림 보완)**
+
+플러그인 `hooks/hooks.json`에 `Notification` 훅(matcher `agent_needs_input|agent_completed`)과
+`scripts/harness/notify.mjs`를 추가했다. background/agents 세션이 입력 대기로 전환되거나 완료·
+실패로 끝날 때 **터미널 벨(BEL)**을 울린다 — OS 데스크톱 알림이 잘 안 뜨는 멀티플렉서(cmux 등)
+안에서 상태 변화를 소리/시각벨로 알아채게 한다. Notification 훅은 stdout·exit code를 무시하고
+`terminalSequence` 출력 필드만 존중하므로(공식 hooks 레퍼런스) BEL을 그 필드로 반환한다.
+`session-start`와 같은 `.harness.json` 게이트라 하네스 채택 레포 세션에서만 울고, 항상 exit 0
+(fail open)이다. **한계(설계상)**: 이 두 matcher는 agent view가 열려 있을 때만 발화하고, 실제
+소리/시각벨 여부는 사용자 터미널·멀티플렉서의 벨 설정 소관이다 — 훅은 지원되는 신호를 보낼 뿐이다.
+
+**변경 3 (보편 코드 주석 컨벤션 가이드 신설)**
+
+`harness/guides/comment-convention.md`를 신설했다 — "정본(PRD/ADR·커밋·PR)의 복사본을 코드에
+두지 않는다"를 핵심으로, 관문(정본에 있나/이름이 말하나/불변식은 테스트가 봉인/허용목록 지목/
+5줄 초과=문서)·허용목록 ①~⑥·형식 규칙(줄번호 금지→심볼명, 마크다운 금지, 타입 재선언 금지)·
+`@see` 하나 원칙·롤아웃·밀도목표 금지를 담았다. 이슈 표기법·정본 경로 체계·베이스 스타일
+가이드처럼 **레포마다 다른 축은 하네스가 규정하지 않고 레포 기존 규칙에 위임하며, 규칙이 없으면
+가장 널리 쓰이는 관례를 폴백**한다. `feature-develop`(Phase 2 구현·Phase 3.7 자체리뷰)과
+`guides/code-review-guideline.md`(리뷰 렌즈)가 이 가이드를 참조하도록 배선했다.
+
+**소비자 조치: 없음** — 세 변경 전부 인-플러그인(스킬·훅·가이드)이라 마켓플레이스 갱신으로 자동
+반영된다. `Notification` 훅도 플러그인 `hooks.json` 번들이라 소비 레포 배선 변경이 없다.
+
 ## 2026-08-22 v2.4.1 pr-review-loop-numeric-owner-repo-graphql
 
 **변경 (pr-review-check-loop watch helper가 순수 숫자 소유자/저장소 이름에서 무한 poll-error에 빠지던 버그 수정)**
