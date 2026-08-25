@@ -1,9 +1,9 @@
 ---
-name: pr-review-check-loop
-description: PR에 달린 Codex 자동 리뷰를 clean 상태까지 밀어붙이는 라이브 워치 루프. 코멘트를 검증·반영·푸시하고 각 스레드에 답글을 단 뒤 @codex review로 재리뷰를 요청하고, 새 리뷰가 없다는 Codex의 명시적 무이슈 판정이 나올 때까지 백그라운드 watch로 계속 감시하며 반복한다. "코덱스 리뷰 루프", "리뷰 끝까지 돌려", "무이슈까지", "check codex review loop", "리뷰 반영 반복" 등에 사용. 1회만 확인하는 경량 버전은 pr-review-check-once.
+name: pr-codex-loop
+description: PR에 달린 Codex 자동 리뷰를 clean 상태까지 밀어붙이는 라이브 워치 루프. 코멘트를 검증·반영·푸시하고 각 스레드에 답글을 단 뒤 @codex review로 재리뷰를 요청하고, 새 리뷰가 없다는 Codex의 명시적 무이슈 판정이 나올 때까지 백그라운드 watch로 계속 감시하며 반복한다. "코덱스 리뷰 루프", "리뷰 끝까지 돌려", "무이슈까지", "check codex review loop", "리뷰 반영 반복" 등에 사용. 1회만 확인하는 경량 버전은 pr-codex-once.
 ---
 
-# PR Review Check Loop
+# PR Codex Loop
 
 PR에 달린 **Codex 자동 리뷰**를 가져와 프로젝트/세션 컨텍스트로 검증하고, 정당한 지적은 PR head 브랜치에서 수정·푸시한 뒤 **각 코멘트에 답글**로 반영 내용을 설명하고, **`@codex review`로 재리뷰를 요청**한 다음, **Codex가 명시적으로 "무이슈"라고 응답할 때까지 백그라운드 watch로 계속 감시하며 같은 루프를 반복**하는 스킬.
 
@@ -12,19 +12,19 @@ PR에 달린 **Codex 자동 리뷰**를 가져와 프로젝트/세션 컨텍스�
 > ⚠️ **적용 대상 제한 — Codex 자동 리뷰가 없는 호스트는 제외.** Codex 자동 리뷰는 **github.com** 레포에만 붙는다. 시작 시 `git remote get-url origin`으로 호스트를 확인해 **`github.com`이 아니면(예: GitHub Enterprise 호스트) 이 스킬(루프 포함)을 적용하지 않는다**: Codex 리뷰가 존재하지 않으므로, 그 사실을 사용자에게 한 줄로 알리고 **즉시 종료**한다(watch 루프 시작·코드 변경·푸시·답글 금지).
 
 ## Trigger
-- 사용자가 `/pr-review-check-loop` 명령 사용
+- 사용자가 `/pr-codex-loop` 명령 사용
 - "코덱스 리뷰 루프", "리뷰 끝까지 돌려줘", "무이슈 뜰 때까지", "리뷰 반영 반복", "check codex review loop" 등
 
 ## Arguments
-`/pr-review-check-loop [PR_LINK_OR_NUMBER] [--snapshot]`
+`/pr-codex-loop [PR_LINK_OR_NUMBER] [--snapshot]`
 
 - **PR_LINK_OR_NUMBER** (선택): PR URL(`https://github.com/<owner>/<repo>/pull/<N>`), `owner/repo#N`, 또는 `#N`(현재 repo 기준). 생략 시 세션 컨텍스트/현재 브랜치로 추론(절차 1). 추론 불가 시에만 사용자에게 링크 요청.
-- **`--snapshot`** (선택): 장시간 watch 없이 **현재 보이는 리뷰까지만** 1-pass 처리(기존 `pr-review-check-once`와 동등). 이 플래그가 없으면 **항상 live-watch가 기본**이다.
+- **`--snapshot`** (선택): 장시간 watch 없이 **현재 보이는 리뷰까지만** 1-pass 처리(기존 `pr-codex-once`와 동등). 이 플래그가 없으면 **항상 live-watch가 기본**이다.
 
 **예시:**
-- `/pr-review-check-loop https://github.com/<owner>/<repo>/pull/4`
-- `/pr-review-check-loop #4`
-- `/pr-review-check-loop` — 세션 컨텍스트에서 PR 추론, live-watch
+- `/pr-codex-loop https://github.com/<owner>/<repo>/pull/4`
+- `/pr-codex-loop #4`
+- `/pr-codex-loop` — 세션 컨텍스트에서 PR 추론, live-watch
 
 ---
 
@@ -44,15 +44,15 @@ PR에 달린 **Codex 자동 리뷰**를 가져와 프로젝트/세션 컨텍스�
 
 ### 0. 사전 점검 (gate)
 
-1. **`gh` 인증 확인:** `gh auth status` 로 로그인이 살아 있는지 확인. 죽어 있으면 사용자에게 재로그인 요청(`! gh auth login`) 후 중단. `gh`가 없거나 인증 불가하면 → GitHub MCP(`mcp__github__*`)로 read-only 폴백만 가능(watch 루프 불가 → 사실상 `pr-review-check-once` 수준으로 축소되고, 그 사실을 사용자에게 보고).
-2. **helper 경로 확인:** `PR_REVIEW_WATCH="${CLAUDE_PLUGIN_ROOT}/skills/pr-review-check-loop/scripts/pr_review_watch.py"` (플러그인에 함께 배포되는 helper를 쓴다).
+1. **`gh` 인증 확인:** `gh auth status` 로 로그인이 살아 있는지 확인. 죽어 있으면 사용자에게 재로그인 요청(`! gh auth login`) 후 중단. `gh`가 없거나 인증 불가하면 → GitHub MCP(`mcp__github__*`)로 read-only 폴백만 가능(watch 루프 불가 → 사실상 `pr-codex-once` 수준으로 축소되고, 그 사실을 사용자에게 보고).
+2. **helper 경로 확인:** `PR_REVIEW_WATCH="${CLAUDE_PLUGIN_ROOT}/skills/pr-codex-loop/scripts/pr_review_watch.py"` (플러그인에 함께 배포되는 helper를 쓴다).
 3. **모드 결정:** `--snapshot`이면 snapshot pass, 아니면 live-watch(기본).
 
 ### 1. PR 식별
 우선순위:
 1. **인자**의 PR 링크/번호. URL/`owner/repo#N`/`#N` 파싱. `#N`만 있으면 `git remote get-url origin`에서 owner/repo 추출.
 2. 인자 없으면 **세션 컨텍스트 추론**: 이번 대화에서 생성/언급된 PR → 그 PR. 없으면 **현재 git 브랜치**(`git rev-parse --abbrev-ref HEAD`)를 head로 하는 열린 PR 조회.
-3. **체크포인트 확인:** `~/.cache/pr-review-check-loop/pr-<owner>-<repo>-<N>.json`이 있으면 중단됐던 cycle을 재개(protocol.md §6).
+3. **체크포인트 확인:** `~/.cache/pr-codex-loop/pr-<owner>-<repo>-<N>.json`이 있으면 중단됐던 cycle을 재개(protocol.md §6).
 4. 위로도 특정 안 되면 사용자에게 링크 요청 후 중단(유일하게 허용된 needs-input).
 
 확정 후 PR을 조회해 아래를 확보한다:
@@ -198,7 +198,7 @@ watch 종료 시 stdout JSON `result` 분기:
 - 수정·푸시는 PR head 브랜치 한정. 머지/닫힘/fork/non-fast-forward는 멈추고 확인. force 계열 전면 금지.
 - valid-bug는 수정 전 실패 테스트로 결함 입증 후 고친다.
 - 백그라운드 잡/공유 체크아웃은 worktree 격리.
-- 1회만 확인하고 끝내려면 → **`/llm-project-harness:pr-review-check-once`** 스킬(경량 1-pass, gh 우선).
+- 1회만 확인하고 끝내려면 → **`/lph:pr-codex-once`** 스킬(경량 1-pass, gh 우선).
 
 ### 토큰 효율 (필수 — protocol.md §8, non-negotiable을 완화하지 않음)
 - **수집은 항상 투영+Codex필터(`--jq`).** raw 전량 덤프 금지. 전량 재수집은 루프 진입 1회, 이후는 watch verdict delta 처리(O1·O2). "모든 Codex 코멘트를 읽는다"는 `body`를 그대로 유지하므로 위반 아님.

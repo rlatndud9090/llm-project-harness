@@ -10,12 +10,12 @@ composite action으로 소비된다 — 소비 저장소에 `.harness` 심볼릭
 - 소비 프로젝트의 `docs/raw/`, `docs/wiki/`, `AGENTS.md`는 프로젝트 소유다.
 - 하네스는 소비 프로젝트의 `docs/` 아래에 공유 파일이나 symlink를 만들지 않는다.
 - 하네스는 raw/wiki/PRD/ADR/검증/커밋 절차와 템플릿을 제공한다.
-- 스킬·커맨드·에이전트는 플러그인이 namespace(`/llm-project-harness:<name>`)로 제공한다.
+- 스킬·커맨드·에이전트는 플러그인이 namespace(`/lph:<name>`)로 제공한다.
 - 같은 이름의 로컬 스킬/커맨드를 소비 프로젝트 `.claude/`에 두면 그 로컬 정의가 override로 우선한다.
 - 작업 단위, 브랜치 정책, PRD/ADR 승인 정책은 소비 프로젝트가 하네스를 사용할 때
   적용한다. 하네스 저장소 자체에 같은 정책을 강제하지 않는다.
 - 프로토콜 본문의 `$skill-name`은 "그 하네스 skill을 호출하라"는 표시다(플러그인에서는
-  namespace `/llm-project-harness:skill-name` 또는 Skill 도구). `$deep-interview`, `$ralph`,
+  namespace `/lph:skill-name` 또는 Skill 도구). `$deep-interview`, `$ralph`,
   `$ralplan`, `/team`은 하네스가 배포하지 않는 선택적 외부 가속기다. 프로토콜이
   `$deep-interview`를 명시할 때는 그 스킬을 최우선으로 사용하고, 질문 transport는
   deep-interview 내부에서 현재 surface에 맞게 선택한다. `$deep-interview`가 없을
@@ -37,7 +37,7 @@ composite action으로 소비된다 — 소비 저장소에 `.harness` 심볼릭
 
 - `guides/code-review-guideline.md` — 소비 프로젝트들의 자동 코드리뷰 지적 391건(P1 57건)을
   전수 클러스터링해 **"리뷰어가 diff에서 무엇을 잡아내야 하는가(탐지)"** 로 정립한 단일 출처
-  (R1–R7 근본 실패 계층 + 표면별 탐지기). `$pr-self-loop`·`$pr-review-check-*` 리뷰어가 탐지
+  (R1–R7 근본 실패 계층 + 표면별 탐지기). `$pr-self-loop`·`$pr-codex-*` 리뷰어가 탐지
   렌즈로(부록 A), `feature-develop`의 설계·구현·자체 검증(Phase 3.7)이 같은 규칙을 예방·자가리뷰
   체크리스트로 참조한다(표면 인덱스로 해당 섹션만·전체 로드 금지·복제 금지).
 
@@ -130,7 +130,7 @@ integrator` role 체인이고, `$ralph`가 설치돼 있으면 가속기로 쓸 
 ## 명령
 
 소비 프로젝트는 하네스 npm 스크립트를 갖지 않는다. 각 단계는 플러그인 스킬·커맨드
-(`/llm-project-harness:<name>`)로 부르고, 스킬 어댑터는 엔진을 세션 안에서
+(`/lph:<name>`)로 부르고, 스킬 어댑터는 엔진을 세션 안에서
 `${CLAUDE_PLUGIN_ROOT}/scripts/harness/*.mjs`로 실행한다. CI에서는 공용 composite
 action이 게이트를 돌린다.
 

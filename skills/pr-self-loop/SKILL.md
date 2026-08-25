@@ -1,21 +1,21 @@
 ---
 name: pr-self-loop
-description: Codex 자동 리뷰를 대신하는 자체 리뷰 루프. 코덱스 토큰이 소진·미가용일 때 pr-review-check-loop 대신 격리된 리뷰어 에이전트(Workflow 다중 렌즈 finder + 적대 검증)가 매 사이클 PR diff를 꼼꼼히 리뷰하고, 정당한 결함을 head 브랜치에서 수정·gate·커밋한 뒤, "연속 클린 2회(loop-until-dry)"에 도달할 때까지 조기종료 없이 루프를 돈다. **라이브 운영에 영향 주는 결함(BLOCKER)만 루프를 늘리고, 주석·문서 정합·네이밍 같은 사소한 것(COSMETIC)은 놓치지 않되 수렴 후 한 번에 배치 처리**해 루프가 늘어지지 않게 한다. "자체 리뷰 루프", "코덱스 대신 셀프 리뷰", "pr self loop", "격리 리뷰어로 돌려" 등에 사용. Codex를 쓰는 원본은 pr-review-check-loop.
+description: Codex 자동 리뷰를 대신하는 자체 리뷰 루프. 코덱스 토큰이 소진·미가용일 때 pr-codex-loop 대신 격리된 리뷰어 에이전트(Workflow 다중 렌즈 finder + 적대 검증)가 매 사이클 PR diff를 꼼꼼히 리뷰하고, 정당한 결함을 head 브랜치에서 수정·gate·커밋한 뒤, "연속 클린 2회(loop-until-dry)"에 도달할 때까지 조기종료 없이 루프를 돈다. **라이브 운영에 영향 주는 결함(BLOCKER)만 루프를 늘리고, 주석·문서 정합·네이밍 같은 사소한 것(COSMETIC)은 놓치지 않되 수렴 후 한 번에 배치 처리**해 루프가 늘어지지 않게 한다. "자체 리뷰 루프", "코덱스 대신 셀프 리뷰", "pr self loop", "격리 리뷰어로 돌려" 등에 사용. Codex를 쓰는 원본은 pr-codex-loop.
 ---
 
 # PR Self-Review Loop
 
 Codex 자동 리뷰를 **격리된 리뷰어 에이전트의 자체 리뷰**로 대체하는 루프. 코덱스 토큰이 소진되거나
-쓸 수 없을 때 [pr-review-check-loop](../pr-review-check-loop/SKILL.md)를 대신한다. 리뷰까지 Claude가
+쓸 수 없을 때 [pr-codex-loop](../pr-codex-loop/SKILL.md)를 대신한다. 리뷰까지 Claude가
 직접 하므로 **토큰 효율**과 **검증 정확도**를 동시에 챙기는 게 이 스킬의 존재 이유다.
 
-> ⚠️ pr-review-check-loop와 달리 이건 GitHub의 Codex 리뷰를 읽는 게 아니라 **자체 리뷰**라, github.com이든
+> ⚠️ pr-codex-loop와 달리 이건 GitHub의 Codex 리뷰를 읽는 게 아니라 **자체 리뷰**라, github.com이든
 > Enterprise든 로컬 브랜치든 무관하게 diff만 있으면 돈다(원격·리뷰 봇 불필요).
 
 ## Trigger
 - 사용자가 `/pr-self-loop` 명령 사용
 - "자체 리뷰 루프", "코덱스 대신 셀프 리뷰", "격리 리뷰어로 리뷰 끝까지", "pr self loop" 등
-- pr-review-check-loop 진행 중 Codex가 토큰 소진/무응답으로 재리뷰를 못 올릴 때 이 스킬로 전환
+- pr-codex-loop 진행 중 Codex가 토큰 소진/무응답으로 재리뷰를 못 올릴 때 이 스킬로 전환
 
 ## Arguments
 `/pr-self-loop [PR_LINK_OR_NUMBER | BRANCH]`

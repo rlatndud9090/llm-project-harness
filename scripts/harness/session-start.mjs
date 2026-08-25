@@ -57,7 +57,7 @@ function main() {
     );
   }
   lines.push(
-    "열린 요청은 /llm-project-harness:next-feature, 확정 작업은 /llm-project-harness:kickoff → prd-helper,",
+    "열린 요청은 /lph:next-feature, 확정 작업은 /lph:kickoff → prd-helper,",
     "사전 승인된 구현은 feature-develop, PR 차례면 make-pr로 진입합니다.",
   );
 

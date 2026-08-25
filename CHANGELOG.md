@@ -26,6 +26,38 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-08-25 v2.6.0 lph-prefix-and-pr-codex-skill-rename
+
+프롬프트 중간에서 `/` 입력 후 스킬을 자동완성하기 쉽게 두 가지를 바꿨다: (1) 슬래시 prefix
+축약, (2) 두 리뷰 스킬 개명.
+
+**변경 1 (슬래시 prefix `/llm-project-harness:` → `/lph:`)**
+
+- **뿌리**: Claude Code는 `plugin.json`의 `name` 필드를 커맨드/스킬 prefix로 쓴다(공식 문서
+  확인). name이 `llm-project-harness`라 prefix가 길어 `/` 자동완성 타이핑이 번거로웠다.
+- `.claude-plugin/plugin.json`의 `name`만 `lph`로 바꿨다. 마켓플레이스·활성화 식별자
+  (`marketplace.json`의 name들, 소비 레포 `.harness.json`의 `harness` 값, `.claude/settings.json`의
+  `extraKnownMarketplaces`/`enabledPlugins` 키)는 `llm-project-harness` 그대로다 — prefix만 짧아지고
+  활성화 배선은 안 건드린다.
+- `scripts/harness/init.mjs`: 이중역할을 하던 `MARKETPLACE_NAME`에서 **prefix 표시용
+  `PLUGIN_NAME = "lph"` 상수를 분리**했다(활성화 키는 계속 `MARKETPLACE_NAME`, 세션 안내의
+  `/${...}:next-feature` prefix만 `PLUGIN_NAME`). 활성 문서·엔진의 `/llm-project-harness:<name>`
+  표기를 전부 `/lph:<name>`으로 갱신했다(CHANGELOG의 과거 항목은 사료라 유지).
+
+**변경 2 (리뷰 스킬 개명 — 정체를 이름에 드러냄)**
+
+- `pr-review-check-loop` → **`pr-codex-loop`**, `pr-review-check-once` → **`pr-codex-once`**. 두
+  스킬 모두 Codex 자동 리뷰를 다루는데 이름이 모호했다. 디렉터리·frontmatter `name`·제목·명령
+  예시·상호참조·helper 캐시 경로(`~/.cache/pr-codex-loop/`)·다른 스킬(`make-pr`·`merge-and-clean`·
+  `pr-self-loop`)과 가이드의 참조를 일관되게 갱신했다. helper 파일명(`pr_review_watch.py`)은 내부
+  구현이라 유지. `pr-self-loop`(Codex 대신 격리 리뷰어) 이름은 그대로다.
+
+**소비자 조치: 없음.** 둘 다 플러그인 번들 안의 변경이라 마켓플레이스 갱신으로 자동 반영된다.
+소비 레포에 커밋된 배선이 바뀌지 않아 `/lph-init` 재실행도 불필요하다. 옛 명령을 습관적으로
+쓰던 경우 새 형태(예: `/lph:pr-codex-loop`)로 부르면 된다. 갱신 후에도 스킬이 옛
+`/llm-project-harness:` prefix로 노출되면 `/plugin`에서 이 플러그인을 한 번 비활성화→재활성화하면
+`/lph:`로 잡힌다(설정 파일 수정 불필요). 상세는 `harness/reconcile.md`의 `## 2.6.0`.
+
 ## 2026-08-24 v2.5.0 handoff-needs-input-notify-and-comment-convention
 
 **변경 1 (스킬 간 핸드오프·대기를 Needs input으로 신호 — FleetView 상태·알림 정확도)**

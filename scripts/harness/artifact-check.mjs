@@ -1092,7 +1092,7 @@ function assertHarnessAdapters() {
 // Plugin-model invariant (provider mode): a skill and a slash command must never
 // share a name. Claude Code disambiguates a name registered as BOTH a command and a
 // skill by forcing the plugin prefix, which defeats unprefixed skill invocation
-// (`/kickoff` → `/llm-project-harness:kickoff`). Keeping every skill name unique
+// (`/kickoff` → `/lph:kickoff`). Keeping every skill name unique
 // machine-guarantees all skills stay unprefixed-callable. When a slash entry point is
 // still wanted, name the command differently from the skill (e.g. the artifact-check
 // command ↔ artifact-validation skill pair); otherwise let the skill be the entry

@@ -35,7 +35,7 @@ scripts/harness/    init, kickoff, wiki ingest, artifact check, gate 엔진 스�
 
 플러그인이 소비 프로젝트에 제공하는 스킬은 하나의 작업 단위(feature/bugfix/chore)를
 아이디어부터 머지까지 끌고 가는 수명주기를 이룹니다. 스킬은
-`/llm-project-harness:<name>`으로 노출됩니다.
+`/lph:<name>`으로 노출됩니다.
 
 1. `next-feature` — 다음 작업 단위 후보를 추천하고 하나를 선택합니다.
 2. `kickoff` — 확정된 단위의 브랜치·`docs/raw` 디렉터리·템플릿을 생성합니다.
@@ -43,7 +43,7 @@ scripts/harness/    init, kickoff, wiki ingest, artifact check, gate 엔진 스�
    결정이 필요하면 ADR로 기록합니다.
 4. `feature-develop` — PRD/ADR을 근거로 구현·재작업·부분 수정을 진행합니다.
 5. `make-pr` — 사전 승인·구현이 끝난 단위를 최종 확정하고 커밋·PR을 만듭니다.
-6. `pr-review-check-loop` / `pr-self-loop` — 리뷰 코멘트를 무이슈까지 반영합니다.
+6. `pr-codex-loop` / `pr-self-loop` — 리뷰 코멘트를 무이슈까지 반영합니다.
 7. `merge-and-clean` — PR을 머지하고 브랜치·워크트리를 정리합니다.
 
 `one-shot`은 kickoff부터 리뷰 수렴까지를 사용자 개입 없이 한 번에 진행합니다.
@@ -86,7 +86,7 @@ block만 upsert합니다. 먼저 dry-run으로 확인합니다.
 /lph-init --retrofit --report lph-init-report.md
 ```
 
-플러그인 스킬·커맨드는 namespace(`/llm-project-harness:<name>`)로 노출되므로 로컬
+플러그인 스킬·커맨드는 namespace(`/lph:<name>`)로 노출되므로 로컬
 파일과 충돌하지 않습니다. 같은 이름의 로컬 스킬/커맨드가 있으면 로컬 정의가 우선합니다.
 
 ## 하네스 업데이트

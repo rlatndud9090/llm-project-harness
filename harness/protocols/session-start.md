@@ -53,7 +53,7 @@
 ClaudeCode에서 같은 단계가 `/command`와 skill 두 표면으로 노출되면(`kickoff`,
 `wiki-ingest`, `artifact-check`), `/command`는 사람이 직접 부르는 진입점이고 같은
 이름의 skill은 모델이 자동 트리거하는 진입점이다. 둘 다 같은 protocol 문서를 기준으로
-동작한다. 플러그인 스킬·커맨드는 namespace(`/llm-project-harness:<name>`)로 노출된다.
+동작한다. 플러그인 스킬·커맨드는 namespace(`/lph:<name>`)로 노출된다.
 
 ## 위임 비용 (항상 인지)
 

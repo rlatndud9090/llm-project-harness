@@ -87,7 +87,7 @@ description: 대상 PR을 squash merge한 뒤, 그 head 브랜치가 사는 전�
 ### 2. 사전 조회(최소 1콜) + 변수 확정 + 게이트
 
 **조회는 mergeability 확인용 단 한 번의 read로 끝낸다.** 리뷰 무이슈 판정(Codex `+1`/무이슈 문구)은
-`/llm-project-harness:pr-review-check-loop` 소관이므로 **여기서 reviews/threads/reactions/comments를 재조회하지 않는다**
+`/lph:pr-codex-loop` 소관이므로 **여기서 reviews/threads/reactions/comments를 재조회하지 않는다**
 (중복 조회 = 순수 토큰 낭비). merge-and-clean이 read에서 확인할 것은 오직 **mergeability + 정리에 필요한 ref/fork**다.
 
 1. `<remote>` 확정: `git rev-parse --abbrev-ref <base>@{upstream}`(성공 시 리모트명 추출) 또는 `git remote`가
@@ -227,7 +227,7 @@ fi
 아래를 지킨다(정보량·안전은 그대로, 같은 일을 더 적은 토큰으로).
 
 - **최소 조회 (M1):** GitHub read는 **mergeability 확인용 `gh pr view --json` 단 1콜**. 리뷰 무이슈 판정은
-  `/llm-project-harness:pr-review-check-loop` 소관 — reviews/threads/reactions/comments **재조회 금지**. `mergeable==UNKNOWN` 재조회만 예외(1~2회).
+  `/lph:pr-codex-loop` 소관 — reviews/threads/reactions/comments **재조회 금지**. `mergeable==UNKNOWN` 재조회만 예외(1~2회).
 - **페이로드 투영 (M2):** `gh pr view --json <필드목록>`으로 **서버사이드 투영**해 필요한 필드만 가져온다(2단계 목록 필드만).
   객체 전량을 다시 인용/에코하지 않는다.
 - **git 배치 (M3):** 정리·최신화는 개별 명령이 아니라 **블록 A(read-only 게이트) + 블록 B(파괴+최신화) 2회 실행**으로 묶어

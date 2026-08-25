@@ -26,8 +26,15 @@ const retrofit = Boolean(args.retrofit);
 const installHooks = !args["no-git-hooks"];
 const reportPath = typeof args.report === "string" ? path.resolve(projectRoot, args.report) : null;
 
+// 마켓플레이스/활성화 식별자: `.harness.json`의 `harness` 값과 소비 레포
+// `.claude/settings.json`의 `extraKnownMarketplaces`/`enabledPlugins` 키에 쓰인다.
+// 이 값은 배선(활성화 키)이므로 바꾸면 소비자가 재활성화해야 한다 — 그래서 고정한다.
 const MARKETPLACE_NAME = "llm-project-harness";
 const MARKETPLACE_REPO = "rlatndud9090/llm-project-harness";
+// 슬래시 prefix: 플러그인이 노출하는 커맨드/스킬은 `/${PLUGIN_NAME}:<name>`으로 불린다
+// (Claude Code는 `plugin.json`의 `name`을 prefix로 쓴다). 활성화 키(MARKETPLACE_NAME)와
+// 별개라, 여기만 짧게 두면 마켓플레이스/활성화 배선을 건드리지 않고 prefix만 짧아진다.
+const PLUGIN_NAME = "lph";
 
 if (sameRealPath(projectRoot, harnessRoot)) {
   fail("run this from a consuming project root, not from the harness plugin repository");
@@ -321,7 +328,7 @@ TODO: describe this product.
 1. Read \`docs/wiki/index.md\` first when starting project work.
 2. The harness plugin injects the shared session-start protocol at session start.
 3. Follow only raw links relevant to the task.
-4. Use \`/${MARKETPLACE_NAME}:next-feature\` for open-ended product work.
+4. Use \`/${PLUGIN_NAME}:next-feature\` for open-ended product work.
 5. Keep product-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
 
 The shared harness workflow (PRD/ADR, raw/wiki, approval gate, commit protocol) is

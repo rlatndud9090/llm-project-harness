@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only helpers for the pr-review-check-loop skill (Claude Code port).
+"""Read-only helpers for the pr-codex-loop skill (Claude Code port).
 
 Subcommands:
 - ack: wait for Codex bot `eyes` reaction on an issue comment
@@ -23,7 +23,7 @@ Claude Code port notes (differs from the codex original):
   (This is the single most common failure mode in this environment.)
 - `append_stat` never raises: a stats-write failure must not kill a watch,
   because a dead watch reads as a premature "done".
-- Default stats path lives under ~/.cache/pr-review-check-loop (not ~/.codex).
+- Default stats path lives under ~/.cache/pr-codex-loop (not ~/.codex).
 
 Responsiveness redesign (2026-07):
 - `parse_iso` accepts BOTH `...Z` and numeric-offset (`...+09:00`) timestamps.
@@ -60,7 +60,7 @@ from typing import Any
 CODEX_LOGIN = "chatgpt-codex-connector"
 RECENT_REVIEW_WINDOW = 50
 DEFAULT_STATS_PATH = (
-    Path.home() / ".cache" / "pr-review-check-loop" / "poll_stats.jsonl"
+    Path.home() / ".cache" / "pr-codex-loop" / "poll_stats.jsonl"
 )
 NO_ISSUES_PATTERNS = (
     "didn't find any major issues",
@@ -745,7 +745,7 @@ def watch_mode(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Read-only helpers for pr-review-check-loop")
+    parser = argparse.ArgumentParser(description="Read-only helpers for pr-codex-loop")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     ack = subparsers.add_parser("ack", help="wait for Codex bot eyes reaction on a trigger comment")

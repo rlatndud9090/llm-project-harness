@@ -1,6 +1,6 @@
-# PR Review Check Loop — Protocol
+# PR Codex Loop — Protocol
 
-이 문서는 `pr-review-check-loop` 스킬의 **상태기계·조기종료 방지 규칙·복구 규칙**을 정의한다.
+이 문서는 `pr-codex-loop` 스킬의 **상태기계·조기종료 방지 규칙·복구 규칙**을 정의한다.
 SKILL.md보다 이 문서가 더 상세하며, 충돌 시 **이 문서의 non-negotiable 규칙이 우선**한다.
 
 > 이 프로토콜의 존재 이유: Codex 원본 스킬에서 "루프가 완전히 끝나지 않았는데 에이전트가 제멋대로 종료하는" 현상이 반복됐다. 아래 규칙은 그 조기종료를 막기 위한 것이며, 임의로 완화하면 안 된다.
@@ -153,7 +153,7 @@ Codex가 새 PR에 자동리뷰를 거는 저장소용 **변형**(기본 경로 
 실행 예:
 
 ```bash
-PR_REVIEW_WATCH="${CLAUDE_PLUGIN_ROOT}/skills/pr-review-check-loop/scripts/pr_review_watch.py"
+PR_REVIEW_WATCH="${CLAUDE_PLUGIN_ROOT}/skills/pr-codex-loop/scripts/pr_review_watch.py"
 python3 "$PR_REVIEW_WATCH" watch \
   --owner <OWNER> --repo <REPO> --pr-number <N> \
   --trigger-ts <TRIGGER_TS> \
@@ -233,7 +233,7 @@ helper stdout의 `result` 필드로 분기:
 체크포인트 파일 경로:
 
 ```
-~/.cache/pr-review-check-loop/pr-<owner>-<repo>-<N>.json
+~/.cache/pr-codex-loop/pr-<owner>-<repo>-<N>.json
 ```
 
 최소 필드:
@@ -253,7 +253,7 @@ helper stdout의 `result` 필드로 분기:
 }
 ```
 
-재개: 사용자가 `/pr-review-check-loop <PR>` 를 다시 호출하면 이 파일을 읽어 **같은 cycle을 이어간다.** 체크포인트는 완료가 아니라 일시중지이며, 보고 시 반드시 "미완료 — 재개 필요"임을 명시한다.
+재개: 사용자가 `/pr-codex-loop <PR>` 를 다시 호출하면 이 파일을 읽어 **같은 cycle을 이어간다.** 체크포인트는 완료가 아니라 일시중지이며, 보고 시 반드시 "미완료 — 재개 필요"임을 명시한다.
 
 ---
 

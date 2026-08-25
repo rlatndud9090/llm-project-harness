@@ -28,6 +28,23 @@
 
 ---
 
+## 2.6.0
+
+- (없음) **슬래시 prefix를 `/llm-project-harness:`에서 `/lph:`로 축약**했다(프롬프트 중간에서
+  `/` 자동완성이 짧아진다). `plugin.json`의 `name`만 `lph`로 바꿨고(Claude Code는 이 필드를
+  커맨드/스킬 prefix로 쓴다), 마켓플레이스·활성화 식별자(`marketplace.json`의 name들,
+  소비 레포 `.harness.json`의 `harness` 값, `.claude/settings.json`의
+  `extraKnownMarketplaces`/`enabledPlugins` 키)는 `llm-project-harness` 그대로다. 소비 레포에
+  **커밋된 배선이 바뀌지 않으므로 `/lph-init` 재실행은 불필요**하고, 마켓플레이스 갱신만으로
+  새 prefix가 반영된다. 다만 Claude Code가 plugin name 변경 뒤 활성화 키를 자동 인식하지 못해
+  갱신 후에도 스킬이 옛 `/llm-project-harness:` prefix로 보이면, `/plugin`에서 이 플러그인을
+  한 번 **비활성화→재활성화**하면 `/lph:`로 잡힌다(설정 파일 수정 불필요).
+- (없음) 두 리뷰 스킬을 이름으로 정체가 드러나게 개명했다: `pr-review-check-loop` →
+  **`pr-codex-loop`**, `pr-review-check-once` → **`pr-codex-once`**(Codex 자동 리뷰를 다루는
+  스킬임을 이름에서 바로 읽게 했다). 플러그인 번들 안의 변경이라 마켓플레이스 갱신으로 자동
+  반영된다. 옛 이름으로 부르던 습관만 새 이름(예: `/lph:pr-codex-loop`)으로 바꾸면 된다 —
+  배선/산출물 조치 없음.
+
 ## 2.5.0
 
 - (없음) 세 가지 인-플러그인 변경으로, 전부 마켓플레이스 갱신으로 자동 반영된다: (1) 스킬 간

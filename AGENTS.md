@@ -97,7 +97,7 @@ CI through the composite action.
 The symlink/overlay model (and `--retrofit`/`--force`) is obsolete. The plugin
 provides its commands, agents, and skills globally once it is enabled.
 
-- The plugin's surfaces are namespaced (`/llm-project-harness:<name>`), so they
+- The plugin's surfaces are namespaced (`/lph:<name>`), so they
   never collide with a project's own files.
 - A project overrides any harness surface by defining a same-named local skill
   or command in its own `.claude/` — the local definition wins.
@@ -111,7 +111,7 @@ provides its commands, agents, and skills globally once it is enabled.
 Protocol and adapter prose points at harness skills with a `$` marker, e.g.
 `$next-feature`, `$kickoff`, `$prd-helper`. `$<name>` means "invoke the harness
 skill `<name>`" — in the plugin the runtime invocation is plugin-namespaced,
-`/llm-project-harness:<name>` (or the Skill tool). The marker is a documentation
+`/lph:<name>` (or the Skill tool). The marker is a documentation
 pointer, not a shell variable, and the name always matches a shipped skill
 adapter. Load-bearing handoffs name the skill in plain language too, so the
 marker is never the only signal.

@@ -111,7 +111,7 @@ version이 올라가 넛지가 저절로 사라진다. 이 훅(로컬)은 CI(우
   개발자가 따로 명령을 외울 필요 없이 `git commit`이 곧 게이트다.
 - **수동 즉시 실행** — 커밋 없이 지금 돌리려면 `sh .git/hooks/pre-commit`. (훅에 baked된
   플러그인 절대경로를 그대로 태우므로 세션 밖에서도 동작한다.)
-- **세션 내** — `/llm-project-harness:artifact-validation` 스킬(플러그인 엔진 직접 호출).
+- **세션 내** — `/lph:artifact-validation` 스킬(플러그인 엔진 직접 호출).
 - **CI(권장)** — `.github/workflows/harness.yml`의 composite action이 **main-타겟 PR마다**
   `check + lint + build + test`를 서버사이드에서 돌린다(문서 전용 PR은 `check`만).
 

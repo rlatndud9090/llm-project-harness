@@ -1,30 +1,30 @@
 ---
-name: pr-review-check-once
-description: PR에 Codex가 자동으로 남긴 리뷰 코멘트를 1회(one-pass) 점검·검증하고, 정당한 지적은 PR 브랜치에서 수정·푸시한 뒤 각 코멘트에 답글로 반영 내용을 설명한다(gh CLI 우선, MCP 폴백). PR 링크를 인자로 받거나, 없으면 현재 세션이 다루던 PR을 추론한다. 의사결정(PRD/ADR)에 반하는 지적은 적용 전 사용자와 논의. "코덱스 리뷰 확인", "PR 코멘트 확인", "check codex review", "리뷰 코멘트 반영", "리뷰 한번만 확인" 등에 사용. 재리뷰를 요청하고 무이슈까지 계속 감시·반복하는 라이브 워치 루프가 필요하면 pr-review-check-loop.
+name: pr-codex-once
+description: PR에 Codex가 자동으로 남긴 리뷰 코멘트를 1회(one-pass) 점검·검증하고, 정당한 지적은 PR 브랜치에서 수정·푸시한 뒤 각 코멘트에 답글로 반영 내용을 설명한다(gh CLI 우선, MCP 폴백). PR 링크를 인자로 받거나, 없으면 현재 세션이 다루던 PR을 추론한다. 의사결정(PRD/ADR)에 반하는 지적은 적용 전 사용자와 논의. "코덱스 리뷰 확인", "PR 코멘트 확인", "check codex review", "리뷰 코멘트 반영", "리뷰 한번만 확인" 등에 사용. 재리뷰를 요청하고 무이슈까지 계속 감시·반복하는 라이브 워치 루프가 필요하면 pr-codex-loop.
 ---
 
-# pr-review-check-once
+# pr-codex-once
 
 PR에 달린 **Codex 자동 리뷰**를 가져와 프로젝트 정보 + 현재 세션 컨텍스트로 검증하고, 정당한 지적은 PR 브랜치에서 수정·푸시한 뒤 **각 코멘트에 답글**로 반영 내용을 설명하는 **1회성(one-pass) 경량 스킬**.
 
-> 🔁 **재리뷰 요청 + 무이슈까지 반복(live-watch loop)** 이 필요하면 **`/llm-project-harness:pr-review-check-loop`** 스킬을 쓴다. 이 스킬은 한 번 확인·반영·푸시·답글하고 종료하는 경량 버전이며, GitHub 작업은 **`gh` CLI 우선**(토큰 효율), gh 미가용 시 `mcp__github__*` MCP 폴백이다.
+> 🔁 **재리뷰 요청 + 무이슈까지 반복(live-watch loop)** 이 필요하면 **`/lph:pr-codex-loop`** 스킬을 쓴다. 이 스킬은 한 번 확인·반영·푸시·답글하고 종료하는 경량 버전이며, GitHub 작업은 **`gh` CLI 우선**(토큰 효율), gh 미가용 시 `mcp__github__*` MCP 폴백이다.
 
 > ⚠️ **적용 대상 제한 — Codex 자동 리뷰가 없는 호스트는 제외.** Codex 자동 리뷰는 **github.com** 레포에만 붙는다. 시작 시 `git remote get-url origin`으로 호스트를 확인해 **`github.com`이 아니면(예: GitHub Enterprise 호스트) 이 스킬을 적용하지 않는다**: Codex 리뷰가 존재하지 않으므로, 그 사실을 사용자에게 한 줄로 알리고 **즉시 종료**한다(코드 변경·푸시·답글 금지).
 
 ## Trigger
-- 사용자가 `/pr-review-check-once` 명령 사용 (구 `/check-codex-review`)
+- 사용자가 `/pr-codex-once` 명령 사용 (구 `/check-codex-review`)
 - "코덱스 리뷰 확인", "PR 코멘트 확인", "리뷰 코멘트 반영", "리뷰 한번만 확인", "check codex review" 등 요청
 
 ## Arguments
-`/pr-review-check-once [PR_LINK_OR_NUMBER]`
+`/pr-codex-once [PR_LINK_OR_NUMBER]`
 
 - **PR_LINK_OR_NUMBER** (선택): PR URL(`https://github.com/<owner>/<repo>/pull/<N>`), `owner/repo#N`, 또는 단순 `#N`(현재 repo 기준).
   - 생략 시 **현재 세션이 다루던 PR을 추론**한다(절차 1). 추론 불가 시에만 사용자에게 명시적 링크를 요청한다.
 
 **예시:**
-- `/pr-review-check-once https://github.com/<owner>/<repo>/pull/4`
-- `/pr-review-check-once #4`
-- `/pr-review-check-once` — 세션 컨텍스트에서 PR 추론
+- `/pr-codex-once https://github.com/<owner>/<repo>/pull/4`
+- `/pr-codex-once #4`
+- `/pr-codex-once` — 세션 컨텍스트에서 PR 추론
 
 ## 핵심 규칙 (반드시 준수)
 
@@ -82,7 +82,7 @@ gh api repos/<O>/<R>/issues/<N>/comments --paginate \
   gh api repos/<O>/<R>/issues/<N>/reactions
   ```
   Codex bot의 `+1`(무이슈) 흔적이 있으면 clean 확정. 그대로 "리뷰할 것 없음(clean)" 보고 후 종료.
-  - 단, **PR이 방금 열렸거나 Codex 리뷰 이벤트 흔적이 전혀 없으면(리액션도 없음)** 아직 리뷰 전일 수 있으니, 그 사실을 보고하고 대기/재시도 여부를 사용자에게 묻는다. (무이슈까지 자동 감시가 필요하면 `/llm-project-harness:pr-review-check-loop`.)
+  - 단, **PR이 방금 열렸거나 Codex 리뷰 이벤트 흔적이 전혀 없으면(리액션도 없음)** 아직 리뷰 전일 수 있으니, 그 사실을 보고하고 대기/재시도 여부를 사용자에게 묻는다. (무이슈까지 자동 감시가 필요하면 `/lph:pr-codex-loop`.)
 
 ### 3. 컨텍스트 종합 + 검증
 각 Codex 코멘트를 다음으로 교차 검증:
@@ -107,7 +107,7 @@ gh api repos/<O>/<R>/issues/<N>/comments --paginate \
 3. 선택지 — **(a)** 결정 유지 + Codex에 "의도된 설계"라고 답글, **(b)** ADR supersede
 를 제시하고 **사용자 결정을 먼저 받는다.** 결정 전에는 그 항목을 수정하지 않는다.
 
-→ (b) supersede 선택 시: `/llm-project-harness:adr-helper` 흐름으로 **새 ADR(accepted) 작성 + 기존 ADR status를 `superseded`로 갱신**까지 완료한 **뒤** 코드 수정에 착수한다(문서만 남고 코드가 안 바뀌거나, 코드만 바뀌고 ADR이 stale로 남는 일 방지).
+→ (b) supersede 선택 시: `/lph:adr-helper` 흐름으로 **새 ADR(accepted) 작성 + 기존 ADR status를 `superseded`로 갱신**까지 완료한 **뒤** 코드 수정에 착수한다(문서만 남고 코드가 안 바뀌거나, 코드만 바뀌고 ADR이 stale로 남는 일 방지).
 
 > ⚠️ **하네스 주의(accepted ADR 불변)**: 이 하네스의 `harness:check`는 **accepted/superseded ADR 본문 변경을 차단**한다. 그러므로 (a) 결정 유지 + 추적만 할 때 노트는 **`adr.md`가 아니라 `notes.md`(후속작업 섹션)** 에 남긴다. ADR 결정 자체를 바꾸려면 (b) supersede ADR로만 한다.
 
@@ -148,7 +148,7 @@ gh api repos/<O>/<R>/issues/<N>/comments -f body='...'
 - harness:gate 결과(green 여부),
 - 단 답글 목록.
 
-clean인 경우엔 "리뷰할 것 없음"만 간결히 보고. (반영 후 재리뷰를 걸고 무이슈까지 반복하고 싶다면 `/llm-project-harness:pr-review-check-loop`로 이어가도록 안내.)
+clean인 경우엔 "리뷰할 것 없음"만 간결히 보고. (반영 후 재리뷰를 걸고 무이슈까지 반복하고 싶다면 `/lph:pr-codex-loop`로 이어가도록 안내.)
 
 ## 주의사항
 - **`gh` CLI 우선** — 항상 `gh ...`, 조회는 `--jq` 투영+Codex 필터. gh 미가용 시에만 `mcp__github__*` MCP 폴백(deferred면 `ToolSearch` 선행). **gh·MCP 둘 다 없으면 답글·푸시 불가** → 사용자에게 보고. write 전 계정·호스트 가드(`gh api user -q .login` 인증 계정 + `git remote get-url origin` 호스트 확인, 다르거나 불명확하면 중단; 특정 계정 고정 금지).
@@ -159,4 +159,4 @@ clean인 경우엔 "리뷰할 것 없음"만 간결히 보고. (반영 후 재�
 - valid-bug는 **수정 전 실패 테스트로 결함 입증** 후 고친다(false-positive 오반영 방지).
 - 답글은 **반영 사실과 근거**를 구체적으로 — Codex가 닫을 수 있도록.
 - 백그라운드 잡/공유 체크아웃에서는 worktree 격리로 작업.
-- **무이슈까지 자동 반복이 필요하면 → `/llm-project-harness:pr-review-check-loop`.**
+- **무이슈까지 자동 반복이 필요하면 → `/lph:pr-codex-loop`.**
