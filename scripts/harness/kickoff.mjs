@@ -11,6 +11,7 @@ import {
   harnessPath,
   inferRawUnitFromBranch,
   isGitRepo,
+  isLinkedWorktree,
   localBranchExists,
   normalizeIssueRef,
   parseArgs,
@@ -122,8 +123,25 @@ function resolveBranch() {
     }
   }
 
-  // 자동 전환은 하지 않는다 — 주 워킹트리는 예약돼 있다. 격리된 워크트리를 기대하며
-  // 상황만 알린다(base·다른 브랜치·detached 모두 "워크트리로 격리하라"로 수렴).
+  // 이미 전용 워크트리 안(격리됨)인데 아직 canonical 작업 브랜치가 아닌 경우. 이 세션은
+  // remote-control --spawn worktree(on-demand 세션마다 워크트리)나 이전 EnterWorktree로
+  // 이미 격리돼 있다 — EnterWorktree로 "다시" 격리하는 건 중복이자 거부된다(도구가 "이미
+  // 워크트리 세션이면 새 워크트리 생성 불가"). 그러니 격리를 또 지시하지 말고, 이 워크트리
+  // 안에서 canonical 브랜치만 맞추도록 --checkout을 안내한다(자동 전환은 여전히 안 한다 —
+  // base 신선도·WIP 판단은 호출자 몫). 격리 방법에 무관하게 git 사실(linked worktree)로만
+  // 판정하므로 remote-control 내부 동작에 의존하지 않는다.
+  if (isLinkedWorktree()) {
+    console.warn(
+      `[kickoff] 이미 전용 워크트리 안입니다(브랜치 ${current}). EnterWorktree로 다시 격리하지 마세요 ` +
+        `— 이미 격리돼 있어 재격리는 거부됩니다. 이 워크트리 안에서 --checkout으로 ${branchName}을(를) ` +
+        `만들어 canonical 작업 브랜치로 맞추세요: harness:kickoff --checkout --type ${type} --slug ${slug}.`,
+    );
+    return `이미 격리된 워크트리 · 브랜치 미변경 (현재 ${current})`;
+  }
+
+  // 주 워킹트리(격리 안 됨)에서 격리 없이 호출됨. 자동 전환은 하지 않는다 — 주 워킹트리는
+  // 개발자 몫으로 예약돼 있다. 전용 워크트리로 격리하라고만 알린다(base·다른 브랜치·detached
+  // 모두 "워크트리로 격리하라"로 수렴).
   if (current === "HEAD") {
     console.warn(`[kickoff] detached HEAD 상태입니다. origin/main 기준 워크트리로 격리한 뒤 다시 실행하거나 --checkout으로 ${branchName}을(를) 만드세요.`);
   } else if (BASE_BRANCHES.has(current)) {

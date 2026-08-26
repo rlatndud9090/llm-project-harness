@@ -151,6 +151,36 @@ export function isGitRepo() {
   }
 }
 
+// True when REPO_ROOT is a *linked* git worktree rather than the primary working
+// tree — i.e. the session is ALREADY isolated. This is the git-observable fact that
+// lets kickoff stay agnostic about HOW isolation happened: a worktree created by
+// Claude Code's EnterWorktree, by `git worktree add`, or spun up by
+// `claude remote-control --spawn worktree` (each on-demand session gets its own
+// worktree) all land here identically. A linked worktree's per-worktree git dir
+// (`.git/worktrees/<name>`) differs from the shared common dir (`.git`); in the main
+// worktree the two coincide. Paths are normalized against REPO_ROOT because git may
+// report either relative (`.git`) or absolute forms depending on cwd/version.
+// Non-git or any error reads as false — fail safe toward "main working tree" so
+// kickoff keeps its default main-wt isolation guard rather than silently skipping it.
+export function isLinkedWorktree() {
+  try {
+    const gitDir = execFileSync("git", ["rev-parse", "--git-dir"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const commonDir = execFileSync("git", ["rev-parse", "--git-common-dir"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (!gitDir || !commonDir) return false;
+    return path.resolve(REPO_ROOT, gitDir) !== path.resolve(REPO_ROOT, commonDir);
+  } catch {
+    return false;
+  }
+}
+
 // True when the work tree has no staged/unstaged/untracked changes (porcelain
 // output is empty). Auto-branching only happens on a clean tree so a checkout can
 // never carry or strand a work-in-progress. Errors read as "not clean" (fail safe).

@@ -61,6 +61,19 @@ function main() {
     "사전 승인된 구현은 feature-develop, PR 차례면 make-pr로 진입합니다.",
   );
 
+  // 이미 전용 워크트리 안(격리됨)이면 kickoff이 재격리하지 않도록 미리 신호한다. remote-control
+  // --spawn worktree는 on-demand 세션마다 워크트리를 만들어 세션이 시작부터 격리돼 있는데,
+  // 그 상태에서 kickoff이 EnterWorktree로 "다시" 격리하려 들면 도구가 "이미 워크트리 세션"이라
+  // 거부한다. git 사실(linked worktree)로만 판정하므로 격리 방법(remote-control·EnterWorktree)에
+  // 무관하다.
+  if (isLinkedWorktree(projectDir)) {
+    lines.push(
+      "※ 이미 전용 워크트리 안입니다(격리됨 · remote-control --spawn worktree 등). " +
+        "/lph:kickoff 시 EnterWorktree로 다시 격리하지 마세요 — 이미 격리돼 있어 재격리는 거부됩니다. " +
+        "브랜치가 이미 feature|bugfix|chore/<slug>면 그대로 kickoff, 임의 이름이면 이 워크트리 안에서 --checkout으로 맞춥니다.",
+    );
+  }
+
   // 배선 신선도 넛지. 플러그인(엔진·스킬·훅)은 마켓플레이스로 자동 갱신되지만,
   // /lph-init이 소비 레포에 직접 커밋한 "배선"(git훅의 baked 절대경로·CI 워크플로·
   // .harness.json·settings)은 자동으로 안 바뀐다. 설치된 플러그인 버전이 이 저장소에
@@ -112,5 +125,29 @@ function currentBranch(cwd) {
     }).trim();
   } catch {
     return null;
+  }
+}
+
+// True when cwd is a linked git worktree (already isolated) rather than the main
+// working tree. Mirrors lib.mjs isLinkedWorktree but stays self-contained — this hook
+// intentionally imports nothing from the engine so a bug here can never wedge a
+// session (fail open). A linked worktree's per-worktree git dir differs from the
+// shared common dir; in the main worktree they coincide. Any error reads as false.
+function isLinkedWorktree(cwd) {
+  try {
+    const gitDir = execFileSync("git", ["rev-parse", "--git-dir"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const commonDir = execFileSync("git", ["rev-parse", "--git-common-dir"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (!gitDir || !commonDir) return false;
+    return path.resolve(cwd, gitDir) !== path.resolve(cwd, commonDir);
+  } catch {
+    return false;
   }
 }

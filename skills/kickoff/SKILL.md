@@ -25,17 +25,25 @@ raw 골격이 생기면 `$prd-helper`로 PRD 작성을 잇는다.
 
 ## 워크트리 격리 (필수 · 주 워킹트리는 개발자 몫)
 
-`harness:kickoff`을 부르기 **전에** 항상 작업을 origin/main 기준 전용 워크트리로 격리한다.
-주 워킹트리(main-wt)는 개발자가 직접 작업·확인하는 자리라 절대 건드리지 않는다 — main-wt
-상태(clean/dirty·어느 브랜치 위인지)와 무관하게 **항상** 격리한다.
+`harness:kickoff`을 부르기 **전에**, 먼저 **이 세션이 이미 전용 워크트리 안(격리됨)인지**
+본다. `claude remote-control --spawn worktree`는 on-demand 세션마다 워크트리를 만들어 세션이
+시작부터 격리돼 있고, 앞 단계에서 `EnterWorktree`로 격리했을 수도 있다. 판정은 격리 방법이
+아니라 git 사실(**linked worktree**)로 한다 — 세션 시작 훅이 이미 격리됐으면 "이미 전용
+워크트리 안입니다" 신호를 준다.
 
-1. `git fetch origin`으로 origin/main을 최신화한다.
-2. origin/main을 베이스로 전용 워크트리를 만들고 그 안으로 들어간다.
-   - **ClaudeCode**: `EnterWorktree`(이름 `<type>/<slug>`). 기본 `worktree.baseRef=fresh`면
-     origin/<기본 브랜치>에서 분기한다(설정이 `head`면 origin/main 기준이 되도록 조정).
-   - **Codex**: `git worktree add -b <type>/<slug> <path> origin/main` 후 그 경로로 이동.
-3. 그 워크트리 안에서 위 `harness:kickoff`을 실행한다. 이미 이 유닛의 작업 브랜치 위라
-   스크립트가 브랜치를 건드리지 않고 골격만 만든다.
+- **이미 격리돼 있으면 — `EnterWorktree`를 다시 부르지 않는다**(이미 워크트리 세션이라
+  도구가 거부한다 · 재격리는 중복). 브랜치가 이미 `<type>/<slug>`(또는 `worktree-<type>+<slug>`)면
+  그 자리서 바로 `harness:kickoff`. 임의 이름(remote-control 자동 이름 등)이면 이 워크트리
+  안에서 `harness:kickoff --checkout --type <t> --slug <s>`로 canonical 브랜치를 맞춘다.
+- **주 워킹트리(격리 안 됨)이면 — origin/main 기준 전용 워크트리로 격리하고** 그 안에서
+  kickoff한다. main-wt는 개발자가 직접 작업·확인하는 자리라 절대 건드리지 않는다(상태 무관):
+  1. `git fetch origin`으로 origin/main을 최신화한다.
+  2. origin/main을 베이스로 전용 워크트리를 만들고 그 안으로 들어간다.
+     - **ClaudeCode**: `EnterWorktree`(이름 `<type>/<slug>`). 기본 `worktree.baseRef=fresh`면
+       origin/<기본 브랜치>에서 분기한다(설정이 `head`면 origin/main 기준이 되도록 조정).
+     - **Codex**: `git worktree add -b <type>/<slug> <path> origin/main` 후 그 경로로 이동.
+  3. 그 워크트리 안에서 `harness:kickoff`을 실행한다. 이미 이 유닛의 작업 브랜치 위라
+     스크립트가 브랜치를 건드리지 않고 골격만 만든다.
 
 **브랜치명은 손대지 않는다.** ClaudeCode `EnterWorktree`는 이름 `<type>/<slug>`를 받아 브랜치를
 `worktree-<type>+<slug>`로 만든다(`worktree-` 프리픽스 + `/`→`+`). 이 형태를 canonical로 되돌리는
@@ -43,10 +51,13 @@ raw 골격이 생기면 `$prd-helper`로 PRD 작성을 잇는다.
 `ExitWorktree` 정리를 깬다. 하네스가 이 형태를 그대로 인정한다(`parseWorkBranch`가 파싱해 raw
 `docs/raw/<type>/<slug>`로 정합; branch↔raw 게이트 통과).
 
-**EnterWorktree가 실패하면 그 결과·원인을 사용자에게 그대로 알리고 멈춘다.** `git worktree add`나
-main-wt 그 자리 `--checkout` 같은 우회로 워크트리/브랜치를 만들지 않는다 — 우회 생성물은
-`ExitWorktree`가 추적하지 못해 merge-and-clean이 깔끔히 못 빠져나온다. `--checkout`은 사용자가
-명시적으로 main-wt에서 작업하겠다고 할 때만 쓰는 탈출구이지 실패 폴백이 아니다.
+**(주 워킹트리에서 격리하려는데) EnterWorktree가 실패하면 그 결과·원인을 사용자에게 그대로
+알리고 멈춘다.** `git worktree add`나 main-wt 그 자리 `--checkout` 같은 우회로 워크트리/브랜치를
+만들지 않는다 — 우회 생성물은 `ExitWorktree`가 추적하지 못해 merge-and-clean이 깔끔히 못
+빠져나온다. `--checkout`은 main-wt에서 **명시적으로** 작업하겠다고 할 때, 또는 **이미 격리된
+워크트리 안에서 canonical 브랜치를 맞출 때** 쓰는 명시 옵션이지 (주 워킹트리) 실패 폴백이 아니다.
+단, **"이미 워크트리 세션이라 못 만든다"는 실패가 아니라 이미 격리된 정상 상태**다 — 위 분기대로
+애초에 EnterWorktree를 부르지 않으면 되고, 이 거부를 보고 재시도하지 않는다.
 
 격리 없이 base(main)에서 부르면 kickoff은 전환하지 않고 "워크트리로 격리하라" 힌트만 낸다.
 공용 기준은 `${CLAUDE_PLUGIN_ROOT}/harness/protocols/kickoff.md`의 "브랜치 처리".

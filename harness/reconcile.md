@@ -28,6 +28,14 @@
 
 ---
 
+## 2.8.0
+
+- (없음) kickoff이 이미 격리된 워크트리(`claude remote-control --spawn worktree`의 on-demand
+  세션 등)를 git 사실(linked worktree: per-worktree git dir ≠ 공용 common dir)로 인지해,
+  `EnterWorktree` 재격리(중복·거부)를 지시하지 않고 그 자리서 kickoff(임의 브랜치면 `--checkout`)
+  하도록 한다. 엔진(`lib.mjs`·`kickoff.mjs`·세션 시작 훅)·`kickoff` 스킬·프로토콜 변경이라
+  마켓플레이스 갱신만으로 자동 반영되고 소비 레포에 커밋된 배선은 바뀌지 않는다.
+
 ## 2.7.0
 
 - (없음) 리뷰 지침(`code-review-guideline.md`)에 allowlist 코어 렌즈·경로 식별자 완전성 detector·

@@ -461,6 +461,62 @@ describe("kickoff-window link gates (settled-gating)", () => {
   });
 });
 
+describe("kickoff in a linked worktree (remote-control --spawn worktree / EnterWorktree)", () => {
+  // Reproduces the runtime shape of `claude remote-control --spawn worktree`: the
+  // session runs INSIDE an already-created linked worktree. kickoff must detect that
+  // (git-observable, no dependency on how it was isolated) and NOT tell it to isolate
+  // again — EnterWorktree would reject a re-isolation, wedging kickoff's first step.
+  function seedWorktree(projectRoot, branch) {
+    writeFile(path.join(projectRoot, "seed.txt"), "seed\n");
+    commitAll(projectRoot);
+    const wtPath = path.join(projectRoot, ".wt");
+    git(projectRoot, ["worktree", "add", "-q", "-b", branch, wtPath]);
+    return wtPath;
+  }
+
+  it("keeps a canonical work branch as-is and scaffolds (branch-first, no re-isolation)", () => {
+    withGitProject((projectRoot) => {
+      const wtPath = seedWorktree(projectRoot, "feature/data-contract");
+
+      const result = kickoff(wtPath, ["--type", "feature", "--slug", "data-contract", "--title", "데이터 계약"]);
+
+      expect(result.status).toBe(0);
+      expect(read(path.join(wtPath, "docs", "raw", "feature", "data-contract", "prd.md"))).toContain("데이터 계약");
+      expect(result.stdout).toContain("그대로 둠");
+    });
+  });
+
+  it("does NOT tell an already-isolated worktree to isolate again; points to --checkout", () => {
+    withGitProject((projectRoot) => {
+      // A non-work-branch name, like the auto-generated name remote-control may use.
+      const wtPath = seedWorktree(projectRoot, "worktree-random-name");
+
+      const result = kickoff(wtPath, ["--type", "feature", "--slug", "data-contract", "--title", "데이터 계약"]);
+
+      // The skeleton is still created; only the branch hint changes.
+      expect(result.status).toBe(0);
+      const out = `${result.stdout}${result.stderr}`;
+      expect(out).toContain("이미 전용 워크트리");
+      expect(out).toContain("다시 격리하지 마세요");
+      expect(out).toContain("--checkout");
+      // Must NOT emit the main-working-tree "isolate into a worktree" hint.
+      expect(out).not.toContain("origin/main 기준 전용 워크트리로 격리해");
+    });
+  });
+
+  it("--checkout inside the worktree pins the canonical branch (no re-isolation needed)", () => {
+    withGitProject((projectRoot) => {
+      const wtPath = seedWorktree(projectRoot, "worktree-random-name");
+
+      const result = kickoff(wtPath, ["--checkout", "--type", "feature", "--slug", "data-contract", "--title", "데이터 계약"]);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("생성·전환");
+      expect(currentBranch(wtPath)).toBe("feature/data-contract");
+    });
+  });
+});
+
 describe("artifact-check area gates", () => {
   it("fails when a declared area does not match the linked heading", () => {
     withProject((projectRoot) => {

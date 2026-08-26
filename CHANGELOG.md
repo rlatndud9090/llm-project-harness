@@ -26,6 +26,33 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-08-26 v2.8.0 kickoff-worktree-aware-remote-control
+
+`claude remote-control --spawn worktree`(원격 제어 서버가 on-demand 세션마다 전용 워크트리를
+만드는 모드)에서 새 세션은 **시작부터 이미 격리**돼 있다. 이 상태에서 kickoff이 기존 지침대로
+`EnterWorktree`로 "또" 격리하려 들면, 도구가 "이미 워크트리 세션이면 새 워크트리를 만들 수 없다"며
+거부해 kickoff 첫 단계가 걸렸다. kickoff이 이미 격리된 워크트리를 인지하고 재격리를 건너뛰도록 했다.
+
+**변경**
+
+- `scripts/harness/lib.mjs`: `isLinkedWorktree()` 추가 — per-worktree git dir와 공용 common dir을
+  비교해, 세션이 이미 linked worktree(격리됨)인지 **git 사실로만** 판정한다. 격리를 누가
+  (remote-control·EnterWorktree·`git worktree add`) 했는지에 무관하고 remote-control 내부 동작에
+  의존하지 않는다(공식 문서가 on-demand 워크트리의 브랜치명·baseRef를 확정하지 않으므로 관찰 가능한
+  git 사실만 신뢰).
+- `scripts/harness/kickoff.mjs`: 브랜치 힌트를 linked worktree 여부로 분기 — 이미 격리된 워크트리인데
+  브랜치가 canonical work branch가 아니면, "워크트리로 격리하라"(틀린 힌트)가 아니라 "이미 격리됨 ·
+  이 워크트리 안에서 `--checkout`으로 `<type>/<slug>`를 맞춰라 · EnterWorktree 재호출 금지"로 정확히
+  안내한다. 주 워킹트리 경로는 불변(자동 전환 없음).
+- `scripts/harness/session-start.mjs`: 세션 시작 시 이미 격리된 워크트리면 "EnterWorktree로 다시
+  격리하지 말라"는 신호를 미리 준다(fail-open · 엔진 import 없이 자체 감지).
+- `skills/kickoff/SKILL.md`·`harness/protocols/kickoff.md`: 격리 절차를 "먼저 이미 격리됐는지 확인 →
+  격리됐으면 EnterWorktree 건너뛰기(work branch면 바로 kickoff, 임의 이름이면 `--checkout`) / 주
+  워킹트리면 EnterWorktree로 격리"로 갱신. "이미 워크트리 세션 거부는 실패가 아니라 정상"으로
+  재분류하고 상황 테이블에 remote-control 케이스를 추가했다.
+
+**소비자 조치: 없음.** 마켓플레이스 갱신(`/plugin marketplace update`)만으로 반영된다. 배선 변경 없음.
+
 ## 2026-08-26 v2.7.0 review-guideline-allowlist-and-anti-patch
 
 정적 내보내기 카탈로그 소비 프로젝트의 PR #4에 달린 Codex 자동 리뷰 53건(P1 3)을 전수 분석해,

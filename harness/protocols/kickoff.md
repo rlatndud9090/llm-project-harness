@@ -96,17 +96,41 @@ state 원장에만 남는다). URL을 주면 URL을, 번호를 주면 `#<번호>
 
 `$kickoff`은 raw 골격을 만들기 **전에** 작업을 전용 워크트리로 격리한다. **주
 워킹트리(main-wt)는 개발자가 직접 작업하거나 확인하는 자리로 남겨 두고, kickoff이 그
-브랜치를 자동으로 갈아끼우지 않는다.** main-wt 상태(clean/dirty·어느 브랜치 위인지)와
-무관하게 항상 격리하며, 순서는 다음과 같다:
+브랜치를 자동으로 갈아끼우지 않는다.**
 
-1. `git fetch origin` — origin/main을 최신으로 맞춘다.
-2. **origin/main을 베이스로 전용 워크트리를 만들고 그 안으로 들어간다.**
-   - **ClaudeCode**: `EnterWorktree`(이름 = `<type>/<slug>`, 예 `feature/data-contract`).
-     워크트리는 기본 `worktree.baseRef=fresh`로 origin/<기본 브랜치>에서 분기한다.
-   - **Codex**: `git worktree add -b <type>/<slug> <path> origin/main` 후 그 경로로 이동.
-3. 격리된 워크트리 안에서 `harness:kickoff`을 실행한다(워크트리 브랜치명은 아래
-   "브랜치명은 손대지 않는다"대로 그대로 둔다). 이미 이 유닛의 작업 브랜치 위이므로
-   스크립트는 브랜치를 건드리지 않고(branch-first) 골격만 만든다.
+**먼저 이 세션이 이미 전용 워크트리 안(격리됨)인지 본다.** `claude remote-control --spawn
+worktree`는 on-demand 세션마다 워크트리를 만들어 세션이 **시작부터 이미 격리**돼 있고, 앞
+단계에서 `EnterWorktree`로 격리했을 수도 있다. 이 판정은 "누가 어떻게 격리했나"가 아니라
+git 사실(**linked worktree**: per-worktree git dir ≠ 공용 common dir)로만 한다 — 그래서
+remote-control이든 EnterWorktree든 무관하다. 세션 시작 훅이 이미 격리됐으면 "이미 전용
+워크트리 안입니다" 한 줄을 미리 준다.
+
+- **이미 격리돼 있으면 — `EnterWorktree`를 다시 부르지 않는다.** 이미 워크트리 세션이라
+  `EnterWorktree`로 새 워크트리를 만드는 건 도구가 거부한다("Must not already be in a
+  worktree session when creating a new worktree"). 재격리는 중복이다. 대신:
+  - 브랜치가 이미 `<type>/<slug>`(또는 EnterWorktree 형태 `worktree-<type>+<slug>`)면 →
+    그 자리에서 바로 `harness:kickoff`을 실행한다(branch-first, 골격만 생성).
+  - 브랜치가 임의 이름(remote-control 자동 이름 `worktree-<...>` 등)이면 → **이 워크트리
+    안에서** `harness:kickoff --checkout --type <t> --slug <s>`로 canonical 작업 브랜치를
+    만들어 맞춘다(자동 전환이 아니라 **명시 `--checkout`** — linked worktree엔 main-wt 예약
+    우려가 없어 이 자리 브랜치 생성이 안전하다).
+
+- **주 워킹트리(격리 안 됨)이면 — 전용 워크트리로 격리하고 그 안에서 kickoff한다.** main-wt
+  상태(clean/dirty·어느 브랜치 위인지)와 무관하게 항상 격리하며, 순서는:
+  1. `git fetch origin` — origin/main을 최신으로 맞춘다.
+  2. **origin/main을 베이스로 전용 워크트리를 만들고 그 안으로 들어간다.**
+     - **ClaudeCode**: `EnterWorktree`(이름 = `<type>/<slug>`, 예 `feature/data-contract`).
+       워크트리는 기본 `worktree.baseRef=fresh`로 origin/<기본 브랜치>에서 분기한다.
+     - **Codex**: `git worktree add -b <type>/<slug> <path> origin/main` 후 그 경로로 이동.
+  3. 격리된 워크트리 안에서 `harness:kickoff`을 실행한다(워크트리 브랜치명은 아래
+     "브랜치명은 손대지 않는다"대로 그대로 둔다). 이미 이 유닛의 작업 브랜치 위이므로
+     스크립트는 브랜치를 건드리지 않고(branch-first) 골격만 만든다.
+
+> **remote-control 워크트리의 base 주의**: on-demand 워크트리의 base ref는 공식 문서가
+> 확정하지 않는다(fresh origin/main일 수도, 현재 HEAD일 수도). 이미 격리된 워크트리에서
+> `--checkout`으로 브랜치를 팔 때 base가 origin/main보다 뒤처졌다고 판단되고 그 워크트리에
+> 쌓인 변경이 없으면 origin/main으로 맞춘 뒤 진행한다. WIP가 있거나 판단이 서지 않으면
+> 강제 리셋하지 말고 사용자에게 base 상태를 알린다(base 판단은 사람 몫).
 
 #### 브랜치명은 손대지 않는다 (EnterWorktree 형태 그대로)
 
@@ -122,20 +146,26 @@ canonical `<type>/<slug>`을 쓰고, **브랜치명만** 워크트리 형태로 
 
 #### EnterWorktree가 실패하면 — 보고하고 멈춘다 (우회 생성 금지)
 
-워크트리 진입에 실패하면(이미 워크트리 세션 안이라 새로 못 만듦·이름 충돌·훅 미설정·비-git
-등) **그 실패 결과와 원인을 사용자에게 그대로 전달하고 멈춘다.** `git worktree add` 수동 생성이나
+(주 워킹트리에서 격리하려는데) 워크트리 진입에 실패하면(이름 충돌·훅 미설정·비-git 등)
+**그 실패 결과와 원인을 사용자에게 그대로 전달하고 멈춘다.** `git worktree add` 수동 생성이나
 main-wt 그 자리 `--checkout` 같은 **우회로 워크트리/브랜치를 만들지 않는다** — 우회로 만든
 워크트리는 `EnterWorktree`가 추적하지 않아 나중에 merge-and-clean이 `ExitWorktree`로 깔끔히
 빠져나올 수 없다. 사용자가 원인을 보고 직접 조치(예: 기존 워크트리 종료 후 재시도)하게 한다.
-`--checkout`은 사용자가 **명시적으로** 주 워킹트리에서 작업하겠다고 할 때만 쓰는 탈출구이지,
-EnterWorktree 실패의 자동 폴백이 아니다.
+`--checkout`은 주 워킹트리에서 **명시적으로** 작업하겠다고 할 때, 그리고 **이미 격리된 워크트리
+안에서 canonical 브랜치를 맞출 때** 쓰는 명시 옵션이지, (주 워킹트리) EnterWorktree 실패의
+자동 폴백이 아니다.
+
+**"이미 워크트리 세션이라 새로 못 만든다"는 실패가 아니라 이미 격리된 정상 상태다.** 위 "이미
+격리돼 있으면" 분기대로 애초에 `EnterWorktree`를 부르지 않고 그 자리서 kickoff(임의 브랜치면
+`--checkout`)하면 된다. 이 거부 신호를 보고 다시 `EnterWorktree`를 시도하지 말 것.
 
 | 상황 | 동작 |
 | --- | --- |
 | 격리된 워크트리에서 이 유닛의 작업 브랜치 위 — `worktree-<type>+<slug>`(EnterWorktree 형태) 또는 canonical `<type>/<slug>` (정상 경로) | 브랜치 그대로 두고 골격 생성 (branch-first, 리네이밍 없음) |
-| `main`/`master` 등 base 위에서 격리 없이 실행 | 전환하지 않고 "워크트리로 격리하라" 힌트만 |
+| **이미 linked worktree(격리됨)인데 임의 브랜치**(work branch 아님) — remote-control --spawn worktree 등 | 재격리 안 함. "이미 격리됨 · 이 워크트리 안에서 `--checkout`으로 `<type>/<slug>`를 맞추라"는 힌트(EnterWorktree 재호출 금지) |
+| 주 워킹트리(격리 안 됨)의 `main`/`master` 등 base 위에서 격리 없이 실행 | 전환하지 않고 "전용 워크트리로 격리하라" 힌트만 |
 | 목표 브랜치가 이미 존재 | 전환하지 않고 힌트만 (그 브랜치의 워크트리로 진입) |
-| 다른 브랜치 / detached HEAD / 비-git | 브랜치를 건드리지 않고 힌트만 |
+| 주 워킹트리의 다른 브랜치 / detached HEAD / 비-git | 브랜치를 건드리지 않고 힌트만 |
 
 자동 전환은 **어느 경우에도 하지 않는다** — main-wt를 침범하지 않기 위해서다. 주
 워킹트리에서 **의도적으로** 격리 없이 그 자리에 브랜치를 파야 하면 `--checkout`으로
