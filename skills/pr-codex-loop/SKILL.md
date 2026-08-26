@@ -126,7 +126,7 @@ gh pr view <N> --repo <OWNER>/<REPO> \
 
 게이트 통과 시:
 1. **PR head 브랜치에서 작업.** 브랜치 판정은 `git rev-parse --abbrev-ref HEAD`로만. 현재 체크아웃이 `headRefName`이 아니면 체크아웃/worktree 전환. 백그라운드 잡/공유 체크아웃이면 worktree 격리.
-2. 코멘트별 **최소·정확한 수정.** valid-bug는 4단계 실패 테스트가 통과하는지 확인(test-first).
+2. 코멘트별 수정 — **개별 케이스가 아니라 결함 클래스를 닫는다(안티-땜빵).** 지적이 blocklist류·"이 값도 막으세요"형이거나 같은 표면에서 반복되면, 지적된 값 하나만 고쳐 push하지 말고 그 지적이 드러낸 **결함 클래스의 입력 공간 전체**를 닫는다(위험 문자 추가가 아니라 관문을 allowlist로 뒤집기, 케이스 하나가 아니라 최종 산출물 기준 완전성 검증). 그러지 않으면 8단계 watch가 재리뷰를 돌릴 때 논리적 동치 케이스로 3·4·N연속 재발해 watch 사이클과 재리뷰 토큰이 그 땜빵 루프에 녹는다(판정 렌즈: `guides/code-review-guideline.md` §0 코어 렌즈 3의 allowlist·산출물 기준 완전성, "후속 트래킹" 안티-땜빵). valid-bug는 4단계 실패 테스트가 통과하는지 확인(test-first)하고, 봉인 테스트는 지적된 그 입력만이 아니라 같은 클래스의 경계·조합 케이스까지 덮는다.
 3. **검증:** 가장 작은 증명 가능한 검증부터 → 저장소 실제 진입점으로 확장(`package.json`의 test/lint/typecheck/build, `pyproject.toml`/pytest, Makefile, 저장소 `AGENTS.md`/README). 하네스면 `npm run harness:gate`를 green으로. **토큰 효율(O4): 검증 명령은 로그를 파일로 캡처하고 요약만 읽되, 종료코드를 1차 게이트로 삼는다** — 예: `npm run harness:gate > "$TMP/gate.log" 2>&1; rc=$?` 후 `grep -niE 'fail|failed|✗|✘|error|assert|traceback' "$TMP/gate.log"` + `tail -n 20 "$TMP/gate.log"`, 그리고 `[ $rc -ne 0 ] && echo "FAILED(rc=$rc)"`. **최종 pass/fail은 `rc`로 판정**(grep은 보조 요약) — 문구 없이 종료코드만 실패인 케이스를 놓치지 않는다. 로그 전문을 컨텍스트로 끌어오지 않는다. 오래 걸리는 검증은 `run_in_background`.
 4. **커밋:** 저장소 커밋 컨벤션 준수. 트레일러(예: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`)를 끝에.
 5. **푸시:** push 직전 `git rev-parse --abbrev-ref HEAD` == `headRefName` 검증 후 `git push`. **non-fast-forward면 푸시 중단** → 원인 보고 후 사용자 확인. **force 계열 전면 금지.**

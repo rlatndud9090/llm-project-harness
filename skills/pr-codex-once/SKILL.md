@@ -35,6 +35,7 @@ PR에 달린 **Codex 자동 리뷰**를 가져와 프로젝트 정보 + 현재 �
 3. **의사결정 가드:** 코멘트가 프로젝트의 확정된 의사결정(하네스 장착 시 `docs/raw/feature/<slug>/{prd,adr}.md`의 approved PRD / accepted ADR)에 **반하는 내용**이면, 임의로 적용하지 않는다. 사용자에게 충돌을 설명하고 **ADR supersede 여부를 먼저 논의**한 뒤 결정에 따른다.
 4. **수정은 항상 PR의 head 브랜치에서만.** `main`/기본 브랜치 직접 커밋·푸시 금지. **history 재작성 push 전면 금지**(`--force`, `--force-with-lease`, `+`-refspec, 강제 non-fast-forward 포함).
 5. 커밋·푸시·답글은 이 스킬 호출로 위임된 작업이라 진행 가능하나, **의사결정 충돌 / 사실관계 불확실한 큰 변경 / 비정상 상태(머지·닫힘·fork·non-fast-forward)** 는 사용자 확인을 먼저 받는다.
+6. **반영은 개별 케이스가 아니라 결함 클래스를 닫는다(안티-땜빵).** blocklist류·"이 값도 막으세요"형·같은 표면 반복 지적을 지적된 값 하나만 고쳐 push하면, 리뷰가 논리적으로 동치인 다음 케이스로 3·4·N연속 재발하고 재리뷰 토큰이 그 루프에 녹는다. 첫 지적에서 **그 클래스의 입력 공간 전체**를 닫고 조합·경계 단위 테스트로 재발 불가를 봉인한 뒤 답한다(판정 렌즈·근거: `guides/code-review-guideline.md` §0 코어 렌즈 3의 allowlist·산출물 기준 완전성, "후속 트래킹"의 안티-땜빵 조항).
 
 ## 실행 절차
 
@@ -118,7 +119,7 @@ gh api repos/<O>/<R>/issues/<N>/comments --paginate \
 
 게이트 통과 시:
 1. **PR head 브랜치에서 작업.** 브랜치 판정은 디렉터리명이 아니라 `git rev-parse --abbrev-ref HEAD`로만 한다. 현재 체크아웃이 `headRefName`이 아니면 체크아웃/worktree로 전환. 백그라운드 잡/공유 체크아웃이면 worktree로 격리.
-2. 코멘트별 **최소·정확한 수정**. valid-bug는 3단계의 실패 테스트가 수정 후 통과하는지 확인(test-first).
+2. 코멘트별 수정 — **핵심 규칙 6(안티-땜빵)을 여기서 적용한다.** 지적된 그 값·그 줄만 고치는 최소 패치가 아니라, 그 지적이 드러낸 **결함 클래스가 논리적으로 발현 가능한 입력 공간 전체**를 닫는다(위험 문자 하나 추가가 아니라 관문을 allowlist로 뒤집기, 케이스 하나가 아니라 최종 산출물 기준 완전성 검증). valid-bug는 3단계의 실패 테스트가 수정 후 통과하는지 확인(test-first)하되, **봉인 테스트는 지적된 그 입력만이 아니라 같은 클래스의 경계·조합 케이스까지** 덮는다.
 3. **하네스 장착 시**: `npm run harness:gate`(또는 프로젝트의 test/build)를 **green**으로 만든 뒤 진행.
 4. **커밋**: 프로젝트 커밋 컨벤션 준수. 하네스라면 Lore 커밋(의도 + 관련 PRD/ADR 링크 + 트레일러). 프로젝트가 쓰는 트레일러(예: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`)를 끝에 붙인다.
 5. **푸시**: push 직전 `git rev-parse --abbrev-ref HEAD`가 `headRefName`과 일치하는지 검증한 뒤 head 브랜치에 push. **non-fast-forward가 나면 푸시 중단** → 원인(원격이 앞섬/잘못된 브랜치) 보고 후 사용자 확인. **모든 force 계열 push 금지.**

@@ -28,6 +28,13 @@
 
 ---
 
+## 2.7.0
+
+- (없음) 리뷰 지침(`code-review-guideline.md`)에 allowlist 코어 렌즈·경로 식별자 완전성 detector·
+  안티-땜빵 조항을 추가하고, 세 반영 스킬(`pr-codex-once`/`pr-codex-loop`/`pr-self-loop`)의 수정
+  단계를 "결함 클래스 전체를 닫는다"로 강화했다. 스킬·지침 변경이라 마켓플레이스 갱신만으로 자동
+  반영되고 소비 레포에 커밋된 배선은 바뀌지 않는다.
+
 ## 2.6.0
 
 - (없음) **슬래시 prefix를 `/llm-project-harness:`에서 `/lph:`로 축약**했다(프롬프트 중간에서
