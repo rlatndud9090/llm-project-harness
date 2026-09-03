@@ -971,6 +971,35 @@ describe("lph-init (plugin bootstrap)", () => {
     });
   });
 
+  it("does not write worktree/bgIsolation when creating a fresh settings.json (kickoff owns isolation)", () => {
+    withProject((projectRoot) => {
+      // No .claude/settings.json yet: init creates one from scratch. It must wire
+      // only the marketplace + enabledPlugins — never worktree.bgIsolation, which
+      // would disable the bg worktree isolation that kickoff now requires.
+      harnessInit(projectRoot);
+
+      const settings = JSON.parse(read(path.join(projectRoot, ".claude", "settings.json")));
+      expect(settings.enabledPlugins["llm-project-harness"]).toBe(true);
+      expect(settings.worktree).toBeUndefined();
+    });
+  });
+
+  it("never injects bgIsolation when merging into an existing settings.json", () => {
+    withProject((projectRoot) => {
+      writeFile(
+        path.join(projectRoot, ".claude", "settings.json"),
+        `${JSON.stringify({ model: "opus" }, null, 2)}\n`,
+      );
+
+      harnessInit(projectRoot);
+
+      const settings = JSON.parse(read(path.join(projectRoot, ".claude", "settings.json")));
+      expect(settings.model).toBe("opus"); // unrelated keys preserved
+      expect(settings.enabledPlugins["llm-project-harness"]).toBe(true);
+      expect(settings.worktree).toBeUndefined(); // no bgIsolation injected
+    });
+  });
+
   it("scaffolds docs only when absent (retrofit preserves a local AGENTS.md)", () => {
     withProject((projectRoot) => {
       writeFile(path.join(projectRoot, "AGENTS.md"), "# 우리 프로젝트\n\n로컬 내용 보존.\n");

@@ -28,6 +28,16 @@
 
 ---
 
+## 2.9.0
+
+- (배선) `/lph-init`이 더 이상 `.claude/settings.json`에 `worktree.bgIsolation = "none"`을 심지
+  않는다. `/lph-init`을 다시 실행하면 새 배선 형태(마켓플레이스 + `enabledPlugins` 두 키만)로
+  정렬되고 `.harness.json` version이 2.9.0으로 올라간다. 단, additive 병합이라 이미 심긴
+  `worktree.bgIsolation` 키를 **지우지는 않는다**(아래 산출물 조치 참조).
+- (산출물) 이전 버전으로 init해 `.claude/settings.json`에 `worktree.bgIsolation: "none"`이 남아
+  있는 레포는, kickoff의 워크트리 격리 흐름을 쓰려면 그 키를 **손으로 제거**한다. 이 설정은 bg
+  세션 워크트리 격리를 끄므로, 격리를 요구하는 kickoff과 충돌한다.
+
 ## 2.8.0
 
 - (없음) kickoff이 이미 격리된 워크트리(`claude remote-control --spawn worktree`의 on-demand

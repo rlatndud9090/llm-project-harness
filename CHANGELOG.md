@@ -26,6 +26,30 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-09-03 v2.9.0 drop-bgisolation-none-from-init
+
+`/lph-init`이 소비 레포 `.claude/settings.json`에 `worktree.bgIsolation = "none"`을 심던 로직을
+제거했다. 이 설정은 Claude Code의 background 세션 워크트리 격리를 끄는데, v2.8.0에서 kickoff을
+"세션은 워크트리로 격리돼 있어야 하고, 이미 격리됐으면 그 사실을 git으로 인지한다"는 방향으로
+못 박은 뒤로는 정면 충돌했다 — 격리를 요구하는 흐름 위에 격리를 무력화하는 설정을 심고 있던 셈.
+kickoff의 워크트리 격리 지침이 유일한 권위가 되도록, init은 이제 `.claude/settings.json`에 마켓
+플레이스와 `enabledPlugins` 두 키만 additive로 심는다(워크트리 관련 키는 건드리지 않는다).
+
+**변경**
+
+- `scripts/harness/init.mjs`: `ensureClaudeSettings()`의 신규 생성·기존 병합 두 경로 모두에서
+  `worktree.bgIsolation` 주입 로직을 삭제했다. 남는 배선은 `extraKnownMarketplaces`와
+  `enabledPlugins`뿐이며, 소비자가 스스로 넣은 `worktree` 설정은 (여전히) 보존한다.
+- `scripts/harness/harness-flows.test.mjs`: init이 신규 생성·기존 병합 어느 경로에서도
+  `worktree.bgIsolation`을 쓰지 않음을 못 박는 회귀 테스트를 추가했다(다시 심기는 회귀 봉인).
+
+**소비자 조치**
+
+- 새로 `/lph-init`하는 레포엔 이 키가 애초에 심기지 않는다 — 조치 없음.
+- **이미 이전 버전으로 init해 `.claude/settings.json`에 `worktree.bgIsolation: "none"`이 심긴
+  레포**는, kickoff의 워크트리 격리 흐름을 쓰려면 그 키를 손으로 제거한다. `/lph-init` 재실행은
+  additive 병합이라 기존 키를 지우지 않으므로 자동으로 사라지지 않는다.
+
 ## 2026-08-26 v2.8.0 kickoff-worktree-aware-remote-control
 
 `claude remote-control --spawn worktree`(원격 제어 서버가 on-demand 세션마다 전용 워크트리를
