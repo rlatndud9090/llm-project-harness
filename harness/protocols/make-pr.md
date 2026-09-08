@@ -96,7 +96,13 @@ trailer, HEREDOC). 정본 `commit-protocol.md`는 이 컨텍스트에 아직 로
 
 1. 작업 단위 브랜치를 원격에 push한다.
 2. PR을 실제로 만드는 수단은 도구별 어댑터가 정의한다 — `gh` CLI를 우선 쓰고(토큰 효율),
-   미설치·미인증이면 런타임의 GitHub 통합(GitHub MCP 등)으로 폴백한다.
+   미설치·미인증이면 런타임의 GitHub 통합(GitHub MCP 등)으로 폴백한다. **PR은 항상
+   ready-for-review(non-draft)로 만든다** — `gh pr create`에 `--draft`를 붙이지 않고, GitHub MCP
+   폴백 시 `draft:false`로 만든다. 하네스엔 draft PR을 만드는 흐름이 없다. 격리 background
+   세션에서 Claude Code는 세션 종료 시 "작업 보존"으로 draft PR을 자동으로 열도록 지시하는데,
+   그 지침에 끌려가 draft로 만들지 않는다(런타임 훅 `claude-pr-guard`가 draft PR과 최종 확정 전
+   PR을 차단한다 — 이 불변식의 기계 강제다). 하네스 흐름엔 draft PR 예외가 없다 — 초기 리뷰가
+   필요하면 ready PR로 올린 뒤 리뷰 루프(`$pr-codex-loop`)를 돌린다.
 3. PR 제목·본문:
    - 제목은 작업 단위를 한 줄로 설명한다(소비 프로젝트에 커밋/PR 제목 규약이 있으면 그것을 따른다).
    - 본문에는 무엇을·왜 바꿨는지 요약과 함께 PRD/ADR 경로를 링크한다. 저장소에 PR 템플릿
@@ -113,6 +119,9 @@ trailer, HEREDOC). 정본 `commit-protocol.md`는 이 컨텍스트에 아직 로
 
 - **나쁨:** 최종 확정 없이(`pre-approved`인 채로) 커밋·PR을 만든다.
 - **좋음:** feature 단위는 `$make-pr`에서 `approved`/`accepted`로 확정한 뒤 커밋·PR을 만든다.
+
+- **나쁨:** PR을 draft로 만들어 리뷰 루프(`$pr-codex-loop`)가 자동 리뷰를 못 받거나, 격리 세션의 자동 "작업 보존" 지침에 PR 생성 자체를 맡겨 `$make-pr` 밖에서 PR이 생긴다.
+- **좋음:** PR은 `$make-pr`의 최종 확정 뒤에만, 항상 ready-for-review로 만든다(`claude-pr-guard`가 두 경우를 기계로 차단한다).
 
 - **나쁨:** `harness:gate`를 확정 전에 한 번 돌리고 확정 후에는 생략한다.
 - **좋음:** 최종 확정으로 status가 바뀐 뒤 `harness:gate`를 다시 신선하게 판정하고 커밋한다.

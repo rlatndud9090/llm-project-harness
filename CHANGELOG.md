@@ -26,6 +26,48 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-09-08 v2.10.0 machine-block-draft-and-unsanctioned-pr
+
+**배경.** Claude Code의 background 세션(agents/FleetView 화면)은 `worktree.bgIsolation`
+설정으로 두 모드를 **패키지로** 준다. `"none"`이면 세션에 "work in place / Skip EnterWorktree"
+지침이 주입돼 kickoff이 주 워킹트리에서 격리 없이 브랜치를 만들고, 미설정(기본값 `"isolate"`)이면
+세션을 격리하는 대신 종료 시 "작업 보존"으로 **draft PR을 자동으로 여는** 지침이 주입된다(공식
+agent-view 문서). "격리는 켜되 draft-PR 주입만 끄는" 설정은 없다. 그래서 하네스가 격리·PR을
+**자연어 자문**으로만 다루던 지금까지는, 어느 설정을 쓰든 세션 지침이 그 자문을 이겨 (a) kickoff
+work-in-place 또는 (b) `$make-pr` 밖 자동 draft PR·make-pr의 draft PR이 났다. 근본은 하나의 결함
+클래스 — **격리와 PR 생성/상태를 기계강제 없이 자연어로만 규율한다**.
+
+**변경.**
+- **draft·무단 PR 기계 차단(신설).** `scripts/harness/claude-pr-guard.mjs` PreToolUse 가드를
+  추가하고 `hooks/hooks.json`에 `Bash|create_pull_request` 매처로 배선했다(=`gh pr create` +
+  이름이 `create_pull_request`로 끝나는 모든 MCP: github·github-personal·플러그인형 포함). 하네스
+  작업 단위 컨텍스트(작업 브랜치 파싱 성공 + `state.md` 존재)에서만 동작하며 ① `--draft`/`-d`/
+  `draft:true` PR을 무조건 차단하고(격리 세션 자동 draft·make-pr 실수 draft 공통 신호), ② feature
+  단위인데 `state.md`에 최종 `APPROVAL` 이벤트가 없으면(=`$make-pr` 미호출) 차단한다. 플래그 감지는
+  커맨드의 따옴표 문자열을 제거한 뒤 하므로 `--title`/`--body` 속 `--draft` 리터럴을 오탐하지 않는다.
+  그 밖의 컨텍스트(provider 자기수정·비-하네스 레포·main·kickoff 전)에서는 fail-open으로 통과해 일반
+  `gh pr create`를 막지 않는다. bugfix/chore는 승인 축이 없어 draft 규칙만 적용(무단 오탐 없음).
+  작업 단위 판정은 현재 git 브랜치 기준이며(`--head` 미파싱, 의도된 fail-open 스코프), draft 상태엔
+  git-time 백스톱(harness:check)이 없어 이 훅이 유일 강제점이다. 전제: 보존 draft PR이 모델 tool
+  호출로 열린다는 것(agent-view "Claude opens one") — 런타임 직접 생성이면 훅 밖이고 그땐 make-pr.md
+  ready 불변식이 병렬 방어다.
+- **make-pr "PR은 항상 ready" 불변식.** `harness/protocols/make-pr.md` Phase 4·실패 모드와
+  `skills/make-pr/SKILL.md`에 "draft 금지·ready로 생성"을 명시했다(지시 완전성 결함 닫기 — 기존엔
+  draft/ready에 침묵해 세션 습관이 빈칸을 채웠다).
+- **lph-doctor 능동 격리 점검.** `scripts/harness/doctor.mjs`가 모든 소비자 경로에서 소비 레포
+  `.claude/settings.json`·`settings.local.json`을 읽어 `worktree.bgIsolation:"none"`이 남아 있으면
+  경고한다(버전 drift와 무관). `harness/protocols/lph-doctor.md`에 반영.
+
+**설계 요지.** 격리는 강제 주체(Claude Code, 기본값 isolate)에게 맡기고, PR draft·무단 생성은
+강제 주체(harness tool 게이트)가 막는다 — 각 부작용을 실제로 강제할 수 있는 쪽이 맡는 배치라
+`bgIsolation`을 어느 값으로 두든 두 증상이 닫힌다. 정규 경로는 무영향: `$make-pr`가 Phase 1에서
+`harness:approve --final`로 APPROVAL을 남기고 Phase 4에서 ready PR을 push하므로, PR 시점엔 APPROVAL이
+존재하고 `--draft`가 없다.
+
+**소비자 조치.** 배선 없음(플러그인 hooks가 마켓플레이스 갱신으로 자동 활성화). 다만 이전 버전으로
+init해 `worktree.bgIsolation:"none"`이 남은 레포는 그 키를 제거해 격리를 켜야 한다(기본값 isolate).
+`/lph-doctor`가 이제 이 키를 능동 감지해 경고한다. 상세는 `harness/reconcile.md` 2.10.0.
+
 ## 2026-09-03 v2.9.0 drop-bgisolation-none-from-init
 
 `/lph-init`이 소비 레포 `.claude/settings.json`에 `worktree.bgIsolation = "none"`을 심던 로직을

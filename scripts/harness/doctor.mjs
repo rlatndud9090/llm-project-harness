@@ -45,6 +45,50 @@ if (pathExists(flagPath)) {
 function emit(status, lines) {
   console.log(`[lph-doctor] status=${status}`);
   for (const line of lines) console.log(line);
+  // Active checks run on EVERY consumer path (version-independent). Only the provider
+  // path above bypasses emit(), which is correct — the provider repo keeps its own
+  // settings.local.json for self-editing and must not be nagged.
+  for (const line of bgIsolationWarning()) console.log(line);
+}
+
+// Active check: a consumer repo whose EFFECTIVE worktree.bgIsolation is "none" has
+// background-session worktree isolation turned OFF — so a background session gets a
+// "work in place / Skip EnterWorktree" instruction and kickoff makes the branch in the
+// main working tree instead of isolating (the exact work-in-place symptom). Since v2.9.0
+// init no longer writes this key, but a key seeded by an older init survives the
+// additive merge, so we read the files and flag it regardless of version drift. Default
+// (key absent) is isolate — removing the key restores isolation. We compute the EFFECTIVE
+// value the way Claude Code merges settings — settings.local.json overrides
+// settings.json — so a base "none" that local flips back to isolate does NOT nag, and we
+// warn once against the source that actually wins. (user-level ~/.claude is out of a
+// repo-scoped tool's reach; noted in the message.)
+function bgIsolationWarning() {
+  let effective; // last string value wins → local after base
+  let source = null;
+  for (const rel of [
+    [".claude", "settings.json"],
+    [".claude", "settings.local.json"], // higher precedence — read last
+  ]) {
+    const p = repoPath(...rel);
+    if (!pathExists(p)) continue;
+    let settings;
+    try {
+      settings = JSON.parse(readText(p));
+    } catch {
+      continue; // malformed settings — not this tool's job to parse-fail on
+    }
+    const value = settings?.worktree?.bgIsolation;
+    if (typeof value === "string") {
+      effective = value;
+      source = rel.join("/");
+    }
+  }
+  if (effective !== "none") return [];
+  return [
+    `- ⚠ ${source}의 worktree.bgIsolation="none"이 유효 설정입니다 — background 세션 워크트리 격리가 꺼져 있습니다.`,
+    `  이 상태에서는 kickoff이 워크트리로 격리하지 않고 주 워킹트리에서 브랜치를 만듭니다(work-in-place).`,
+    `  이 키를 제거해 기본값(isolate)으로 되돌리세요(v2.9.0부터 init은 이 키를 심지 않습니다). user-level ~/.claude 설정은 이 진단 범위 밖입니다.`,
+  ];
 }
 
 // ─── uninitialized: 아직 한 번도 정합 안 됨 → /lph-init ──────────────────────

@@ -41,6 +41,17 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/doctor.mjs"
 `(산출물)` 조치는 프로젝트 판단이 필요하므로 doctor가 요지만 제시하고 사람이 반영한다. 임의로
 소비 프로젝트 산출물을 고치지 않는다.
 
+## 능동 점검 — background 격리 (버전과 무관)
+
+버전 drift와 별개로, doctor는 모든 소비자 경로에서 소비 레포 `.claude/settings.json`·
+`settings.local.json`을 실제로 읽어 `worktree.bgIsolation` 값을 점검한다. `"none"`이면
+background 세션 워크트리 격리가 꺼져 있다는 뜻이라 경고를 낸다(status 라인 아래 `- ⚠ …`):
+그 상태에서는 Claude Code가 세션에 "work in place / EnterWorktree 건너뛰기" 지침을 주입해
+kickoff이 워크트리로 격리하지 않고 주 워킹트리에서 브랜치를 만든다. 기본값(키 없음)이 `isolate`
+이므로 **이 키를 제거하면** 격리가 켜진다. v2.9.0부터 `/lph-init`은 이 키를 심지 않지만, 이전에
+심긴 키는 additive 병합으로 남으므로 doctor가 파일을 직접 읽어 알려 준다(reconcile v2.9.0
+`(산출물)` 조치의 상시 연장).
+
 ## reconcile 원장과의 관계
 
 `harness/reconcile.md`가 버전별 소비자 조치의 단일 출처다. provider는 **매 버전 범프마다** 그

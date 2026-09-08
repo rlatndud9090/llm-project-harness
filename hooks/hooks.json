@@ -19,6 +19,15 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/harness/claude-approval-guard.mjs\""
           }
         ]
+      },
+      {
+        "matcher": "Bash|create_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/harness/claude-pr-guard.mjs\""
+          }
+        ]
       }
     ],
     "Notification": [

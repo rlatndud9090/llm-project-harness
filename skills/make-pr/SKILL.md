@@ -53,7 +53,9 @@ FleetView(agents 화면) 세션 제목을 **절대 덮어쓰지 않는다**: `se
 
 - PR 생성은 `gh pr create --base <기본 브랜치> --head <작업 브랜치> --title "<제목>" --body "<본문>"`
   우선(토큰 효율), `gh` 미설치·미인증이면 GitHub MCP(`mcp__github__create_pull_request`, 필요 시
-  `create_branch`/`update_pull_request`)로 폴백한다.
+  `create_branch`/`update_pull_request`)로 폴백한다. **PR은 항상 ready로 만든다 — `--draft` 금지**
+  (GitHub MCP는 `draft:false`). 격리 세션이 자동으로 여는 draft 보존 PR에 끌려가지 않는다.
+  런타임 훅 `claude-pr-guard`가 draft PR과 최종 확정 전 PR을 차단한다.
 - 생성된 **PR URL을 그대로 출력한다** — FleetView는 세션 출력에서 링크를 스캔해 표면화하므로,
   아래 result 라인에 PR URL을 포함시키면 agents 화면에서 PR로 바로 갈 수 있다.
 

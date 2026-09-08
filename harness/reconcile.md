@@ -28,6 +28,18 @@
 
 ---
 
+## 2.10.0
+
+- (없음) draft PR과 최종 확정 전 무단 PR을 차단하는 PreToolUse 가드(`claude-pr-guard`)가
+  추가됐다. 플러그인 `hooks/hooks.json`이 제공하므로 마켓플레이스 갱신만으로 자동 활성화된다 —
+  소비 레포에 커밋된 배선 조치는 없다. 이 가드는 하네스 작업 단위 컨텍스트(작업 브랜치 +
+  `state.md` 존재)에서만 동작하고 그 밖에서는 통과하므로, 소비 레포의 일반 `gh pr create`는
+  막지 않는다.
+- (산출물) background 세션 격리를 켜려면(kickoff work-in-place 방지) 소비 레포
+  `.claude/settings.json`·`settings.local.json`에 남은 `worktree.bgIsolation: "none"`을 제거해
+  기본값(isolate)으로 되돌린다. `/lph-doctor`가 이제 이 키를 **능동 감지**해 경고한다(2.9.0
+  산출물 조치의 상시 연장 — 도구가 파일을 직접 읽어 알려 준다).
+
 ## 2.9.0
 
 - (배선) `/lph-init`이 더 이상 `.claude/settings.json`에 `worktree.bgIsolation = "none"`을 심지

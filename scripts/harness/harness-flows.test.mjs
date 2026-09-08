@@ -2093,6 +2093,221 @@ describe("claude-approval-guard", () => {
   });
 });
 
+describe("claude-pr-guard", () => {
+  // state.md for the branch's raw unit. `approved` writes a final APPROVAL event (the
+  // $make-pr stamp); `preapproved` writes only a PREAPPROVAL event (the realistic
+  // $feature-develop state: build-entry approved, not yet finally confirmed). `approved`
+  // implies the preapproval lineage.
+  function seedPrUnit(projectRoot, type, slug, { approved = false, preapproved = false, stage = "implementing" } = {}) {
+    const events = [];
+    if (approved || preapproved) events.push("- PREAPPROVAL prd 2026-07-29 harness:approve :: 이대로 구현 들어가자");
+    if (approved) events.push("- APPROVAL prd 2026-08-01 make-pr :: 이대로 PR 올려");
+    const approvalBlock = events.length ? `\n## 승인 이벤트\n\n${events.join("\n")}\n` : "";
+    writeFile(
+      path.join(projectRoot, "docs", "raw", type, slug, "state.md"),
+      `${frontmatter({ title: slug, stage, prd_status: approved ? "approved" : "pre-approved", adr_status: "proposed" })}\n# 원장\n${approvalBlock}`,
+    );
+  }
+
+  it("blocks a draft gh pr create on a feature branch (harness context)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { approved: true }); // approved, yet draft → still blocked
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head feature/x --title "t" --body "b" --draft' },
+      });
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("draft");
+    });
+  });
+
+  it("blocks a GitHub MCP create_pull_request with draft:true", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { approved: true });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "mcp__github__create_pull_request",
+        tool_input: { base: "main", head: "feature/x", title: "t", body: "b", draft: true },
+      });
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("draft");
+    });
+  });
+
+  it("blocks a ready PR on a feature branch when state.md has no final APPROVAL (unsanctioned)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { approved: false });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head feature/x --title "t" --body "b"' },
+      });
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("APPROVAL");
+    });
+  });
+
+  it("allows a ready PR on a feature branch once state.md carries a final APPROVAL ($make-pr path)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { approved: true });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head feature/x --title "t" --body "b"' },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("allows a ready PR on a bugfix branch without an APPROVAL (no approval axis)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "bugfix/y"]);
+      seedPrUnit(projectRoot, "bugfix", "y", { approved: false });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head bugfix/y --title "t" --body "b"' },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("blocks a draft PR on a bugfix branch (draft rule applies to all types)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "bugfix/y"]);
+      seedPrUnit(projectRoot, "bugfix", "y", { approved: false });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head bugfix/y --title "t" --body "b" --draft' },
+      });
+      expect(result.status).toBe(2);
+    });
+  });
+
+  it("fails open (allows) when the branch parses but the raw unit state.md is absent", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]); // no state.md seeded
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head feature/x --title "t" --body "b" --draft' },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("fails open on a non-harness branch (main), never obstructing an ordinary gh pr create", () => {
+    withGitProject((projectRoot) => {
+      // stays on main; a state.md that could not belong to a base branch is irrelevant
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head some-branch --title "t" --body "b" --draft' },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("ignores a Bash command that is not gh pr create", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { approved: false });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: "gh pr view 123 --json state" },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("recognizes the EnterWorktree branch form (worktree-feature+x) as a feature unit", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "worktree-feature+x"]);
+      seedPrUnit(projectRoot, "feature", "x", { approved: false });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head worktree-feature+x --title "t" --body "b"' },
+      });
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("APPROVAL");
+    });
+  });
+
+  it("blocks a ready PR at the realistic feature-develop state (PREAPPROVAL only, no final APPROVAL)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { preapproved: true }); // pre-approved, not yet finalized
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'gh pr create --base main --head feature/x --title "t" --body "b"' },
+      });
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("APPROVAL");
+    });
+  });
+
+  it("blocks the --draft=true equals form", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { approved: true });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: "gh pr create --base main --head feature/x --title t --body b --draft=true" },
+      });
+      expect(result.status).toBe(2);
+    });
+  });
+
+  it("blocks the -d short form (quotes stripped make it unambiguous)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "bugfix/y"]);
+      seedPrUnit(projectRoot, "bugfix", "y", { approved: false });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: "gh pr create --base main --head bugfix/y --title t --body b -d" },
+      });
+      expect(result.status).toBe(2);
+    });
+  });
+
+  it("does NOT false-block a ready PR whose --body/--title merely mentions --draft (regression)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { approved: true });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: {
+          command: 'gh pr create --base main --head feature/x --title "support --draft mode" --body "adds a -d / --draft flag"',
+        },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it("blocks an unapproved feature PR via a provider-agnostic MCP tool (github-personal)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { preapproved: true });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "mcp__github-personal__create_pull_request",
+        tool_input: { base: "main", head: "feature/x", title: "t", body: "b", draft: false },
+      });
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("APPROVAL");
+    });
+  });
+
+  it("does not treat `echo \"gh pr create --draft\"` as a PR creation (quoted literal)", () => {
+    withGitProject((projectRoot) => {
+      git(projectRoot, ["checkout", "-q", "-b", "feature/x"]);
+      seedPrUnit(projectRoot, "feature", "x", { preapproved: true });
+      const result = runPrGuard(projectRoot, {
+        tool_name: "Bash",
+        tool_input: { command: 'echo "gh pr create --draft"' },
+      });
+      expect(result.status).toBe(0);
+    });
+  });
+});
+
 function seedDecisionUnit(projectRoot, adrStatus, adrApproval) {
   harnessInit(projectRoot);
   const unitDir = path.join(projectRoot, "docs", "raw", "feature", "decision");
@@ -2235,6 +2450,16 @@ function runApprove(projectRoot, unitPath, extraArgs = []) {
 function runGuard(payload) {
   return spawnSync(process.execPath, [path.join(repoRoot, "scripts", "harness", "claude-approval-guard.mjs")], {
     input: JSON.stringify(payload),
+    encoding: "utf8",
+  });
+}
+
+// Runs the PR guard against a consumer repo at `projectRoot`. The guard resolves the
+// branch/state from payload.cwd, so we stamp it (and also set the spawn cwd to match).
+function runPrGuard(projectRoot, payload) {
+  return spawnSync(process.execPath, [path.join(repoRoot, "scripts", "harness", "claude-pr-guard.mjs")], {
+    input: JSON.stringify({ ...payload, cwd: projectRoot }),
+    cwd: projectRoot,
     encoding: "utf8",
   });
 }
