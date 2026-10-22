@@ -24,6 +24,11 @@ import {
   slugifyHeading,
 } from "./knowledge-lib.mjs";
 
+// GitHub Actions가 러너에 심는 브랜치 변수(GITHUB_REF_NAME=main 등)가 자식 프로세스로 새면 픽스처의
+// git 브랜치 대신 CI 브랜치로 판정된다(getWorkBranch·K9·K11). 테스트는 이 변수를 지운 채 시작하고,
+// CI 동작을 보는 테스트만 env 인자로 명시 주입한다.
+for (const key of ["GITHUB_HEAD_REF", "GITHUB_REF_NAME", "GITHUB_BASE_REF"]) delete process.env[key];
+
 // 엔진은 이 저장소(플러그인)에만 있고, 테스트는 임시 소비 프로젝트를 cwd로 두고 스크립트를
 // 직접 spawn한다 — harness-flows.test.mjs와 같은 방식이다.
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");

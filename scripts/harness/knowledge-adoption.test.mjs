@@ -5,6 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+// GitHub Actions가 러너에 심는 브랜치 변수(GITHUB_REF_NAME=main 등)가 자식 프로세스로 새면 픽스처의
+// git 브랜치 대신 CI 브랜치로 판정된다(getWorkBranch·K9·K11). 테스트는 이 변수를 지운 채 시작하고,
+// CI 동작을 보는 테스트만 env 인자로 명시 주입한다.
+for (const key of ["GITHUB_HEAD_REF", "GITHUB_REF_NAME", "GITHUB_BASE_REF"]) delete process.env[key];
+
 // 지식 계층 도입 배선(doctor 안내 · init 시드/AGENTS 줄 · session-start 한 줄)을 검증한다.
 // 엔진은 이 저장소(플러그인)에서, cwd는 임시 소비 프로젝트로 spawn한다.
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
