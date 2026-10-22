@@ -13,6 +13,7 @@ import {
   readText,
   repoPath,
 } from "./lib.mjs";
+import { knowledgeStatus } from "./knowledge-lib.mjs";
 
 const pluginVersion = readPluginVersion();
 
@@ -49,6 +50,48 @@ function emit(status, lines) {
   // path above bypasses emit(), which is correct — the provider repo keeps its own
   // settings.local.json for self-editing and must not be nagged.
   for (const line of bgIsolationWarning()) console.log(line);
+  for (const line of knowledgeLines()) console.log(line);
+}
+
+// 지식 계층(docs/knowledge) 점검. bgIsolation과 마찬가지로 모든 소비자 경로·버전 무관으로
+// 돌고 진단만 한다(exit 0). 상태 판정은 knowledge-lib의 knowledgeStatus() 하나만 쓴다.
+// 줄은 항상 `- 지식:` 접두의 짧은 한국어 한두 줄이다.
+// 실제 절대경로로 찍는다 — 출력을 그대로 복사해 실행하는 셸에서는 ${CLAUDE_PLUGIN_ROOT}가 확장되지 않는다.
+const KNOWLEDGE_CLI = `node "${harnessPath("scripts", "harness", "knowledge.mjs")}"`;
+const BOOTSTRAP_THRESHOLD = 5; // final 단위가 이 수를 넘으면 소급 부트스트랩을 권한다
+function knowledgeLines() {
+  let status;
+  try {
+    status = knowledgeStatus();
+  } catch {
+    return []; // 진단 도구는 지식 계층 파싱 실패로 죽지 않는다
+  }
+  if (status.state === "bootstrap-in-progress") {
+    return [
+      "- 지식: 소급 부트스트랩 진행 중입니다 — bootstrap 브랜치에서 이어가세요.",
+      `  상태 확인: ${KNOWLEDGE_CLI} bootstrap status · 재개: /knowledge-distill --bootstrap`,
+    ];
+  }
+  if (status.marker) {
+    const base = `- 지식: 활성(항목 ${status.activeCount}건 · final 단위 ${status.finalUnitCount}).`;
+    if (status.pendingCount < 1) return [base];
+    return [
+      `${base} 기록 대기 ${status.pendingCount}건.`,
+      "  → /knowledge-distill --consolidate 로 정리하세요.",
+    ];
+  }
+  const lines = [];
+  if (status.legacyGotchasFiles.length) {
+    lines.push(
+      `- 지식: 다른 형식의 gotchas 파일 감지(${status.legacyGotchasFiles.join(", ")}) — 부트스트랩 시드 소스로 흡수할 수 있습니다(파일은 건드리지 않습니다).`,
+    );
+  }
+  lines.push(
+    status.finalUnitCount > BOOTSTRAP_THRESHOLD
+      ? `- 지식: 미활성(final 단위 ${status.finalUnitCount}건). 이력이 있으니 /knowledge-distill --bootstrap 으로 소급 활성화를 권합니다.`
+      : `- 지식: 미활성(final 단위 ${status.finalUnitCount}건). 이력이 적으니 ${KNOWLEDGE_CLI} seed 로 바로 시작하세요.`,
+  );
+  return lines;
 }
 
 // Active check: a consumer repo whose EFFECTIVE worktree.bgIsolation is "none" has

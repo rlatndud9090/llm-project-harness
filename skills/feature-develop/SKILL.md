@@ -17,7 +17,10 @@ description: "PRD/ADR 기반 기능 구현, 재작업, 부분 수정을 진행�
    (`session-start`에서 이미 읽었으면 재판독하지 않는다).
 5. 작업 표면에 해당하는 `${CLAUDE_PLUGIN_ROOT}/harness/guides/code-review-guideline.md` 섹션 —
    §0 코어 원칙 + 표면 인덱스로 선택해 구현 브리핑에 발췌한다(전체 로드 금지).
-6. 주석을 남기는 구현이면 `${CLAUDE_PLUGIN_ROOT}/harness/guides/comment-convention.md`의
+6. 지식 마커(`docs/knowledge/index.md`의 `lph-knowledge: 1`)가 있으면 설계 브리핑에서
+   `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --paths <계획 파일…>` —
+   서브에이전트에는 겹치는 항목만 발췌한다(전체 카탈로그 로드 금지).
+7. 주석을 남기는 구현이면 `${CLAUDE_PLUGIN_ROOT}/harness/guides/comment-convention.md`의
    관문·허용목록 — WHY(결정 근거·수치·이력·결정 ID)는 정본에 두고 코드엔 제약만 남긴다.
 
 ## 사전 승인 게이트 (구현 전 하드 차단)

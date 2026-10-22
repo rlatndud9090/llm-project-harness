@@ -52,6 +52,21 @@ kickoff이 워크트리로 격리하지 않고 주 워킹트리에서 브랜치�
 심긴 키는 additive 병합으로 남으므로 doctor가 파일을 직접 읽어 알려 준다(reconcile v2.9.0
 `(산출물)` 조치의 상시 연장).
 
+## 능동 점검 — 지식 계층 (버전과 무관)
+
+doctor는 모든 소비자 경로에서 `knowledgeStatus()`로 지식 계층(`docs/knowledge`) 상태를 점검해
+`- 지식:` 줄로 보고한다(진단만, exit 0). 상태별 안내:
+
+| 상태 | 안내 |
+| --- | --- |
+| 마커 없음 · final 단위 > 5 | `/knowledge-distill --bootstrap` — 쌓인 이력에서 소급 활성화 |
+| 마커 없음 · final 단위 ≤ 5 | `knowledge.mjs seed` — 이력이 적으니 바로 시작 |
+| 소급 부트스트랩 진행 중 | `knowledge.mjs bootstrap status` 확인 후 `/knowledge-distill --bootstrap`으로 재개 |
+| 마커 없음 · 다른 형식 gotchas 파일(`docs/**/gotchas*.md`) | 부트스트랩 시드 소스로 흡수 가능(파일은 건드리지 않는다) |
+| 마커 있음 · 기록 대기 ≥ 1 | `/knowledge-distill --consolidate` (대기 N건) |
+
+활성화(seed·bootstrap)는 프로젝트의 옵트인이다. doctor가 임의로 `docs/knowledge`를 만들지 않는다.
+
 ## reconcile 원장과의 관계
 
 `harness/reconcile.md`가 버전별 소비자 조치의 단일 출처다. provider는 **매 버전 범프마다** 그

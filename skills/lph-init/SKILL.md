@@ -20,6 +20,8 @@ description: "소비 프로젝트를 LLM Project Harness 플러그인에 적용�
 - `.claude/settings.json` — `extraKnownMarketplaces` + `enabledPlugins` additive 병합(다른 키 보존).
 - `.github/workflows/harness.yml` — CI 게이트(공용 composite action 호출).
 - docs 스캐폴드 — `AGENTS.md`, `docs/raw/README.md`, `docs/wiki/index.md`(없을 때만).
+- 지식 계층 — 신규 스캐폴드만 `docs/knowledge` 마커를 시드하고(retrofit은 안 만든다), `AGENTS.md`
+  마커 블록에 코드 수정 전 `knowledge.mjs brief --paths` 조회 한 줄을 넣는다(멱등).
 - (opt-in) git 훅 — `pre-commit`(하네스 검사)·`commit-msg`(`관련 문서:` 검증).
 
 ## 마지막 정합 버전 기록 (lph-doctor 연동)

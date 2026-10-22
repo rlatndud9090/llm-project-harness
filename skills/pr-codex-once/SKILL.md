@@ -119,10 +119,12 @@ gh api repos/<O>/<R>/issues/<N>/comments --paginate \
 
 게이트 통과 시:
 1. **PR head 브랜치에서 작업.** 브랜치 판정은 디렉터리명이 아니라 `git rev-parse --abbrev-ref HEAD`로만 한다. 현재 체크아웃이 `headRefName`이 아니면 체크아웃/worktree로 전환. 백그라운드 잡/공유 체크아웃이면 worktree로 격리.
-2. 코멘트별 수정 — **핵심 규칙 6(안티-땜빵)을 여기서 적용한다.** 지적된 그 값·그 줄만 고치는 최소 패치가 아니라, 그 지적이 드러낸 **결함 클래스가 논리적으로 발현 가능한 입력 공간 전체**를 닫는다(위험 문자 하나 추가가 아니라 관문을 allowlist로 뒤집기, 케이스 하나가 아니라 최종 산출물 기준 완전성 검증). valid-bug는 3단계의 실패 테스트가 수정 후 통과하는지 확인(test-first)하되, **봉인 테스트는 지적된 그 입력만이 아니라 같은 클래스의 경계·조합 케이스까지** 덮는다.
-3. **하네스 장착 시**: `npm run harness:gate`(또는 프로젝트의 test/build)를 **green**으로 만든 뒤 진행.
-4. **커밋**: 프로젝트 커밋 컨벤션 준수. 하네스라면 Lore 커밋(의도 + 관련 PRD/ADR 링크 + 트레일러). 프로젝트가 쓰는 트레일러(예: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`)를 끝에 붙인다.
-5. **푸시**: push 직전 `git rev-parse --abbrev-ref HEAD`가 `headRefName`과 일치하는지 검증한 뒤 head 브랜치에 push. **non-fast-forward가 나면 푸시 중단** → 원인(원격이 앞섬/잘못된 브랜치) 보고 후 사용자 확인. **모든 force 계열 push 금지.**
+2. **지식 조회**(`docs/knowledge/index.md`에 `lph-knowledge: 1`이 있을 때만): 반영 직전에 지적 대상 파일로 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --paths <대상 파일…>`을 실행해 이미 등록된 gotcha·불변식과 지적이 충돌하는지 확인한다(불변식에 반하는 지적은 decision-conflict처럼 사용자에게 돌린다). 전체 카탈로그 로드 금지.
+3. 코멘트별 수정 — **핵심 규칙 6(안티-땜빵)을 여기서 적용한다.** 지적된 그 값·그 줄만 고치는 최소 패치가 아니라, 그 지적이 드러낸 **결함 클래스가 논리적으로 발현 가능한 입력 공간 전체**를 닫는다(위험 문자 하나 추가가 아니라 관문을 allowlist로 뒤집기, 케이스 하나가 아니라 최종 산출물 기준 완전성 검증). valid-bug는 3단계의 실패 테스트가 수정 후 통과하는지 확인(test-first)하되, **봉인 테스트는 지적된 그 입력만이 아니라 같은 클래스의 경계·조합 케이스까지** 덮는다.
+4. **지식 환류**(마커가 있을 때만, 승인 게이트 아님): 유효 지적이 **이 저장소 고유의 비자명한 함정**을 드러냈으면 `knowledge-distill --feedback`으로 등록한다(정본 `harness/protocols/knowledge.md` 「등록 시점」 2). **gate·커밋 전에 수행해** `docs/knowledge`·`state.md` 변경이 같은 gate·커밋·푸시에 들어가게 한다. 범용 지적은 G로 복제하지 않고 `→guideline`으로 남긴다. 새 ID는 푸시 뒤 PR 본문 `## 지식 등록` 섹션에 `gh pr edit`로 추가한다.
+5. **하네스 장착 시**: `npm run harness:gate`(또는 프로젝트의 test/build)를 **green**으로 만든 뒤 진행.
+6. **커밋**: 프로젝트 커밋 컨벤션 준수. 하네스라면 Lore 커밋(의도 + 관련 PRD/ADR 링크 + 트레일러). 프로젝트가 쓰는 트레일러(예: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`)를 끝에 붙인다.
+7. **푸시**: push 직전 `git rev-parse --abbrev-ref HEAD`가 `headRefName`과 일치하는지 검증한 뒤 head 브랜치에 push. **non-fast-forward가 나면 푸시 중단** → 원인(원격이 앞섬/잘못된 브랜치) 보고 후 사용자 확인. **모든 force 계열 push 금지.**
 
 ### 6. 답글 (반영 설명)
 처리한 **각 Codex 코멘트에 in-thread 답글**:

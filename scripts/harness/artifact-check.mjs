@@ -39,6 +39,7 @@ import {
   toPosix,
   unitIsSettled,
 } from "./lib.mjs";
+import { fragmentExists, runKnowledgeGates } from "./knowledge-lib.mjs";
 
 const errors = [];
 const harnessRoot = findHarnessRoot();
@@ -65,13 +66,17 @@ function assertHarnessShape() {
     harnessPath("harness", "protocols", "session-start.md"),
     harnessPath("harness", "protocols", "lph-init.md"),
     harnessPath("harness", "protocols", "lph-doctor.md"),
+    harnessPath("harness", "protocols", "knowledge.md"),
+    harnessPath("harness", "protocols", "knowledge-bootstrap.md"),
     harnessPath("harness", "reconcile.md"),
     harnessPath("harness", "templates", "raw", "feature-prd.md"),
     harnessPath("harness", "templates", "raw", "feature-adr.md"),
     harnessPath("harness", "templates", "raw", "notes.md"),
     harnessPath("harness", "templates", "wiki", "index.md"),
+    harnessPath("harness", "templates", "knowledge", "index.md"),
     harnessPath("scripts", "harness", "init.mjs"),
     harnessPath("scripts", "harness", "kickoff.mjs"),
+    harnessPath("scripts", "harness", "knowledge.mjs"),
   ]) {
     if (!pathExists(requiredPath)) {
       addError(`missing harness file: ${toPosix(path.relative(harnessRoot, requiredPath))}`);
@@ -82,7 +87,12 @@ function assertHarnessShape() {
 function assertNoHarnessDocsNamespace() {
   if (!harnessRepoMode) return;
 
-  for (const removedPath of [repoPath("docs", "harness"), repoPath("docs", "raw"), repoPath("docs", "wiki")]) {
+  for (const removedPath of [
+    repoPath("docs", "harness"),
+    repoPath("docs", "raw"),
+    repoPath("docs", "wiki"),
+    repoPath("docs", "knowledge"),
+  ]) {
     if (pathExists(removedPath)) {
       addError(`harness repository must not own consumer docs namespace: ${toPosix(path.relative(process.cwd(), removedPath))}`);
     }
@@ -1002,8 +1012,14 @@ function assertAdrReferences() {
     for (const key of ["related_prd", "supersedes"]) {
       const value = fields[key];
       if (!value) continue;
-      if (!pathExists(path.resolve(dir, value))) {
+      // supersedes는 결정 하나만 대체할 때 `../a/adr.md#결정-2`처럼 fragment를 달 수 있다
+      // (파일 존재 + fragment 실재 둘 다 확인). related_prd는 파일만 본다.
+      const hashIndex = key === "supersedes" ? value.indexOf("#") : -1;
+      const target = path.resolve(dir, hashIndex === -1 ? value : value.slice(0, hashIndex));
+      if (!pathExists(target)) {
         addError(`adr.md ${key} points to a missing file (${value}): ${relative}`);
+      } else if (hashIndex !== -1 && !fragmentExists(readText(target), value.slice(hashIndex + 1))) {
+        addError(`adr.md ${key} points to a missing fragment (${value}): ${relative}`);
       }
     }
   }
@@ -1078,6 +1094,7 @@ function assertHarnessAdapters() {
     { name: "lph doctor", paths: [rootAdapterPath("skills", "lph-doctor", "SKILL.md")] },
     { name: "ui verification", paths: [rootAdapterPath("skills", "ui-verification", "SKILL.md")] },
     { name: "wiki ingest", paths: [rootAdapterPath("skills", "wiki-ingest", "SKILL.md")] },
+    { name: "knowledge distill", paths: [rootAdapterPath("skills", "knowledge-distill", "SKILL.md")] },
   ];
 
   // Each listed entry is a distinct runtime entrypoint (e.g. a skill and a
@@ -1122,6 +1139,16 @@ function assertReconcileLedgerCurrent() {
         `consumer reconciliation (use "- (없음)" if there is no consumer action).`,
     );
   }
+}
+
+// 지식 계층 게이트(K1–K11). 마커(docs/knowledge/index.md의 lph-knowledge: 1)가 있어야 켜지고,
+// 마커 없이도 도는 건 in-progress 부트스트랩 base 진입 금지(K9)뿐이다. 구현은 knowledge-lib.
+function assertKnowledgeLayer() {
+  if (harnessRepoMode) return;
+
+  const { errors: knowledgeErrors, warnings } = runKnowledgeGates();
+  for (const message of knowledgeErrors) addError(message);
+  for (const message of warnings) console.warn(`[harness:check] WARNING: ${message}`);
 }
 
 function assertNoCommandSkillNameCollision() {
@@ -1175,6 +1202,7 @@ assertAdrPhaseGate();
 assertPrdReferences();
 assertAdrReferences();
 assertImmutableAdrBody();
+assertKnowledgeLayer();
 assertPublicSafeDocs();
 assertHarnessAdapters();
 assertNoCommandSkillNameCollision();

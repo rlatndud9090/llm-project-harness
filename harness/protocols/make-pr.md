@@ -36,6 +36,13 @@
    개정이 없으면 재판독하지 않는다(같은 세션에서 빌드까지 마치고 넘어온 경우가 그렇다).
 3. 구현과 검증이 실제로 끝났는지 확인한다. 미완이면 `feature-develop`로 되돌린다.
 
+## Phase 0.5: 변경 파일 지식 조회 (`knowledge` 마커가 있을 때만)
+
+최종 확정 **전에** diff 파일(`git diff --name-only <base>...HEAD`)로
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --paths <파일…>`을 실행해 이 변경이 건드리는
+기존 gotcha·불변식을 확인한다(위반이 보이면 확정 전에 고친다). `docs/knowledge/index.md`에 `lph-knowledge: 1`이
+없으면 건너뛴다. 전체 카탈로그는 로드하지 않는다. 조회는 정보일 뿐 게이트가 아니다.
+
 ## Phase 1: 최종 확정 (`$make-pr` 호출 = 명시 최종 승인)
 
 feature 단위의 `approved`/`accepted` 전환은 오직 `harness:approve --final`로만 하며, 그
@@ -72,6 +79,17 @@ npm run harness:approve -- --unit docs/raw/feature/<slug> --quote "<사용자의
   `one-shot`으로 찍는다(정본은 `harness/protocols/one-shot.md`). 이때는 위 make-pr
   transport 대신 one-shot transport를 쓴다.
 
+## Phase 1.5: 지식 등록 (`knowledge` 마커가 있을 때만)
+
+`docs/knowledge/index.md`에 `lph-knowledge: 1`이 없으면 이 절 전체를 건너뛴다. 정본은
+`harness/protocols/knowledge.md`다. **등록은 승인 게이트가 아니다** — 건너뛰거나 실패해도
+확정·커밋·PR은 막히지 않는다(미등록은 `harness:check` warning과 `knowledge.mjs pending`으로만 드러난다).
+
+1. **`approve --final` 직후**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" record --unit docs/raw/<type>/<slug> --auto --via make-pr`. 엔진이 `none(auto)`를 기록하면 끝이다.
+2. **`needs-judgment`가 나오면**: `knowledge-distill --unit docs/raw/<type>/<slug>`로 그 단위의 ADR 결정·bugfix 원인·notes `## 지식 후보`만 발췌해 판정한다. 등록할 항목은 `knowledge.mjs scaffold`로 골격을 만들어 채우고, 새 ID를 `record --invariants <..> --gotchas <..> --via make-pr`로 남긴다. 등록할 게 없으면 `none`으로 기록한다.
+
+PR 본문(Phase 4)에 새로 등록한 ID가 있으면 `## 지식 등록` 섹션을 둔다.
+
 ## Phase 2: 통합 게이트
 
 ```sh
@@ -105,7 +123,9 @@ trailer, HEREDOC). 정본 `commit-protocol.md`는 이 컨텍스트에 아직 로
    필요하면 ready PR로 올린 뒤 리뷰 루프(`$pr-codex-loop`)를 돌린다.
 3. PR 제목·본문:
    - 제목은 작업 단위를 한 줄로 설명한다(소비 프로젝트에 커밋/PR 제목 규약이 있으면 그것을 따른다).
-   - 본문에는 무엇을·왜 바꿨는지 요약과 함께 PRD/ADR 경로를 링크한다. 저장소에 PR 템플릿
+   - 본문에는 무엇을·왜 바꿨는지 요약과 함께 PRD/ADR 경로를 링크한다. Phase 1.5에서 새로 등록한
+     지식이 있으면 `## 지식 등록` 섹션에 `knowledge.mjs brief --ids <새 ID,…>` 출력을 그대로 넣는다
+     (리뷰어가 같이 볼 수 있게 하는 정보 섹션이지 승인 게이트가 아니다). 저장소에 PR 템플릿
      (`.github/PULL_REQUEST_TEMPLATE` 등)이 있으면 그 구조를 따른다.
 4. 생성된 PR의 URL을 사용자에게 보고한다.
 

@@ -37,6 +37,10 @@ description: "확정된 작은 작업 단위를 kickoff부터 PR 리뷰 수렴�
    node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/approve.mjs" --unit docs/raw/feature/<slug> --quote "<사용자의 포괄 위임 발화 verbatim>" --transport one-shot --final [--adr]
    ```
 
+   지식 마커(`lph-knowledge: 1`)가 있으면 make-pr의 지식 등록을 `--via one-shot`으로 수행한다
+   (`node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" record --unit <u> --auto --via one-shot`;
+   `needs-judgment`면 `knowledge-distill --unit`). 무인 등록 gotcha는 제목에 `(미확인)`을 기본으로 붙인다.
+
 6. **PR 리뷰 수렴 (스킬 있으면)**: PR 리뷰를 검증·반영·수렴하는 스킬이 설치돼 있으면 그걸로
    clean까지 밀어붙인다(이름을 하드코딩하지 않고 역할로 가리킨다 — 선택적 외부 가속기).
    없으면 이 단계를 건너뛰고 PR만 생성한 채 보고한다.

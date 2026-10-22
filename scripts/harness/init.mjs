@@ -36,6 +36,22 @@ const MARKETPLACE_REPO = "rlatndud9090/llm-project-harness";
 // 별개라, 여기만 짧게 두면 마켓플레이스/활성화 배선을 건드리지 않고 prefix만 짧아진다.
 const PLUGIN_NAME = "lph";
 
+// AGENTS.md LLM-HARNESS 마커 블록. 지식 계층 조회 줄(brief)을 포함한다 — 마커가 이미 있는
+// AGENTS.md에는 retrofit 여부와 무관하게 이 블록만 재작성해(멱등) 재실행으로 새 줄이 반영된다.
+const AGENTS_MARKER = "LLM-HARNESS";
+const KNOWLEDGE_BRIEF_LINE =
+  'Before editing code, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --paths <files…>` to see the project knowledge (gotchas/invariants) for those files.';
+const AGENTS_MARKER_CONTENT = `## LLM Project Harness
+
+This project adopts the shared LLM Project Harness as a Claude Code plugin.
+
+- Read \`docs/wiki/index.md\` first when starting project work.
+- The plugin provides the shared session-start protocol, skills, and commands.
+- Keep project-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
+- Adoption is marked by the \`.harness.json\` flag at the repo root.
+- ${KNOWLEDGE_BRIEF_LINE}
+`;
+
 if (sameRealPath(projectRoot, harnessRoot)) {
   fail("run this from a consuming project root, not from the harness plugin repository");
 }
@@ -280,6 +296,9 @@ ${setupNodeWith}${cacheLine}
 // 없을 때만 생성한다. 위키 index는 하네스 템플릿에서 seed한다. retrofit이면 기존
 // AGENTS.md/위키는 덮어쓰지 않고 marker block만 upsert한다(프로젝트 소유 보존).
 function ensureProjectDocs() {
+  // docs가 아직 없던 프로젝트만 "신규 스캐폴드"다 — 이때만 지식 계층 마커를 시드한다.
+  // retrofit(이미 docs가 있음)은 docs/knowledge에 아무것도 만들지 않는다(옵트인은 doctor 안내).
+  const freshDocs = !retrofit && !pathExists(path.join(projectRoot, "docs"));
   ensureDirectory(path.join(projectRoot, "docs", "raw"));
   ensureDirectory(path.join(projectRoot, "docs", "wiki"));
 
@@ -323,21 +342,35 @@ TODO: describe this product.
 3. Follow only raw links relevant to the task.
 4. Use \`/${PLUGIN_NAME}:next-feature\` for open-ended product work.
 5. Keep product-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
+6. ${KNOWLEDGE_BRIEF_LINE}
 
 The shared harness workflow (PRD/ADR, raw/wiki, approval gate, commit protocol) is
 provided entirely by the plugin — there is no local engine copy to maintain.
 `,
-    "LLM-HARNESS",
-    `## LLM Project Harness
-
-This project adopts the shared LLM Project Harness as a Claude Code plugin.
-
-- Read \`docs/wiki/index.md\` first when starting project work.
-- The plugin provides the shared session-start protocol, skills, and commands.
-- Keep project-specific decisions in this project's \`docs/raw/\` and \`docs/wiki/\`.
-- Adoption is marked by the \`.harness.json\` flag at the repo root.
-`,
+    AGENTS_MARKER,
+    AGENTS_MARKER_CONTENT,
   );
+  ensureAgentsKnowledgeLine();
+  if (freshDocs) seedKnowledge();
+}
+
+// 마커 블록이 이미 있는 AGENTS.md는 retrofit이 아니어도 블록만 갱신한다(블록 밖은 프로젝트
+// 소유라 그대로). 마커가 없으면 프로젝트 소유 파일이라 건드리지 않는다. 멱등 — 이미 같으면 kept.
+function ensureAgentsKnowledgeLine() {
+  const agentsPath = path.join(projectRoot, "AGENTS.md");
+  if (retrofit || !pathExists(agentsPath)) return; // retrofit은 ensureFileOrMarker가 이미 upsert
+  const current = fs.readFileSync(agentsPath, "utf8");
+  if (!current.includes(`<!-- ${AGENTS_MARKER}:START -->`)) return;
+  const next = upsertMarkerBlock(current, AGENTS_MARKER, AGENTS_MARKER_CONTENT);
+  if (next === current) return;
+  operations.push(`update ${relative(agentsPath)} marker ${AGENTS_MARKER}`);
+  if (!dryRun) fs.writeFileSync(agentsPath, next, "utf8");
+}
+
+// `knowledge.mjs seed`와 같은 결과: 활성화 마커 index.md + 빈 _tombstones.md.
+function seedKnowledge() {
+  ensureFile(path.join(projectRoot, "docs", "knowledge", "index.md"), readHarnessTemplate("knowledge", "index.md"));
+  ensureFile(path.join(projectRoot, "docs", "knowledge", "_tombstones.md"), readHarnessTemplate("knowledge", "tombstones.md"));
 }
 
 // ─── git 훅 설치(opt-in) ─────────────────────────────────────────────────────

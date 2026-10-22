@@ -129,6 +129,19 @@ export function getCurrentBranch() {
   }
 }
 
+// CI는 PR을 detached HEAD(머지 커밋)로 체크아웃하므로 getCurrentBranch()가 "HEAD"를 돌려줘
+// 브랜치 판정이 무력해진다. GitHub Actions가 채우는 환경변수를 먼저 보고(PR이면
+// GITHUB_HEAD_REF=작업 브랜치, push면 GITHUB_REF_NAME), 없을 때만 git에 묻는다. PR 이벤트의
+// GITHUB_REF_NAME은 `<번호>/merge`라 브랜치가 아니므로 버린다. 로컬 실행엔 이 변수가 없어
+// 기존 동작과 같다.
+export function getWorkBranch() {
+  const headRef = process.env.GITHUB_HEAD_REF?.trim();
+  if (headRef) return headRef;
+  const refName = process.env.GITHUB_REF_NAME?.trim();
+  if (refName && !/^\d+\/merge$/.test(refName)) return refName;
+  return getCurrentBranch();
+}
+
 // Base branches kickoff may auto-branch off of. A checkout that moves global git
 // state is only safe from one of these (a fresh feature branch off a clean base);
 // on any other branch kickoff defers the choice (worktree vs in-place) to the caller.
@@ -689,6 +702,46 @@ export function parseApprovalEvents(content) {
   return events;
 }
 
+// 지식 기록 이벤트(state.md `## 지식 기록`). 승인 이벤트와 달리 사람 발화가 아니라 엔진
+// (knowledge.mjs record)이 쓰는 처리 흔적이다 — 한 줄 형식을 승인 이벤트와 겹치지 않게
+// `- KNOWLEDGE`로 시작시켜, 승인 파서·가드(APPROVAL_EVENT_RE / PREAPPROVAL|APPROVAL 라인)가
+// 이 줄을 승인 변경으로 오인하지 않는다.
+//   - KNOWLEDGE 2026-10-22 invariants=INV-261022-a-b,none gotchas=none(auto) via=make-pr
+export const KNOWLEDGE_VIA_VALUES = ["make-pr", "feedback", "one-shot", "bootstrap", "consolidate"];
+export const KNOWLEDGE_EVENT_RE =
+  /^- KNOWLEDGE (\d{4}-\d{2}-\d{2}) invariants=(\S+) gotchas=(\S+) via=(make-pr|feedback|one-shot|bootstrap|consolidate)$/;
+
+// ids: 배열(빈 배열 = none) 또는 문자열 `none(auto)`.
+function formatKnowledgeIds(ids) {
+  if (typeof ids === "string") return ids;
+  return ids.length > 0 ? ids.join(",") : "none";
+}
+
+export function formatKnowledgeEvent({ date, invariants = [], gotchas = [], via }) {
+  return `- KNOWLEDGE ${date} invariants=${formatKnowledgeIds(invariants)} gotchas=${formatKnowledgeIds(gotchas)} via=${via}`;
+}
+
+function parseKnowledgeIds(raw) {
+  if (raw === "none" || raw === "none(auto)") return [];
+  return raw.split(",").filter(Boolean);
+}
+
+export function parseKnowledgeEvents(content) {
+  const events = [];
+  for (const rawLine of content.split(/\r?\n/)) {
+    const match = KNOWLEDGE_EVENT_RE.exec(rawLine.trim());
+    if (!match) continue;
+    events.push({
+      date: match[1],
+      invariants: parseKnowledgeIds(match[2]),
+      gotchas: parseKnowledgeIds(match[3]),
+      auto: match[2] === "none(auto)" || match[3] === "none(auto)",
+      via: match[4],
+    });
+  }
+  return events;
+}
+
 // ─── Wiki area taxonomy (shared by wiki-ingest.mjs and artifact-check.mjs) ───
 // An "area" is a narrow functional/structural unit of the product (a screen, a
 // flow, an engine). It replaces the old ephemeral `--category` CLI argument with
@@ -827,6 +880,25 @@ export function unitIsSettled(unitDir, type) {
     return status === "review" || status === "fixed";
   }
   return true; // chore: linked at kickoff, always required thereafter
+}
+
+// 단위가 "끝난" 상태인지(지식 등록 대상 판정). feature는 PRD 최종 승인(approved), bugfix는
+// fixed. chore는 상태 라이프사이클이 없으므로 항상 false — 지식 계층은 chore를 자동 무기여로
+// 취급한다. unitIsSettled(리뷰 진입)보다 한 단계 더 나아간 종료 시점 판정이다.
+export function unitIsFinal(unitDir, type) {
+  if (type === "feature") return readArtifactStatus(unitDir, "prd.md") === "approved";
+  if (type === "bugfix") return readArtifactStatus(unitDir, "bugfix.md") === "fixed";
+  return false;
+}
+
+// 산출물 파일 하나의 final 판정(불변식 출처 단위). adr는 accepted뿐 아니라 이후 대체·폐기된
+// (= 한때 accepted였던) 상태도 final로 본다 — 대체된 결정을 출처로 둔 불변식은 "작성 중 출처"가
+// 아니라 "재판정 필요"이기 때문이다.
+export function artifactIsFinal(baseName, status) {
+  if (baseName === "prd.md") return status === "approved";
+  if (baseName === "adr.md") return status === "accepted" || status === "superseded" || status === "deprecated";
+  if (baseName === "bugfix.md") return status === "fixed";
+  return false;
 }
 
 function readArtifactStatus(unitDir, fileName) {

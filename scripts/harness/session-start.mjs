@@ -74,6 +74,15 @@ function main() {
     );
   }
 
+  // 소급 부트스트랩이 진행 중이면 한 줄만 알린다. bootstrap.md 하나의 frontmatter만 읽는
+  // O(1) 확인이고(지식 카탈로그를 파싱하지 않는다), 평소엔 0줄이다. 훅 자립 원칙대로 엔진을
+  // import하지 않고 직접 읽으며, 실패하면 조용히 넘어간다.
+  if (bootstrapInProgress(projectDir)) {
+    lines.push(
+      "※ 지식 계층 소급 부트스트랩이 진행 중입니다(docs/knowledge/bootstrap.md). 이어가려면 /knowledge-distill --bootstrap, 상태는 knowledge.mjs bootstrap status.",
+    );
+  }
+
   // 배선 신선도 넛지. 플러그인(엔진·스킬·훅)은 마켓플레이스로 자동 갱신되지만,
   // /lph-init이 소비 레포에 직접 커밋한 "배선"(git훅의 baked 절대경로·CI 워크플로·
   // .harness.json·settings)은 자동으로 안 바뀐다. 설치된 플러그인 버전이 이 저장소에
@@ -88,6 +97,16 @@ function main() {
   }
 
   process.stdout.write(lines.join("\n") + "\n");
+}
+
+function bootstrapInProgress(projectDir) {
+  try {
+    const text = fs.readFileSync(path.join(projectDir, "docs", "knowledge", "bootstrap.md"), "utf8");
+    const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+    return front ? /^status:\s*["']?in-progress["']?\s*$/m.test(front[1]) : false;
+  } catch {
+    return false;
+  }
 }
 
 // 이 훅 스크립트는 플러그인 안에 있으므로, 두 단계 위가 플러그인 루트다.

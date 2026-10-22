@@ -101,6 +101,12 @@ one-shot --final`(+ ADR 있으면 `--adr`)로 `approved`/`accepted`로 전환한
 `harness:gate`를 신선하게 판정하고 `commit-protocol`로 확정 커밋을 만들고 push·PR을
 생성한다. bugfix/chore는 승인 플립을 건너뛰고 곧바로 게이트·커밋·PR로 간다.
 
+지식 마커(`docs/knowledge/index.md`의 `lph-knowledge: 1`)가 있으면 `$make-pr` Phase 1.5도
+그대로 따르되 `--via one-shot`으로 기록한다(`knowledge.mjs record --unit <u> --auto --via
+one-shot`, `needs-judgment`면 `knowledge-distill --unit`). 무인 구간이라 사람이 코드로 확인하지
+못했으므로 **새로 등록하는 gotcha는 제목 끝에 `(미확인)`을 기본으로 붙인다.** 등록은 승인
+게이트가 아니며 실패해도 PR 생성을 막지 않는다.
+
 ## Phase 5: PR 리뷰 수렴 (스킬이 있을 때만)
 
 **PR에 달린 리뷰를 수렴·반영하는 스킬이 현재 런타임에 설치돼 있으면**, 그 스킬을 호출해 리뷰

@@ -14,7 +14,7 @@ description: "PRD에서 ADR이 필요하다고 결론났을 때 아키텍처 결
 2. **진입 즉시 `state.md`의 `stage`를 `adr-draft`로 올린다** — 그래야 `adr.md` 편집 잠금이 풀린다(그 전에는 런타임 가드와 `harness:check`가 막는다).
 3. 결정 선택지와 제약을 끌어낸다(`$deep-interview`가 있으면 그 스킬을 우선 사용하고, 없으면 현재 런타임의 구조화 질문 도구를 우선 사용하며 그마저 없을 때만 명시 질문).
 4. `${CLAUDE_PLUGIN_ROOT}/harness/roles/researcher.md`로 선택지별 트레이드오프를 조사한다.
-5. `${CLAUDE_PLUGIN_ROOT}/harness/roles/architect.md`로 결정/선택지/선택 근거/결과/검증을 `adr.md`에 작성하고, 초안이 서면 `stage`를 `adr-review`로 갱신한다.
+5. `${CLAUDE_PLUGIN_ROOT}/harness/roles/architect.md`로 결정/선택지/선택 근거/결과/검증을 `adr.md`에 작성하고(결정이 여럿이면 `### 결정 N.` 번호를 붙이고, 일부만 대체하면 `supersedes: "../<slug>/adr.md#결정-N"`; 결정을 supersede하면 그 결정을 인용한 지식 불변식이 K5로 재판정 대상이 된다. 지식 마커가 있으면 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --area <area>`로 기존 불변식과 모순 점검), 초안이 서면 `stage`를 `adr-review`로 갱신한다.
 6. `${CLAUDE_PLUGIN_ROOT}/harness/roles/reviewer.md`로 선택지 비교와 placeholder를 검토한다. ADR 피드백으로 PRD 수정이 필요하면 `prd.md`도 함께 고친다(PRD는 `review` 유지).
 
 ADR은 `proposed` 상태로 작성하고, 사용자 명시 사전 승인 전에는 `pre-accepted`로 바꾸지

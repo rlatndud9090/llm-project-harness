@@ -71,6 +71,16 @@ docs/wiki/index.md
 값이 올라가 drift가 해소된다. `.harness.json` 자체가 없으면(아직 한 번도 정합 안 됨)
 `$lph-doctor`가 곧장 `/lph-init`을 안내한다.
 
+## 지식 계층 배선
+
+- **신규 스캐폴드**(`docs/`가 없던 프로젝트)는 `knowledge.mjs seed`와 같은 결과로 활성화 마커
+  `docs/knowledge/index.md`와 빈 `_tombstones.md`를 만든다.
+- **retrofit**(이미 `docs/`가 있음)은 `docs/knowledge`에 아무것도 만들지 않는다. 활성화는 프로젝트가
+  `/lph-doctor` 안내(`--bootstrap` 또는 `seed`)를 따라 옵트인한다.
+- `AGENTS.md`의 `LLM-HARNESS` 마커 블록에 "코드 수정 전 `knowledge.mjs brief --paths <파일…>`" 한 줄을
+  넣는다. 마커가 이미 있으면 retrofit이 아니어도 블록만 갱신하고(멱등), 마커가 없는 기존
+  `AGENTS.md`는 프로젝트 소유라 건드리지 않는다.
+
 ## 기존 프로젝트에 붙이기 (retrofit)
 
 이미 진행 중인 프로젝트에는 `--retrofit`을 쓴다. 기존 `AGENTS.md`·`docs/wiki/index.md`는

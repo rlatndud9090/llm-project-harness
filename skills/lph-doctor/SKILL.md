@@ -34,6 +34,12 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/doctor.mjs"
 - `undecidable` — 버전 비교 불가 → 수동 확인.
 - `provider` — provider 저장소에서 실행됨(doctor는 소비 프로젝트용).
 
+## 지식 계층 점검
+
+status와 별개로 `- 지식:` 줄이 나온다(진단만). 미활성이면 final 단위 수에 따라 `/knowledge-distill
+--bootstrap`(많음) 또는 `knowledge.mjs seed`(적음)를, 부트스트랩 진행 중이면 `bootstrap status`·재개를,
+기록 대기가 있으면 `/knowledge-distill --consolidate`를 사용자에게 안내한다. 활성화는 옵트인이므로 임의로 만들지 않는다.
+
 ## 규율
 
 doctor는 **진단만** 한다. 실제 복구(`/lph-init` 재실행 등)는 사용자에게 상태를 보고한 뒤

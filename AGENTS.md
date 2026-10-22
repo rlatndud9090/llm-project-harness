@@ -27,13 +27,13 @@ This repository is the **harness provider**, not a product project.
 - **Do not invoke the harness's own skills/protocols to drive work here**
   (`next-feature`, `one-shot`, `kickoff`, `prd-helper`, `adr-helper`,
   `feature-develop`, `make-pr`, `commit-protocol`, `wiki-ingest`,
-  `artifact-check`, …). This
+  `artifact-check`, `knowledge-distill`, …). This
   repository *defines* those flows; only consumer projects *run* them. A skill
   name in this repo's own prose points at a definition to edit, not a flow to
   execute against this repo.
 - Do not use the consumer-project LLM Wiki workflow, and do not create
-  `docs/raw`, `docs/wiki`, PRDs, ADRs, `state.md`, or approval frontmatter for a
-  harness self-edit.
+  `docs/raw`, `docs/wiki`, `docs/knowledge`, PRDs, ADRs, `state.md`, or approval
+  frontmatter for a harness self-edit.
 - Still run provider-mode verification before claiming done: `npm run
   harness:check`, `npm run lint`, `npm run build`, `npm run test:run`.
 
@@ -41,6 +41,7 @@ Consumer projects own those workflow artifacts:
 
 - `docs/raw/`
 - `docs/wiki/`
+- `docs/knowledge/` (opt-in gotchas/invariants layer; protocol `harness/protocols/knowledge.md`)
 - product PRDs and ADRs
 - product-specific skills and agents
 - project-local `AGENTS.md`
@@ -61,12 +62,12 @@ harness/
   guides/             Shared single-source implementation guidelines
   templates/raw/      Starter templates for consumer docs/raw units
 
-scripts/harness/      init, kickoff, wiki-ingest, artifact-check, gate, install-hooks
+scripts/harness/      init, kickoff, wiki-ingest, artifact-check, knowledge, gate, install-hooks
 ```
 
 The `docs/` namespace is reserved for consuming projects. This harness
-repository must not reintroduce `docs/harness`, `docs/raw`, or `docs/wiki` as
-its own operating structure.
+repository must not reintroduce `docs/harness`, `docs/raw`, `docs/wiki`, or
+`docs/knowledge` as its own operating structure.
 
 ## Consumer Project Model
 
@@ -79,6 +80,7 @@ app-project/
   .github/workflows/harness.yml   CI gate (calls the shared composite action)
   docs/raw/                       Project-owned raw PRD/ADR/notes
   docs/wiki/                      Project-owned thin wiki index
+  docs/knowledge/                 Project-owned gotchas/invariants (opt-in marker)
   AGENTS.md                       Project-owned guide
 ```
 

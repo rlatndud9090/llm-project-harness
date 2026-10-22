@@ -32,6 +32,9 @@
    추측으로 승인 여부를 판단하지 않는다. 승인 이벤트가 없으면 아직 미승인이다.
 8. 브랜치가 `main`이면 wiki index에서 현재 요청과 관련된 raw link만 따라간다.
 9. product/architecture 결정을 하기 전에는 반드시 관련 PRD/ADR을 읽는다.
+10. `docs/knowledge/bootstrap.md`가 있고 frontmatter `status: in-progress`이면(파일 확인만, 그 외엔 0줄)
+    한 줄로 알린다: "지식 소급 부트스트랩 진행 중 — `/knowledge-distill --bootstrap`으로 재개 가능
+    (`knowledge.mjs bootstrap status`)". 이 부트스트랩 브랜치에서만 작업하고 base에 합치지 않는다.
 
 ## 분기 판단
 

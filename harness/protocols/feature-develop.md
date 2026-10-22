@@ -150,6 +150,10 @@ domain-engineer/ui-engineer/test-engineer → integrator` role 체인으로 펼�
    - 파일 경계
    - 인터페이스 계약
    - 위험 요소
+5. 지식 마커(`docs/knowledge/index.md`의 `lph-knowledge: 1`)가 있으면 계획한 파일 경로로
+   `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --paths <계획 파일…>`을 실행해
+   기존 gotcha·불변식을 브리핑에 포함한다(전체 카탈로그 로드 금지 — 정본 `knowledge.md`).
+   서브에이전트 브리핑에는 그 역할이 건드릴 파일과 **겹치는 항목만** 발췌해 준다.
 
 게이트:
 

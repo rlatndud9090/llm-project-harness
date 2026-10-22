@@ -20,6 +20,8 @@ approved PRD/accepted ADR, 검증 불가능한 수용 기준, 영어로 작성�
 notes-only 작업, 제품 기능 변경과 섞인 하네스 플러그인 업데이트나 adapter 정리이 있으면
 보정한다.
 
+지식 계층 마커(`docs/knowledge/index.md`의 `lph-knowledge: 1`)가 있으면 `harness:check`가 지식 파일의 형태·ID·출처·앵커·묘비도 검증한다(정본은 `artifact-validation.md`/`knowledge.md`). 앵커가 끊기면 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" reanchor`로 복구하고, 삭제 대신 `retire`한다.
+
 `harness:check`는 feature 단위 `state.md` 원장의 정합성도 강제한다: approved/accepted에는
 대응하는 승인 이벤트(사용자 발화 verbatim)가 있어야 하고, 원장의 승인 축이 PRD/ADR status와
 일치해야 하며, `stage`는 승인 이후 이전 단계로 후퇴할 수 없다. 승인 전환은 오직

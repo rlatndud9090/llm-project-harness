@@ -76,6 +76,9 @@ PRD는 한국어로 작성한다. branch name, file path, command, TypeScript id
 1. `researcher` 역할로 유사 제품, 선행 사례, 표준, 제약을 조사한다.
 2. 조사 결과는 출처와 함께 `notes.md`에 정리하고, PRD에는 결론만 반영한다.
 3. 조사가 PRD의 어떤 요구/비목표/수용 기준을 뒷받침하는지 연결한다.
+4. 지식 마커(`docs/knowledge/index.md`의 `lph-knowledge: 1`)가 있으면 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --area <area>`로
+   이 영역의 활성 불변식·gotcha를 훑어 요구가 기존 불변식과 모순되지 않는지 점검한다(넛지 — 모순이면
+   열린 질문이나 ADR 필요 여부 판단에 올린다. 전체 카탈로그 로드 금지).
 
 ### Phase 3: 초안 작성
 

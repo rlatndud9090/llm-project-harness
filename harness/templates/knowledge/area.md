@@ -1,0 +1,5 @@
+---
+area: {area}
+---
+
+# {label}: {area}

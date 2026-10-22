@@ -20,7 +20,7 @@ description: "사전 승인·구현이 끝난 작업 단위를 최종 확정(app
 
 1. **상태 확인**: 브랜치·raw unit·`state.md`. feature 단위면 PRD `pre-approved`,
    (ADR 있으면) `pre-accepted`여야 한다.
-2. **최종 확정**: **`$make-pr` 호출 자체가 사용자의 명시적 최종 승인이다** — 승인을 다시 묻지
+2. **최종 확정**(마커가 있으면 그 **전에** diff 파일로 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --paths <파일…>` 조회 — 프로토콜 Phase 0.5): **`$make-pr` 호출 자체가 사용자의 명시적 최종 승인이다** — 승인을 다시 묻지
    않는다. 사전 승인 이후 개정이 있으면 바뀐 점을 통보하고(사전 승인을 뒤집는 수준의 개정만
    확정 전 정지·확인), 호출 발화를 verbatim 인용해 오직 아래 명령으로만 전환한다(직접 status
    편집 금지 — 런타임 훅과 `harness:check`가 막는다. bugfix/chore는 승인 축이 없어 스킵).
@@ -29,11 +29,12 @@ description: "사전 승인·구현이 끝난 작업 단위를 최종 확정(app
    node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/approve.mjs" --unit docs/raw/feature/<slug> --quote "<사용자의 make-pr 호출 발화 verbatim>" --transport make-pr --final [--adr]
    ```
 
-3. **게이트**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/wiki-ingest.mjs" docs/raw/<type>/<slug>` → `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"`.
+3. **지식 등록**(`docs/knowledge/index.md`에 `lph-knowledge: 1`이 있을 때만, 승인 게이트 아님): `approve --final` 직후 `knowledge.mjs record --unit docs/raw/<type>/<slug> --auto --via make-pr`. `needs-judgment`면 `knowledge-distill --unit`으로 그 단위의 ADR 결정·bugfix 원인·notes `## 지식 후보`에서 증류해 scaffold·채움·ID 기록. 새 ID는 PR 본문 `## 지식 등록`에 `brief --ids <새 ID>` 출력으로 싣는다.
+4. **게이트**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/wiki-ingest.mjs" docs/raw/<type>/<slug>` → `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/gate.mjs"`.
    실패하면 커밋하지 않고 원인을 고쳐 처음부터 다시 실행한다.
-4. **커밋**: `commit-protocol`로 확정 커밋을 만든다(`관련 문서:` 블록·명시적 stage·HEREDOC) —
+5. **커밋**: `commit-protocol`로 확정 커밋을 만든다(`관련 문서:` 블록·명시적 stage·HEREDOC) —
    `approved`/`accepted`로 올라간 PRD/ADR과 구현을 함께 담는다.
-5. **푸시·PR·보고**: 작업 브랜치를 push하고 PR을 생성한다 — `gh` CLI 우선, 미가용 시 런타임의
+6. **푸시·PR·보고**: 작업 브랜치를 push하고 PR을 생성한다 — `gh` CLI 우선, 미가용 시 런타임의
    GitHub 통합으로 폴백. 본문에 raw unit(PRD/ADR)을 링크하고 PR 템플릿이 있으면 그 구조를
    따른다. 원격이 없으면 PR 단계는 건너뛰고 그 사실을 보고한다. 생성된 PR URL을 보고한다.
 

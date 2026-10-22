@@ -28,6 +28,19 @@
 
 ---
 
+## 2.11.0
+
+- (배선) AGENTS.md의 LLM-HARNESS 블록에 지식 조회 안내 줄(`knowledge.mjs brief --paths`)이 추가됐다.
+  `/lph-init`을 다시 실행하면(먼저 `--dry-run`) 블록이 갱신되고 `.harness.json` version이 2.11.0으로
+  올라간다. 멱등이며 마커 없는 기존 AGENTS.md와 `--retrofit`/기존 docs의 `docs/knowledge`는 건드리지 않는다.
+- (산출물) 지식 계층은 옵트인이다. 쓰려면 `/lph-doctor` 안내에 따라 신규 프로젝트는
+  `knowledge.mjs seed`, 완료 단위가 쌓인 프로젝트는 `/knowledge-distill --bootstrap`으로 마커
+  (`docs/knowledge/index.md`의 `lph-knowledge: 1`)를 연다. 켜지 않으면 동작 변화가 없다.
+- (산출물) 새 ADR의 결정은 `### 결정 N.` 번호 헤딩으로 쓰고, 부분 대체는
+  `supersedes: "../x/adr.md#결정-N"`로 적는다. 기존 ADR은 그대로 유효하다(레거시 `#d-N` 허용).
+- (산출물) 프로젝트가 자체적으로 둔 gotchas 파일은 하네스가 수정하지 않는다. 부트스트랩 시 시드
+  소스로 흡수할지 사람이 정한다(`/lph-doctor`가 목록을 알려 준다).
+
 ## 2.10.0
 
 - (없음) draft PR과 최종 확정 전 무단 PR을 차단하는 PreToolUse 가드(`claude-pr-guard`)가

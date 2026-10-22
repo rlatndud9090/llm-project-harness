@@ -85,11 +85,13 @@ Codex 자동 리뷰를 **격리된 리뷰어 에이전트의 자체 리뷰**로 
 - 반환: `{ blockers: [...], cosmetics: [...] }`.
 
 ### 2. 메인 처리 (라운드마다)
+- **지식 조회**(`docs/knowledge/index.md`에 `lph-knowledge: 1`이 있을 때만): BLOCKER를 고치기 전 대상 파일로 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --paths <대상 파일…>`을 실행해 등록된 gotcha·불변식을 대조한다.
 - **BLOCKER**: accept/reject 판정 → 수정(버그는 **먼저 실패 테스트로 결함 입증 후** 고침; **개별
   케이스가 아니라 결함 클래스를 닫는다** — blocklist류·열거형 결함은 지적 지점 하나가 아니라 그
   클래스의 입력 공간 전체를 allowlist·산출물 기준 완전성으로 닫고 봉인 테스트는 경계·조합까지
-  덮는다. 근거: `guides/code-review-guideline.md` §0 렌즈 3·"후속 트래킹" 안티-땜빵) → `gate` green →
+  덮는다. 근거: `guides/code-review-guideline.md` §0 렌즈 3·"후속 트래킹" 안티-땜빵) → 지식 환류(아래) → `gate` green →
   head 브랜치에 커밋. 여러 개면 한 커밋으로 묶어도 됨.
+- **지식 환류**(마커가 있을 때만, 수정 직후·`gate`·커밋 전에): 유효 BLOCKER가 이 저장소 고유의 비자명한 함정을 드러냈으면 `knowledge-distill --feedback`으로 등록한다(정본 `harness/protocols/knowledge.md` 「등록 시점」 2) — `docs/knowledge`·`state.md` 변경이 같은 커밋에 들어가게 한다. 새 ID는 푸시 뒤 PR 본문 `## 지식 등록`에 `gh pr edit`로 추가. 범용 결함은 G로 복제하지 않고 `→guideline`(code-review-guideline 코퍼스 입력)으로 남긴다.
 - **COSMETIC**: **이번엔 고치지 않는다.** `seen` 집합에 누적만(중복 방지). 루프를 늘리지 않는다.
 - `round_clean = (이번 라운드 신규 BLOCKER 0)`. COSMETIC만 있으면 그 라운드는 clean으로 친다.
 
@@ -133,6 +135,9 @@ self-review가 Codex 리뷰보다 정확도·깊이·퀄리티가 떨어지는 �
 매핑대로 해당 §섹션 탐지 불릿을 focus에 발췌 주입) 바꾼 뒤 `Workflow({scriptPath})`로 라운드마다
 재실행한다. 스크립트는 `{ blockers, cosmetics, round_clean }`를 낸다. 템플릿 전문·주석은
 [scripts/self-review.template.js](scripts/self-review.template.js) 참고.
+
+마커가 있으면 finder 프롬프트에 diff 파일의 `brief --paths` 출력(겹치는 항목만)을 주입한다. 리뷰어는
+등록된 항목의 위반을 인용할 때 **`knowledge.mjs refs <ID…>`를 통과한 ID만** 쓸 수 있다(없는 ID 인용 금지).
 
 렌즈는 diff에 맞춰 3~5개만 남긴다(안 건드린 영역 렌즈 금지). 순수 표시 PR이면 correctness-core+ui-i18n+tests만,
 순수 백엔드면 contract-data+correctness-core+tests만.

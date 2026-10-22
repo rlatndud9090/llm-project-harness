@@ -11,7 +11,7 @@ description: "PRD를 인터뷰·리서치·리뷰로 함께 작성할 때 사용
 
 1. `${CLAUDE_PLUGIN_ROOT}/harness/protocols/prd-helper.md`를 읽는다.
 2. 사용자 의견과 결정 경계를 수집한다(`$deep-interview`가 있으면 그 스킬을 우선 사용하고, 없으면 현재 런타임의 구조화 질문 도구를 우선 사용하며 그마저 없을 때만 명시 질문).
-3. `${CLAUDE_PLUGIN_ROOT}/harness/roles/researcher.md`로 레퍼런스/선행 사례를 모은다(출처는 notes에).
+3. `${CLAUDE_PLUGIN_ROOT}/harness/roles/researcher.md`로 레퍼런스/선행 사례를 모은다(출처는 notes에). 지식 마커(`lph-knowledge: 1`)가 있으면 `node "${CLAUDE_PLUGIN_ROOT}/scripts/harness/knowledge.mjs" brief --area <area>`로 기존 불변식과 모순되는 요구가 없는지 점검한다(넛지).
 4. `${CLAUDE_PLUGIN_ROOT}/harness/roles/prd-writer.md`로 PRD 초안을 작성한다.
 5. `${CLAUDE_PLUGIN_ROOT}/harness/roles/reviewer.md`로 수용 기준/누락/모순을 지속 검토하고 다듬는다.
 6. `## ADR 필요 여부`를 PRD에 판단해 적는다. **이 단계는 `prd.md`만 편집하고 `adr.md`는

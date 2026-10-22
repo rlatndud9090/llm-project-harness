@@ -26,6 +26,48 @@
 `.claude-plugin/plugin.json`·`.claude-plugin/marketplace.json`)의 version을 함께 올리고, `harness/reconcile.md`
 맨 위에 그 버전 항목을 추가한다(조치 없으면 `- (없음)`; provider `harness:check`가 현재 버전 항목을 강제).
 
+## 2026-10-22 v2.11.0 knowledge-layer
+
+**배경.** 하네스는 PRD/ADR/wiki로 "무엇을·왜 했나"를 쌓지만, 코드를 고칠 때 **반드시 지켜야 하는
+제약(불변식)과 반복해서 밟는 함정(gotcha)** 은 흩어진 산문에 묻혀 다음 작업이 재발견해야 했다. 지식
+계층은 이를 작업 단위 산출물에서 증류해 영역별 파일로 두고, 코드 경로로 조회해 구현·리뷰 시점에
+주입한다. 기존 산출물 체계(raw/wiki)는 건드리지 않는 additive 기능이다.
+
+**변경.**
+- **지식 계층(신설, 마커 opt-in).** `docs/knowledge/`(`index.md`·`_tombstones.md`·`gotchas/`·
+  `invariants/`)를 소비 프로젝트 소유 산출물로 정의한다. `index.md`의 `lph-knowledge: 1` 마커가 있어야
+  게이트(K1–K8, K10, K11)가 켜지고 없으면 기존 동작 그대로다(K9만 마커와 무관). ID는 날짜+slug
+  (`G-YYMMDD-slug`·`INV-YYMMDD-slug`, 재번호·삭제 금지, 폐기는 묘비). 조회는 경로 키 브리핑
+  (`knowledge.mjs brief --paths|--area|--ids`)으로 하며 전체 카탈로그를 로드하지 않는다. 엔진은
+  `scripts/harness/knowledge.mjs`·`knowledge-lib.mjs`(brief/show/refs/scaffold/retire/reanchor/record/
+  pending/seed/status/check/bootstrap), 정규 정의는 `harness/protocols/knowledge.md`.
+- **`knowledge-distill` 스킬 + 프로토콜 2종.** `skills/knowledge-distill`(얇은 어댑터: `--unit`·
+  `--feedback`·`--consolidate`·`--bootstrap`·`--seed`), `harness/protocols/knowledge.md`(스키마·등록
+  시점·조회 규칙), `harness/protocols/knowledge-bootstrap.md`(소급 절차).
+- **ADR 번호 결정·fragment supersedes.** ADR 결정을 `### 결정 N.` 번호 헤딩으로 쓰고, `supersedes`가
+  `../x/adr.md#결정-N`(레거시 `#d-N`)처럼 결정 단위 부분 대체를 가리킬 수 있다. `artifact-check`가
+  fragment 실재를 검증하고, 불변식의 모든 ADR 출처가 대체·폐기되면 K5가 재판정을 요구한다.
+- **소급 부트스트랩(retrofit).** 기존 프로젝트의 완료 단위를 `bootstrap plan`(결정적 `plan_hash`·비용
+  추정) → `next-batch`/`mark` 배치 루프 → `finalize`로 지식화한다. 원장(`bootstrap.md`)으로 중단·재개가
+  되고 `--force`는 기존 판정을 보존한다. in-progress 원장이 `main`/`master`(PR CI에서는 병합 대상)에 들어가면 K9가 `harness:check`를 실패시킨다(반쯤 끝난 부트스트랩 머지 차단).
+- **make-pr·one-shot·리뷰 루프 연동.** make-pr에 "지식 등록" 단계(`record --auto --via make-pr`, PR
+  본문 `## 지식 등록`), one-shot은 무인 등록(`--via one-shot`, 제목 끝 `(미확인)` 기본), feature-develop·
+  prd-helper·adr-helper는 `brief` 조회, pr-codex-once/loop·pr-self-loop은 리뷰 지적의 지식 환류
+  (`--feedback`)와 반영 직전 `brief`를 한다. 등록은 승인 게이트가 아니다.
+- **doctor·init·session-start.** `/lph-doctor`가 `- 지식:` 줄(부트스트랩·seed·consolidate 안내, 기존
+  자체 gotchas 파일 감지)을 낸다. `/lph-init`은 신규 스캐폴드에만 `docs/knowledge` 시드를 만들고 AGENTS.md
+  LLM-HARNESS 블록에 `brief --paths` 안내 줄을 넣는다(retrofit·기존 docs는 불간섭). session-start는
+  부트스트랩 in-progress일 때만 재개 힌트 한 줄을 낸다.
+- **`unitIsFinal`/`getWorkBranch`.** `lib.mjs`에 작업 단위 final 판정(`unitIsFinal`·`artifactIsFinal`)과
+  CI/로컬 공통 작업 브랜치 해석(`getWorkBranch`, PR 머지 ref 제외)을 추가했다. `assertNoHarnessDocsNamespace`
+  금지 목록에 `docs/knowledge`를 더했다. `KNOWLEDGE` 이벤트 줄은 승인 이벤트로 오인되지 않는다.
+
+**소비자 조치.** 배선 변경: AGENTS.md 블록의 `brief` 안내 줄 반영을 위해 `/lph-init` 재실행(멱등).
+지식 계층은 **옵트인**이라 하지 않으면 기존 동작 그대로다 — 쓰려면 `/lph-doctor` 안내에 따라 신규는
+`knowledge.mjs seed`, 단위가 쌓인 프로젝트는 `/knowledge-distill --bootstrap`. 새 ADR은 결정을
+`### 결정 N.`으로 번호 매긴다. 프로젝트 자체 gotchas 파일은 건드리지 않으며 시드 소스로만 흡수할 수 있다.
+상세는 `harness/reconcile.md` 2.11.0.
+
 ## 2026-09-08 v2.10.0 machine-block-draft-and-unsanctioned-pr
 
 **배경.** Claude Code의 background 세션(agents/FleetView 화면)은 `worktree.bgIsolation`

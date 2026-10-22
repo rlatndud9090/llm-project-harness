@@ -40,6 +40,13 @@ npm run harness:check
   reopen(`rejected`→`draft`)이나 retire(`accepted`→`superseded`)는 허용한다.
 - ADR의 `related_prd`와 `supersedes` 링크는 실제 파일을 가리킨다(값이 비어 있으면 검사하지 않는다).
 - `accepted`/`deprecated`/`superseded` ADR의 본문은 git 기록 대비 바뀌지 않는다. status/approval 같은 frontmatter 변경은 허용한다.
+- 지식 계층(`docs/knowledge/index.md`에 `lph-knowledge: 1`이 있을 때만; 정본 `knowledge.md`):
+  - 형태·ID·메타·출처·대체·앵커·묘비·삭제 금지·문서 참조 정합성(K1–K8, K10)을 검사한다. 불변식 출처는
+    final(승인 완료) 단위의 raw 문서여야 하고, 그 ADR 결정이 supersede되면 재판정(retire 또는 새 출처 추가)
+    하기 전까지 실패한다. 코드 앵커가 끊기면 `knowledge.mjs reanchor`로 복구한다.
+  - 항목이 길거나 area 파일이 비대하면 warning, final 단위에 `KNOWLEDGE` 기록이 없으면 warning(K11)이다.
+    등록은 승인 게이트가 아니라 `$make-pr` 단계다.
+  - 마커와 무관하게, 소급 부트스트랩이 `in-progress`인 채 base 브랜치에 있으면 실패한다(K9).
 - public docs에는 금지된 출처/세션/로컬 설정 정보가 없다.
 - 공용 harness role은 Codex/ClaudeCode agent adapter를 가진다.
 - 공용 harness skill은 Codex/ClaudeCode skill adapter 또는 command adapter를 가진다.
